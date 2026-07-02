@@ -14,6 +14,8 @@ import { User, Job, Connection, Application, Review } from './types';
 import { Sparkles, MapPin, AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function App() {
+  const DEMO_PASSWORD = 'demo1234';
+
   // Navigation & User session states
   const [currentPage, setCurrentPage] = useState<string>('home');
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -79,7 +81,7 @@ export default function App() {
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: '+252 90 779 1234' }) // Ahmed's phone
+          body: JSON.stringify({ identifier: '+252 90 779 1234', password: DEMO_PASSWORD }) // Ahmed's phone
         });
         if (res.ok) {
           const data = await res.json();
@@ -97,7 +99,7 @@ export default function App() {
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: 'employer1@qardho.com' })
+          body: JSON.stringify({ identifier: 'employer1@qardho.com', password: DEMO_PASSWORD })
         });
         if (res.ok) {
           const data = await res.json();
@@ -106,29 +108,6 @@ export default function App() {
           setCurrentPage('dashboard');
           setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
           setTimeout(() => setRoleToast(null), 4000);
-        } else {
-          // Register first, then login
-          const regRes = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: 'employer-1',
-              name: 'Qardho Agricultural Co.',
-              email: 'employer1@qardho.com',
-              phone: '+252 90 700 1122',
-              role: 'employer',
-              location: 'Wadajir',
-              bio: 'Local farming collective focusing on water-efficient agricultural systems in Karkaar.'
-            })
-          });
-          if (regRes.ok) {
-            const data = await regRes.json();
-            setCurrentUser(data.user);
-            localStorage.setItem('currentUser', JSON.stringify(data.user));
-            setCurrentPage('dashboard');
-            setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
-            setTimeout(() => setRoleToast(null), 4000);
-          }
         }
       } catch (err) {
         console.error(err);
@@ -137,16 +116,16 @@ export default function App() {
   };
 
   // Auth Operations
-  const handleLogin = async ({ identifier }: any) => {
+  const handleLogin = async ({ identifier, password }: any) => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier })
+        body: JSON.stringify({ identifier, password })
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'User not found. Try quick-login or sign up with your phone number.' }));
-        return { success: false, message: data.error || 'User not found.' };
+        const data = await res.json().catch(() => ({ error: 'Invalid email/phone or password. Try the demo password or sign up.' }));
+        return { success: false, message: data.error || 'Invalid email/phone or password.' };
       }
       const data = await res.json();
       if (data.success) {
@@ -155,7 +134,7 @@ export default function App() {
         setCurrentPage('dashboard');
         return { success: true, message: 'Logged in successfully.' };
       }
-      return { success: false, message: 'Invalid credentials. Try quick-login or sign up with your phone number!' };
+      return { success: false, message: 'Invalid email/phone or password.' };
     } catch (err) {
       return { success: false, message: 'Could not reach the authentication server. Please try again.' };
     }

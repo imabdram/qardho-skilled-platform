@@ -4,10 +4,80 @@ import { fileURLToPath } from 'url';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import { createServer as createViteServer } from 'vite';
+import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 
 // ES Module __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const DEMO_PASSWORD = 'demo1234';
+
+const DEMO_EMPLOYER = {
+  id: 'employer-1',
+  name: 'Qardho Agricultural Co.',
+  email: 'employer1@qardho.com',
+  phone: '+252 90 700 1122',
+  role: 'employer',
+  skill: null,
+  location: 'Wadajir',
+  bio: 'Local farming collective focusing on water-efficient agricultural systems in Karkaar.',
+  rate: null
+};
+
+function hashPassword(password: string) {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 64).toString('hex');
+  return `scrypt:${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, storedHash?: string | null) {
+  if (!storedHash) return false;
+
+  const [method, salt, hash] = storedHash.split(':');
+  if (method !== 'scrypt' || !salt || !hash) return false;
+
+  const actual = Buffer.from(hash, 'hex');
+  const expected = scryptSync(password, salt, actual.length);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function sanitizeUser(user: any) {
+  if (!user) return user;
+  const { passwordHash, ...safeUser } = user;
+  return safeUser;
+}
+
+async function ensureDemoCredentials(db: any) {
+  const createdAt = new Date().toISOString();
+  const demoPasswordHash = hashPassword(DEMO_PASSWORD);
+
+  await db.run(
+    `INSERT OR IGNORE INTO users (
+      id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+    [
+      DEMO_EMPLOYER.id,
+      DEMO_EMPLOYER.name,
+      DEMO_EMPLOYER.email,
+      DEMO_EMPLOYER.phone,
+      DEMO_EMPLOYER.role,
+      DEMO_EMPLOYER.skill,
+      DEMO_EMPLOYER.location,
+      DEMO_EMPLOYER.bio,
+      DEMO_EMPLOYER.rate,
+      createdAt,
+      demoPasswordHash
+    ]
+  );
+
+  await db.run(
+    `UPDATE users
+      SET passwordHash = ?
+      WHERE id IN ('worker-1', 'employer-1')
+        AND (passwordHash IS NULL OR passwordHash = '')`,
+    [demoPasswordHash]
+  );
+}
 
 async function startServer() {
   const app = express();
@@ -34,7 +104,8 @@ async function startServer() {
       bio TEXT,
       rate TEXT,
       createdAt TEXT,
-      smsNotificationsEnabled INTEGER DEFAULT 0
+      smsNotificationsEnabled INTEGER DEFAULT 0,
+      passwordHash TEXT
     );
 
     CREATE TABLE IF NOT EXISTS jobs (
@@ -86,6 +157,11 @@ async function startServer() {
       createdAt TEXT NOT NULL
     );
   `);
+
+  const userColumns = await db.all('PRAGMA table_info(users)');
+  if (!userColumns.some((column: any) => column.name === 'passwordHash')) {
+    await db.exec('ALTER TABLE users ADD COLUMN passwordHash TEXT');
+  }
 
   // Seed data if empty
   const usersCount = await db.get('SELECT COUNT(*) as count FROM users');
@@ -153,13 +229,17 @@ async function startServer() {
         bio: 'Reliable plumber with expertise in household piping, solar water heating systems, and water pumps installation.',
         rate: '$18 / day',
         createdAt: new Date().toISOString()
+      },
+      {
+        ...DEMO_EMPLOYER,
+        createdAt: new Date().toISOString()
       }
     ];
 
     for (const w of SAMPLE_WORKERS) {
       await db.run(
-        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
-        [w.id, w.name, w.email, w.phone, w.role, w.skill, w.location, w.bio, w.rate, w.createdAt]
+        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
+        [w.id, w.name, w.email, w.phone, w.role, w.skill, w.location, w.bio, w.rate, w.createdAt, w.id === 'worker-1' || w.id === 'employer-1' ? hashPassword(DEMO_PASSWORD) : null]
       );
     }
 
@@ -304,6 +384,8 @@ async function startServer() {
     }
   }
 
+  await ensureDemoCredentials(db);
+
   // --- API Routes ---
 
   // Get all workers (users with role = 'worker')
@@ -311,7 +393,7 @@ async function startServer() {
     try {
       const workers = await db.all("SELECT * FROM users WHERE role = 'worker'");
       const formattedWorkers = workers.map(w => ({
-        ...w,
+        ...sanitizeUser(w),
         smsNotificationsEnabled: !!w.smsNotificationsEnabled
       }));
       res.json(formattedWorkers);
@@ -362,8 +444,12 @@ async function startServer() {
 
   // Auth Operations
   app.post('/api/auth/register', async (req, res) => {
-    const { id, name, email, phone, role, skill, location, bio, rate, smsNotificationsEnabled } = req.body;
+    const { id, name, email, phone, password, role, skill, location, bio, rate, smsNotificationsEnabled } = req.body;
     try {
+      if (!password) {
+        return res.status(400).json({ error: 'Password is required.' });
+      }
+
       const existingUser = await db.get('SELECT * FROM users WHERE phone = ? OR (email IS NOT NULL AND email = ?)', [phone, email]);
       if (existingUser) {
         return res.status(400).json({ error: 'A user with this phone or email already exists.' });
@@ -371,15 +457,16 @@ async function startServer() {
       
       const newId = id || `user-${Date.now()}`;
       const createdAt = new Date().toISOString();
+      const passwordHash = hashPassword(password);
       await db.run(
-        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [newId, name, email || null, phone, role || 'pending', skill || null, location || null, bio || null, rate || null, createdAt, smsNotificationsEnabled ? 1 : 0]
+        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [newId, name, email || null, phone, role || 'pending', skill || null, location || null, bio || null, rate || null, createdAt, smsNotificationsEnabled ? 1 : 0, passwordHash]
       );
 
       const user = await db.get('SELECT * FROM users WHERE id = ?', [newId]);
       res.json({
         success: true,
-        user: { ...user, smsNotificationsEnabled: !!user.smsNotificationsEnabled }
+        user: { ...sanitizeUser(user), smsNotificationsEnabled: !!user.smsNotificationsEnabled }
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -387,19 +474,23 @@ async function startServer() {
   });
 
   app.post('/api/auth/login', async (req, res) => {
-    const { identifier } = req.body;
+    const { identifier, password } = req.body;
     try {
+      if (!identifier || !password) {
+        return res.status(400).json({ success: false, error: 'Email/phone and password are required.' });
+      }
+
       const user = await db.get(
         'SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR phone = ?',
         [identifier, identifier]
       );
-      if (user) {
+      if (user && verifyPassword(password, user.passwordHash)) {
         return res.json({
           success: true,
-          user: { ...user, smsNotificationsEnabled: !!user.smsNotificationsEnabled }
+          user: { ...sanitizeUser(user), smsNotificationsEnabled: !!user.smsNotificationsEnabled }
         });
       }
-      res.status(444).json({ success: false, error: 'User not found.' });
+      res.status(401).json({ success: false, error: 'Invalid email/phone or password.' });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -427,7 +518,7 @@ async function startServer() {
       const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
       res.json({
         success: true,
-        user: { ...user, smsNotificationsEnabled: !!user.smsNotificationsEnabled }
+        user: { ...sanitizeUser(user), smsNotificationsEnabled: !!user.smsNotificationsEnabled }
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

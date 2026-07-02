@@ -99,7 +99,7 @@ The frontend calls these local API routes:
 | `GET` | `/api/applications` | List job applications. |
 | `GET` | `/api/reviews` | List worker reviews. |
 | `POST` | `/api/auth/register` | Create a new local user account. |
-| `POST` | `/api/auth/login` | Log in by email or phone number. |
+| `POST` | `/api/auth/login` | Log in by email or phone number plus password. |
 | `POST` | `/api/profile/update` | Update user profile and role details. |
 | `POST` | `/api/jobs` | Create a new job post. |
 | `POST` | `/api/connections` | Create a worker connection request. |
@@ -186,6 +186,13 @@ After starting the app, use the quick test actions in the top banner:
 - Log in as Ahmed to test the worker experience.
 - Log in as Farmer to test the employer experience.
 
+The seeded demo credentials are:
+
+| Role | Email or phone | Password |
+| --- | --- | --- |
+| Worker | `ahmed.mohamed@example.com` or `+252 90 779 1234` | `demo1234` |
+| Employer | `employer1@qardho.com` or `+252 90 700 1122` | `demo1234` |
+
 You can then test the complete marketplace loop:
 
 1. Browse workers.
@@ -198,7 +205,7 @@ You can then test the complete marketplace loop:
 
 ## Notes
 
-- Authentication is currently demo/local only. The server checks users by email or phone and does not validate passwords.
+- Authentication is currently demo/local only. The server stores local SQLite password hashes and validates login passwords, but it does not create production-grade sessions or protect API routes.
 - API routes are currently unauthenticated and intended for local prototype use.
 - The SQLite database is local to this project folder.
 - If `database.sqlite` is deleted, the app recreates the schema and seeds sample data on the next server start.
