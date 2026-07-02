@@ -1,0 +1,6 @@
+{
+  "name": "Skills Hub Qardho",
+  "description": "A skilled labor booking platform for Qardho, Somalia connecting workers and employers, with profiles, job postings, connect requests, and applications.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
