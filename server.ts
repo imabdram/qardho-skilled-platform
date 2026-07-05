@@ -49,42 +49,6 @@ function sanitizeUser(user: any) {
   return safeUser;
 }
 
-const camelCaseColumns = [
-  'createdAt',
-  'smsNotificationsEnabled',
-  'passwordHash',
-  'employerId',
-  'employerName',
-  'fromUserId',
-  'fromUserName',
-  'toUserId',
-  'toUserName',
-  'jobId',
-  'jobTitle',
-  'applicantId',
-  'applicantName',
-  'applicantSkill',
-  'workerId',
-];
-
-function toPostgresSql(sql: string) {
-  let index = 0;
-  let converted = sql.replace(/\?/g, () => `$${++index}`);
-
-  for (const column of camelCaseColumns) {
-    converted = converted.replace(new RegExp(`(?<!")\\b${column}\\b(?!")`, 'g'), `"${column}"`);
-  }
-
-  return converted;
-}
-
-function splitSqlStatements(sql: string) {
-  return sql
-    .split(';')
-    .map(statement => statement.trim())
-    .filter(Boolean);
-}
-
 function createPostgresDb(databaseUrl: string) {
   const pool = new Pool({
     connectionString: databaseUrl,
@@ -93,19 +57,17 @@ function createPostgresDb(databaseUrl: string) {
 
   return {
     async exec(sql: string) {
-      for (const statement of splitSqlStatements(sql)) {
-        await pool.query(toPostgresSql(statement));
-      }
+      await pool.query(sql);
     },
     async run(sql: string, params: any[] = []) {
-      return pool.query(toPostgresSql(sql), params);
+      return pool.query(sql, params);
     },
     async get(sql: string, params: any[] = []) {
-      const result = await pool.query(toPostgresSql(sql), params);
+      const result = await pool.query(sql, params);
       return result.rows[0];
     },
     async all(sql: string, params: any[] = []) {
-      const result = await pool.query(toPostgresSql(sql), params);
+      const result = await pool.query(sql, params);
       return result.rows;
     },
   };
@@ -118,7 +80,7 @@ async function ensureDemoCredentials(db: any) {
   await db.run(
     `INSERT INTO users (
       id, name, email, phone, role, skill, location, bio, rate, "createdAt", "smsNotificationsEnabled", "passwordHash", availability, verified
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?, ?, ?)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, $11, $12, $13)
     ON CONFLICT (id) DO NOTHING`,
     [
       DEMO_EMPLOYER.id,
@@ -139,9 +101,9 @@ async function ensureDemoCredentials(db: any) {
 
   await db.run(
     `UPDATE users
-      SET passwordHash = ?
+      SET "passwordHash" = $1
       WHERE id IN ('worker-1', 'employer-1')
-        AND (passwordHash IS NULL OR passwordHash = '')`,
+        AND ("passwordHash" IS NULL OR "passwordHash" = '')`,
     [demoPasswordHash]
   );
 }
@@ -248,9 +210,9 @@ async function startServer() {
     ['Rafto', 'Xiddo'],
   ];
   for (const [oldLocation, newLocation] of locationMappings) {
-    await db.run('UPDATE users SET location = ? WHERE location = ?', [newLocation, oldLocation]);
-    await db.run('UPDATE jobs SET location = ? WHERE location = ?', [newLocation, oldLocation]);
-    await db.run('UPDATE applications SET location = ? WHERE location = ?', [newLocation, oldLocation]);
+    await db.run('UPDATE users SET location = $1 WHERE location = $2', [newLocation, oldLocation]);
+    await db.run('UPDATE jobs SET location = $1 WHERE location = $2', [newLocation, oldLocation]);
+    await db.run('UPDATE applications SET location = $1 WHERE location = $2', [newLocation, oldLocation]);
   }
 
   const formatUser = (user: any) => ({
@@ -350,7 +312,7 @@ async function startServer() {
 
     for (const w of SAMPLE_WORKERS) {
       await db.run(
-        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash, availability, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?, ?, ?)',
+        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, "createdAt", "smsNotificationsEnabled", "passwordHash", availability, verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, $11, $12, $13)',
         [
           w.id,
           w.name,
@@ -411,7 +373,7 @@ async function startServer() {
 
     for (const j of SAMPLE_JOBS) {
       await db.run(
-        'INSERT INTO jobs (id, title, employerId, employerName, location, description, rate, phone, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO jobs (id, title, "employerId", "employerName", location, description, rate, phone, status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
         [j.id, j.title, j.employerId, j.employerName, j.location, j.description, j.rate, j.phone, j.status, j.createdAt]
       );
     }
@@ -444,7 +406,7 @@ async function startServer() {
 
     for (const c of SAMPLE_CONNECTIONS) {
       await db.run(
-        'INSERT INTO connections (id, fromUserId, fromUserName, toUserId, toUserName, status, message, phone, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO connections (id, "fromUserId", "fromUserName", "toUserId", "toUserName", status, message, phone, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
         [c.id, c.fromUserId, c.fromUserName, c.toUserId, c.toUserName, c.status, c.message, c.phone, c.createdAt]
       );
     }
@@ -469,7 +431,7 @@ async function startServer() {
 
     for (const a of SAMPLE_APPLICATIONS) {
       await db.run(
-        'INSERT INTO applications (id, jobId, jobTitle, employerId, applicantId, applicantName, applicantSkill, message, phone, location, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO applications (id, "jobId", "jobTitle", "employerId", "applicantId", "applicantName", "applicantSkill", message, phone, location, status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
         [a.id, a.jobId, a.jobTitle, a.employerId, a.applicantId, a.applicantName, a.applicantSkill, a.message, a.phone, a.location, a.status, a.createdAt]
       );
     }
@@ -507,7 +469,7 @@ async function startServer() {
 
     for (const r of SAMPLE_REVIEWS) {
       await db.run(
-        'INSERT INTO reviews (id, workerId, employerId, employerName, rating, comment, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO reviews (id, "workerId", "employerId", "employerName", rating, comment, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [r.id, r.workerId, r.employerId, r.employerName, r.rating, r.comment, r.createdAt]
       );
     }
@@ -530,7 +492,7 @@ async function startServer() {
   // Get all jobs
   app.get('/api/jobs', async (req, res) => {
     try {
-      const jobs = await db.all('SELECT * FROM jobs ORDER BY createdAt DESC');
+      const jobs = await db.all('SELECT * FROM jobs ORDER BY "createdAt" DESC');
       res.json(jobs);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -540,7 +502,7 @@ async function startServer() {
   // Get all connections
   app.get('/api/connections', async (req, res) => {
     try {
-      const connections = await db.all('SELECT * FROM connections ORDER BY createdAt DESC');
+      const connections = await db.all('SELECT * FROM connections ORDER BY "createdAt" DESC');
       res.json(connections);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -550,7 +512,7 @@ async function startServer() {
   // Get all applications
   app.get('/api/applications', async (req, res) => {
     try {
-      const applications = await db.all('SELECT * FROM applications ORDER BY createdAt DESC');
+      const applications = await db.all('SELECT * FROM applications ORDER BY "createdAt" DESC');
       res.json(applications);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -560,7 +522,7 @@ async function startServer() {
   // Get all reviews
   app.get('/api/reviews', async (req, res) => {
     try {
-      const reviews = await db.all('SELECT * FROM reviews ORDER BY createdAt DESC');
+      const reviews = await db.all('SELECT * FROM reviews ORDER BY "createdAt" DESC');
       res.json(reviews);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -584,7 +546,7 @@ async function startServer() {
         return res.status(400).json({ error: 'Invalid availability value.' });
       }
 
-      const existingUser = await db.get('SELECT * FROM users WHERE phone = ? OR (email IS NOT NULL AND email = ?)', [phone, email]);
+      const existingUser = await db.get('SELECT * FROM users WHERE phone = $1 OR (email IS NOT NULL AND email = $2)', [phone, email]);
       if (existingUser) {
         return res.status(400).json({ error: 'A user with this phone or email already exists.' });
       }
@@ -593,11 +555,11 @@ async function startServer() {
       const createdAt = new Date().toISOString();
       const passwordHash = hashPassword(password);
       await db.run(
-        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash, availability, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
+        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, "createdAt", "smsNotificationsEnabled", "passwordHash", availability, verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, false)',
         [newId, name.trim(), email || null, phone.trim(), role || 'pending', skill || null, location || null, bio || null, rate || null, createdAt, !!smsNotificationsEnabled, passwordHash, availability || 'available']
       );
 
-      const user = await db.get('SELECT * FROM users WHERE id = ?', [newId]);
+      const user = await db.get('SELECT * FROM users WHERE id = $1', [newId]);
       res.json({
         success: true,
         user: formatUser(user)
@@ -615,7 +577,7 @@ async function startServer() {
       }
 
       const user = await db.get(
-        'SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR phone = ?',
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1) OR phone = $2',
         [identifier, identifier]
       );
       if (user && verifyPassword(password, user.passwordHash)) {
@@ -646,21 +608,21 @@ async function startServer() {
 
       await db.run(
         `UPDATE users SET 
-          name = ?, 
-          email = ?, 
-          phone = ?, 
-          role = ?, 
-          skill = ?, 
-          location = ?, 
-          bio = ?, 
-          rate = ?, 
-          smsNotificationsEnabled = ?,
-          availability = ?
-        WHERE id = ?`,
+          name = $1, 
+          email = $2, 
+          phone = $3, 
+          role = $4, 
+          skill = $5, 
+          location = $6, 
+          bio = $7, 
+          rate = $8, 
+          "smsNotificationsEnabled" = $9,
+          availability = $10
+        WHERE id = $11`,
         [name, email || null, phone, role, skill || null, location || null, bio || null, rate || null, !!smsNotificationsEnabled, availability || 'available', id]
       );
 
-      const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+      const user = await db.get('SELECT * FROM users WHERE id = $1', [id]);
       if (!user) {
         return res.status(404).json({ error: 'User not found.' });
       }
@@ -680,7 +642,7 @@ async function startServer() {
       if ([title, employerId, employerName, location, description, rate, phone].some(isBlank)) {
         return res.status(400).json({ error: 'Title, employer, location, description, rate, and phone are required.' });
       }
-      const employer = await db.get('SELECT * FROM users WHERE id = ?', [actorId || employerId]);
+      const employer = await db.get('SELECT * FROM users WHERE id = $1', [actorId || employerId]);
       if (!employer || employer.role !== 'employer' || employer.id !== employerId) {
         return res.status(403).json({ error: 'Only the employer account can post this job.' });
       }
@@ -688,10 +650,10 @@ async function startServer() {
       const newId = id || `job-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
-        'INSERT INTO jobs (id, title, employerId, employerName, location, description, rate, phone, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO jobs (id, title, "employerId", "employerName", location, description, rate, phone, status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
         [newId, title, employerId, employerName, location, description, rate, phone, 'open', createdAt]
       );
-      const job = await db.get('SELECT * FROM jobs WHERE id = ?', [newId]);
+      const job = await db.get('SELECT * FROM jobs WHERE id = $1', [newId]);
       res.json({ success: true, job });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -707,15 +669,15 @@ async function startServer() {
     }
 
     try {
-      const job = await db.get('SELECT * FROM jobs WHERE id = ?', [id]);
+      const job = await db.get('SELECT * FROM jobs WHERE id = $1', [id]);
       if (!job) {
         return res.status(404).json({ error: 'Job not found.' });
       }
       if (job.employerId !== actorId) {
         return res.status(403).json({ error: 'Only the job owner can update this job status.' });
       }
-      await db.run('UPDATE jobs SET status = ? WHERE id = ?', [status, id]);
-      const updatedJob = await db.get('SELECT * FROM jobs WHERE id = ?', [id]);
+      await db.run('UPDATE jobs SET status = $1 WHERE id = $2', [status, id]);
+      const updatedJob = await db.get('SELECT * FROM jobs WHERE id = $1', [id]);
       res.json({ success: true, job: updatedJob });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -729,8 +691,8 @@ async function startServer() {
       if ([fromUserId, fromUserName, toUserId, toUserName, phone].some(isBlank)) {
         return res.status(400).json({ error: 'Connection requester, target worker, and phone are required.' });
       }
-      const fromUser = await db.get('SELECT * FROM users WHERE id = ?', [actorId || fromUserId]);
-      const toUser = await db.get('SELECT * FROM users WHERE id = ?', [toUserId]);
+      const fromUser = await db.get('SELECT * FROM users WHERE id = $1', [actorId || fromUserId]);
+      const toUser = await db.get('SELECT * FROM users WHERE id = $1', [toUserId]);
       if (!fromUser || fromUser.role !== 'employer' || fromUser.id !== fromUserId) {
         return res.status(403).json({ error: 'Only employers can initiate hire connections.' });
       }
@@ -741,10 +703,10 @@ async function startServer() {
       const newId = id || `conn-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
-        'INSERT INTO connections (id, fromUserId, fromUserName, toUserId, toUserName, status, message, phone, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO connections (id, "fromUserId", "fromUserName", "toUserId", "toUserName", status, message, phone, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
         [newId, fromUserId, fromUserName, toUserId, toUserName, 'pending', message || null, phone || null, createdAt]
       );
-      const connection = await db.get('SELECT * FROM connections WHERE id = ?', [newId]);
+      const connection = await db.get('SELECT * FROM connections WHERE id = $1', [newId]);
       res.json({ success: true, connection });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -758,15 +720,15 @@ async function startServer() {
       return res.status(400).json({ error: 'Invalid connection status.' });
     }
     try {
-      const connection = await db.get('SELECT * FROM connections WHERE id = ?', [id]);
+      const connection = await db.get('SELECT * FROM connections WHERE id = $1', [id]);
       if (!connection) {
         return res.status(404).json({ error: 'Connection not found.' });
       }
       if (connection.toUserId !== actorId) {
         return res.status(403).json({ error: 'Only the target worker can update this request.' });
       }
-      await db.run('UPDATE connections SET status = ? WHERE id = ?', [status, id]);
-      const updatedConnection = await db.get('SELECT * FROM connections WHERE id = ?', [id]);
+      await db.run('UPDATE connections SET status = $1 WHERE id = $2', [status, id]);
+      const updatedConnection = await db.get('SELECT * FROM connections WHERE id = $1', [id]);
       res.json({ success: true, connection: updatedConnection });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -780,8 +742,8 @@ async function startServer() {
       if ([jobId, jobTitle, employerId, applicantId, applicantName, applicantSkill, message, phone, location].some(isBlank)) {
         return res.status(400).json({ error: 'Application details, message, phone, and location are required.' });
       }
-      const applicant = await db.get('SELECT * FROM users WHERE id = ?', [actorId || applicantId]);
-      const job = await db.get('SELECT * FROM jobs WHERE id = ?', [jobId]);
+      const applicant = await db.get('SELECT * FROM users WHERE id = $1', [actorId || applicantId]);
+      const job = await db.get('SELECT * FROM jobs WHERE id = $1', [jobId]);
       if (!applicant || applicant.role !== 'worker' || applicant.id !== applicantId) {
         return res.status(403).json({ error: 'Only workers can apply for jobs.' });
       }
@@ -795,10 +757,10 @@ async function startServer() {
       const newId = id || `app-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
-        'INSERT INTO applications (id, jobId, jobTitle, employerId, applicantId, applicantName, applicantSkill, message, phone, location, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO applications (id, "jobId", "jobTitle", "employerId", "applicantId", "applicantName", "applicantSkill", message, phone, location, status, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
         [newId, jobId, jobTitle, employerId, applicantId, applicantName, applicantSkill, message, phone, location, 'pending', createdAt]
       );
-      const application = await db.get('SELECT * FROM applications WHERE id = ?', [newId]);
+      const application = await db.get('SELECT * FROM applications WHERE id = $1', [newId]);
       res.json({ success: true, application });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -812,15 +774,15 @@ async function startServer() {
       return res.status(400).json({ error: 'Invalid application status.' });
     }
     try {
-      const application = await db.get('SELECT * FROM applications WHERE id = ?', [id]);
+      const application = await db.get('SELECT * FROM applications WHERE id = $1', [id]);
       if (!application) {
         return res.status(404).json({ error: 'Application not found.' });
       }
       if (application.employerId !== actorId) {
         return res.status(403).json({ error: 'Only the job owner can update this application.' });
       }
-      await db.run('UPDATE applications SET status = ? WHERE id = ?', [status, id]);
-      const updatedApplication = await db.get('SELECT * FROM applications WHERE id = ?', [id]);
+      await db.run('UPDATE applications SET status = $1 WHERE id = $2', [status, id]);
+      const updatedApplication = await db.get('SELECT * FROM applications WHERE id = $1', [id]);
       res.json({ success: true, application: updatedApplication });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -834,10 +796,10 @@ async function startServer() {
       if ([workerId, employerId, employerName, comment].some(isBlank) || typeof rating !== 'number' || rating < 1 || rating > 5) {
         return res.status(400).json({ error: 'Worker, employer, rating 1-5, and comment are required.' });
       }
-      const employer = await db.get('SELECT * FROM users WHERE id = ?', [actorId || employerId]);
-      const worker = await db.get('SELECT * FROM users WHERE id = ?', [workerId]);
+      const employer = await db.get('SELECT * FROM users WHERE id = $1', [actorId || employerId]);
+      const worker = await db.get('SELECT * FROM users WHERE id = $1', [workerId]);
       const acceptedConnection = await db.get(
-        "SELECT * FROM connections WHERE fromUserId = ? AND toUserId = ? AND status = 'accepted'",
+        'SELECT * FROM connections WHERE "fromUserId" = $1 AND "toUserId" = $2 AND status = \'accepted\'',
         [employerId, workerId]
       );
       if (!employer || employer.role !== 'employer' || employer.id !== employerId) {
@@ -853,10 +815,10 @@ async function startServer() {
       const newId = id || `rev-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
-        'INSERT INTO reviews (id, workerId, employerId, employerName, rating, comment, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO reviews (id, "workerId", "employerId", "employerName", rating, comment, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [newId, workerId, employerId, employerName, rating, comment, createdAt]
       );
-      const review = await db.get('SELECT * FROM reviews WHERE id = ?', [newId]);
+      const review = await db.get('SELECT * FROM reviews WHERE id = $1', [newId]);
       res.json({ success: true, review });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
