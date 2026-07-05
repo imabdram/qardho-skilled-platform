@@ -1,10 +1,10 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { open } from 'sqlite';
-import sqlite3 from 'sqlite3';
 import { createServer as createViteServer } from 'vite';
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
+import { Pool } from 'pg';
 
 // ES Module __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -23,7 +23,7 @@ const DEMO_EMPLOYER = {
   bio: 'Local farming collective focusing on water-efficient agricultural systems in Karkaar.',
   rate: null,
   availability: 'available',
-  verified: 0
+  verified: false
 };
 
 function hashPassword(password: string) {
@@ -49,14 +49,77 @@ function sanitizeUser(user: any) {
   return safeUser;
 }
 
+const camelCaseColumns = [
+  'createdAt',
+  'smsNotificationsEnabled',
+  'passwordHash',
+  'employerId',
+  'employerName',
+  'fromUserId',
+  'fromUserName',
+  'toUserId',
+  'toUserName',
+  'jobId',
+  'jobTitle',
+  'applicantId',
+  'applicantName',
+  'applicantSkill',
+  'workerId',
+];
+
+function toPostgresSql(sql: string) {
+  let index = 0;
+  let converted = sql.replace(/\?/g, () => `$${++index}`);
+
+  for (const column of camelCaseColumns) {
+    converted = converted.replace(new RegExp(`(?<!")\\b${column}\\b(?!")`, 'g'), `"${column}"`);
+  }
+
+  return converted;
+}
+
+function splitSqlStatements(sql: string) {
+  return sql
+    .split(';')
+    .map(statement => statement.trim())
+    .filter(Boolean);
+}
+
+function createPostgresDb(databaseUrl: string) {
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: databaseUrl.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+  });
+
+  return {
+    async exec(sql: string) {
+      for (const statement of splitSqlStatements(sql)) {
+        await pool.query(toPostgresSql(statement));
+      }
+    },
+    async run(sql: string, params: any[] = []) {
+      return pool.query(toPostgresSql(sql), params);
+    },
+    async get(sql: string, params: any[] = []) {
+      const result = await pool.query(toPostgresSql(sql), params);
+      return result.rows[0];
+    },
+    async all(sql: string, params: any[] = []) {
+      const result = await pool.query(toPostgresSql(sql), params);
+      return result.rows;
+    },
+  };
+}
+
 async function ensureDemoCredentials(db: any) {
   const createdAt = new Date().toISOString();
   const demoPasswordHash = hashPassword(DEMO_PASSWORD);
 
   await db.run(
-    `INSERT OR IGNORE INTO users (
-      id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+    `INSERT INTO users (
+      id, name, email, phone, role, skill, location, bio, rate, "createdAt", "smsNotificationsEnabled", "passwordHash", availability, verified
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?, ?, ?)
+    ON CONFLICT (id) DO NOTHING`,
     [
       DEMO_EMPLOYER.id,
       DEMO_EMPLOYER.name,
@@ -68,7 +131,9 @@ async function ensureDemoCredentials(db: any) {
       DEMO_EMPLOYER.bio,
       DEMO_EMPLOYER.rate,
       createdAt,
-      demoPasswordHash
+      demoPasswordHash,
+      DEMO_EMPLOYER.availability,
+      DEMO_EMPLOYER.verified
     ]
   );
 
@@ -85,14 +150,15 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
   const isProduction = process.env.NODE_ENV === 'production' || path.basename(__dirname) === 'dist';
 
-  // Initialize SQLite database
-  const db = await open({
-    filename: path.join(process.cwd(), 'database.sqlite'),
-    driver: sqlite3.Database
-  });
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is required. Set it to your Neon PostgreSQL connection string.');
+  }
+
+  // Initialize PostgreSQL database
+  const db = createPostgresDb(process.env.DATABASE_URL);
 
   // Create tables
   await db.exec(`
@@ -106,81 +172,73 @@ async function startServer() {
       location TEXT,
       bio TEXT,
       rate TEXT,
-      createdAt TEXT,
-      smsNotificationsEnabled INTEGER DEFAULT 0,
-      passwordHash TEXT,
+      "createdAt" TEXT,
+      "smsNotificationsEnabled" BOOLEAN DEFAULT false,
+      "passwordHash" TEXT,
       availability TEXT DEFAULT 'available',
-      verified INTEGER DEFAULT 0
+      verified BOOLEAN DEFAULT false
     );
 
     CREATE TABLE IF NOT EXISTS jobs (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
-      employerId TEXT NOT NULL,
-      employerName TEXT NOT NULL,
+      "employerId" TEXT NOT NULL,
+      "employerName" TEXT NOT NULL,
       location TEXT NOT NULL,
       description TEXT NOT NULL,
       rate TEXT NOT NULL,
       phone TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'open',
-      createdAt TEXT NOT NULL
+      "createdAt" TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS connections (
       id TEXT PRIMARY KEY,
-      fromUserId TEXT NOT NULL,
-      fromUserName TEXT NOT NULL,
-      toUserId TEXT NOT NULL,
-      toUserName TEXT NOT NULL,
+      "fromUserId" TEXT NOT NULL,
+      "fromUserName" TEXT NOT NULL,
+      "toUserId" TEXT NOT NULL,
+      "toUserName" TEXT NOT NULL,
       status TEXT NOT NULL,
       message TEXT,
       phone TEXT,
-      createdAt TEXT NOT NULL
+      "createdAt" TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS applications (
       id TEXT PRIMARY KEY,
-      jobId TEXT NOT NULL,
-      jobTitle TEXT NOT NULL,
-      employerId TEXT NOT NULL,
-      applicantId TEXT NOT NULL,
-      applicantName TEXT NOT NULL,
-      applicantSkill TEXT NOT NULL,
+      "jobId" TEXT NOT NULL,
+      "jobTitle" TEXT NOT NULL,
+      "employerId" TEXT NOT NULL,
+      "applicantId" TEXT NOT NULL,
+      "applicantName" TEXT NOT NULL,
+      "applicantSkill" TEXT NOT NULL,
       message TEXT NOT NULL,
       phone TEXT NOT NULL,
       location TEXT NOT NULL,
       status TEXT NOT NULL,
-      createdAt TEXT NOT NULL
+      "createdAt" TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS reviews (
       id TEXT PRIMARY KEY,
-      workerId TEXT NOT NULL,
-      employerId TEXT NOT NULL,
-      employerName TEXT NOT NULL,
+      "workerId" TEXT NOT NULL,
+      "employerId" TEXT NOT NULL,
+      "employerName" TEXT NOT NULL,
       rating INTEGER NOT NULL,
       comment TEXT NOT NULL,
-      createdAt TEXT NOT NULL
+      "createdAt" TEXT NOT NULL
     );
   `);
 
-  const userColumns = await db.all('PRAGMA table_info(users)');
-  if (!userColumns.some((column: any) => column.name === 'passwordHash')) {
-    await db.exec('ALTER TABLE users ADD COLUMN passwordHash TEXT');
-  }
+  await db.exec(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS "passwordHash" TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT 'available';
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false;
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open';
+  `);
 
-  const jobColumns = await db.all('PRAGMA table_info(jobs)');
-  if (!jobColumns.some((column: any) => column.name === 'status')) {
-    await db.run("ALTER TABLE jobs ADD COLUMN status TEXT NOT NULL DEFAULT 'open'");
-  }
   await db.run("UPDATE jobs SET status = 'open' WHERE status IS NULL OR status = ''");
 
-  if (!userColumns.some((column: any) => column.name === 'availability')) {
-    await db.run("ALTER TABLE users ADD COLUMN availability TEXT DEFAULT 'available'");
-  }
-  if (!userColumns.some((column: any) => column.name === 'verified')) {
-    await db.run("ALTER TABLE users ADD COLUMN verified INTEGER DEFAULT 0");
-  }
   await db.run("UPDATE users SET availability = 'available' WHERE availability IS NULL OR availability = ''");
   const locationMappings = [
     ['Wadajir', 'Kaambo'],
@@ -209,7 +267,7 @@ async function startServer() {
 
   // Seed data if empty
   const usersCount = await db.get('SELECT COUNT(*) as count FROM users');
-  if (usersCount.count === 0) {
+  if (Number(usersCount.count) === 0) {
     console.log('Seeding initial database with sample workers, jobs, connections, reviews...');
     
     // Sample Workers
@@ -292,7 +350,7 @@ async function startServer() {
 
     for (const w of SAMPLE_WORKERS) {
       await db.run(
-        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash, availability, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
+        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash, availability, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?, ?, ?)',
         [
           w.id,
           w.name,
@@ -306,7 +364,7 @@ async function startServer() {
           w.createdAt,
           w.id === 'worker-1' || w.id === 'employer-1' ? hashPassword(DEMO_PASSWORD) : null,
           w.availability || 'available',
-          w.verified || 0
+          Boolean(w.verified)
         ]
       );
     }
@@ -536,7 +594,7 @@ async function startServer() {
       const passwordHash = hashPassword(password);
       await db.run(
         'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash, availability, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
-        [newId, name.trim(), email || null, phone.trim(), role || 'pending', skill || null, location || null, bio || null, rate || null, createdAt, smsNotificationsEnabled ? 1 : 0, passwordHash, availability || 'available']
+        [newId, name.trim(), email || null, phone.trim(), role || 'pending', skill || null, location || null, bio || null, rate || null, createdAt, !!smsNotificationsEnabled, passwordHash, availability || 'available']
       );
 
       const user = await db.get('SELECT * FROM users WHERE id = ?', [newId]);
@@ -599,7 +657,7 @@ async function startServer() {
           smsNotificationsEnabled = ?,
           availability = ?
         WHERE id = ?`,
-        [name, email || null, phone, role, skill || null, location || null, bio || null, rate || null, smsNotificationsEnabled ? 1 : 0, availability || 'available', id]
+        [name, email || null, phone, role, skill || null, location || null, bio || null, rate || null, !!smsNotificationsEnabled, availability || 'available', id]
       );
 
       const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);

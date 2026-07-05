@@ -24,7 +24,7 @@ export default function App() {
   });
   const [viewingProfileUser, setViewingProfileUser] = useState<User | null>(null);
 
-  // App data list states (Initialized empty, populated dynamically from SQLite)
+  // App data list states (initialized empty, populated dynamically from PostgreSQL)
   const [workers, setWorkers] = useState<User[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -55,7 +55,7 @@ export default function App() {
     return data.error || data.message || fallback;
   };
 
-  // Load and refresh all data from the SQLite database
+  // Load and refresh all data from the PostgreSQL database
   const refreshAllData = async () => {
     try {
       setIsLoadingData(true);
@@ -97,7 +97,7 @@ export default function App() {
     refreshAllData();
   }, []);
 
-  // Quick Switch Roles helper for Demo / Testing (Hitting the SQLite DB)
+  // Quick Switch Roles helper for demo/testing
   const loginAsDemoUser = async (role: 'worker' | 'employer') => {
     if (role === 'worker') {
       try {
@@ -620,7 +620,7 @@ export default function App() {
       <div className="bg-slate-900 text-white px-4 py-2 flex flex-col sm:flex-row items-center justify-between text-xs font-semibold shadow-xs" id="preview-alert-banner">
         <div className="flex items-center space-x-1.5 mb-1.5 sm:mb-0">
           <Sparkles className="h-4 w-4 text-sky-300 shrink-0" />
-          <span><strong>Demo Mode:</strong> Local SQLite data with worker, employer, job, and review flows.</span>
+          <span><strong>Demo Mode:</strong> PostgreSQL data with worker, employer, job, and review flows.</span>
         </div>
         <div className="flex items-center space-x-2">
           <span className="text-slate-300 hidden md:inline">Try a role:</span>

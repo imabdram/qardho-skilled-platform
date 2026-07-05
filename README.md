@@ -2,11 +2,11 @@
 
 Qardho Skilled Platform is a local skilled-labor marketplace for Qardho, Somalia. It helps households, farms, schools, businesses, and employers find local workers such as solar technicians, plumbers, builders, tailors, teachers, electricians, and general trade professionals.
 
-The project is currently an MVP/demo app with a real React frontend, Express API, and local SQLite database. It supports the core marketplace loop: browse workers, browse jobs, post a job, apply to a job, send hire connection requests, manage requests from a dashboard, edit profiles, and leave worker reviews.
+The project is currently an MVP/demo app with a real React frontend, Express API, and PostgreSQL database. It supports the core marketplace loop: browse workers, browse jobs, post a job, apply to a job, send hire connection requests, manage requests from a dashboard, edit profiles, and leave worker reviews.
 
 ## Current Status
 
-- Working local MVP with persistent SQLite data.
+- Working MVP with PostgreSQL persistence through `DATABASE_URL`.
 - Demo quick-login flows for both worker and employer roles.
 - Production build and TypeScript check currently pass.
 - Authentication is demo/local only: users sign in by registered phone or email plus password, but the app does not create production-grade sessions or protect all API routes.
@@ -44,13 +44,13 @@ The project is currently an MVP/demo app with a real React frontend, Express API
 | Frontend | Lucide React | Icons for navigation, actions, status badges, forms, and dashboards. |
 | Backend | Node.js | Runtime for the local server. |
 | Backend | Express | API routes, JSON handling, Vite middleware in development, and static serving in production. |
-| Database | SQLite | Local persistent data store. |
-| Database | `sqlite` / `sqlite3` | Promise-based SQLite access and native database driver. |
+| Database | PostgreSQL | Persistent hosted data store, tested for Neon-style connection strings. |
+| Database | `pg` | Node PostgreSQL client used by the Express API. |
 | Build | esbuild | Bundles `server.ts` into `dist/server.mjs`. |
 
 ## Data Model
 
-The backend creates these SQLite tables when the app starts:
+The backend creates these PostgreSQL tables when the app starts:
 
 - `users`: workers, employers, pending onboarding users, profile details, availability, verification, and notification preferences.
 - `jobs`: job posts created by employers.
@@ -58,7 +58,7 @@ The backend creates these SQLite tables when the app starts:
 - `applications`: worker applications to posted jobs.
 - `reviews`: employer reviews for workers.
 
-If `database.sqlite` is empty or missing, the server recreates the schema and seeds sample data.
+If the database has no users, the server seeds sample workers, jobs, connections, applications, and reviews.
 
 ## Project Structure
 
@@ -72,8 +72,7 @@ If `database.sqlite` is empty or missing, the server recreates the schema and se
 |   +-- constants.ts            # Local constants such as Qardho neighborhoods
 |   +-- components/             # Reusable UI components
 |   +-- pages/                  # Main app screens
-+-- server.ts                   # Express server, SQLite schema, seed data, and API routes
-+-- database.sqlite             # Local SQLite database
++-- server.ts                   # Express server, PostgreSQL schema, seed data, and API routes
 +-- vite.config.ts              # Vite, React, Tailwind, and path alias config
 +-- package.json                # Scripts and dependencies
 +-- tsconfig.json               # TypeScript configuration
@@ -115,7 +114,13 @@ npm install
 
 ### Environment Variables
 
-No environment variables are required for the current local MVP. The app uses a local SQLite database and does not require Firebase, SMS, email, or external API credentials.
+Create a local `.env` file or set this variable in your deployment provider:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/neondb?sslmode=require"
+```
+
+Keep the real Neon URL in local/deployment secrets. Do not commit it to Git.
 
 ### Run in Development
 

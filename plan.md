@@ -85,7 +85,7 @@
       - Add recommended workers for a posted job based on skill/location.
 
   4. Notifications
-      - Add in-app notification records in SQLite instead of only computed navbar
+      - Add in-app notification records in PostgreSQL instead of only computed navbar
         notifications.
 
       - Notify users for new applications, accepted requests, job status changes, and new
@@ -146,7 +146,7 @@
   ## Assumptions
 
   - The goal is the best local/demo prototype, not a full production marketplace yet.
-  - SQLite remains acceptable for the demo.
+  - PostgreSQL is now the deployment database through `DATABASE_URL`.
   - Real payments, real SMS, and real identity verification are out of scope unless requested
     later.
 
