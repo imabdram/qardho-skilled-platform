@@ -6,7 +6,7 @@ The project is currently an MVP/demo app with a real React frontend, Express API
 
 ## Current Status
 
-- Working MVP with PostgreSQL persistence through `DATABASE_URL`.
+- **Fully Migrated to Native PostgreSQL:** The database layer communicates directly using native parameterized queries (`$1`, `$2`, etc.) and quoted camelCase identifiers. The old SQLite dynamic translation layer and leftover `.sqlite` files have been completely removed.
 - Demo quick-login flows for both worker and employer roles.
 - Production build and TypeScript check currently pass.
 - Authentication is demo/local only: users sign in by registered phone or email plus password, but the app does not create production-grade sessions or protect all API routes.
@@ -166,6 +166,29 @@ npm run lint
 ```
 
 This runs TypeScript checking with `tsc --noEmit`.
+
+## Deployment
+
+The application is built to run as a single monolithic service that serves the React frontend compiled static files and endpoints from the same Node.js/Express server.
+
+### Deploying to Render.com
+1. Create a new **Web Service** on Render and link your GitHub repository.
+2. Select the **Node** runtime environment.
+3. Configure the following build settings:
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npm start`
+4. Under **Environment Variables**, add:
+   - `DATABASE_URL`: `your_neon_postgresql_connection_string`
+   - `NODE_ENV`: `production`
+5. In **Advanced settings**, set the **Health Check Path** to `/`.
+
+### Deploying to Railway.app
+1. Create a new project on Railway and click **Deploy from GitHub repo**.
+2. Select your repository.
+3. Add the following environment **Variables** in the service settings panel:
+   - `DATABASE_URL`: `your_neon_postgresql_connection_string`
+   - `NODE_ENV`: `production`
+4. Railway will automatically build the assets and start the service.
 
 ## Demo Usage
 
