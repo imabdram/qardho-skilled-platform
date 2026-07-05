@@ -1,5 +1,7 @@
 # Qardho Skilled Platform
 
+**Live Demo:** [https://qardho-skilled-platform.onrender.com/](https://qardho-skilled-platform.onrender.com/)
+
 Qardho Skilled Platform is a local skilled-labor marketplace for Qardho, Somalia. It helps households, farms, schools, businesses, and employers find local workers such as solar technicians, plumbers, builders, tailors, teachers, electricians, and general trade professionals.
 
 The project is currently an MVP/demo app with a real React frontend, Express API, and PostgreSQL database. It supports the core marketplace loop: browse workers, browse jobs, post a job, apply to a job, send hire connection requests, manage requests from a dashboard, edit profiles, and leave worker reviews.
