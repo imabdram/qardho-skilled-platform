@@ -1,9 +1,10 @@
-import React from 'react';
-import { Connection, Application, Job, User } from '../types';
+import React, { useState } from 'react';
+import { Connection, Application, Job, JobStatus, User } from '../types';
 import { 
   Users, Briefcase, FileText, Check, X, Phone, MapPin, 
   Clock, AlertCircle, Sparkles, Send, CheckCircle2, RefreshCw 
 } from 'lucide-react';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface DashboardProps {
   currentUser: User | null;
@@ -12,6 +13,7 @@ interface DashboardProps {
   jobs: Job[];
   onUpdateConnectionStatus: (id: string, status: 'accepted' | 'declined') => void;
   onUpdateApplicationStatus: (id: string, status: 'accepted' | 'declined') => void;
+  onUpdateJobStatus: (id: string, status: JobStatus) => void;
   onNavigate: (page: string) => void;
   onSwitchRole: () => void;
 }
@@ -23,9 +25,19 @@ export default function Dashboard({
   jobs,
   onUpdateConnectionStatus,
   onUpdateApplicationStatus,
+  onUpdateJobStatus,
   onNavigate,
   onSwitchRole
 }: DashboardProps) {
+  const [activeTab, setActiveTab] = useState<'connections' | 'applications' | 'jobs'>('connections');
+  const [pendingAction, setPendingAction] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    tone?: 'danger' | 'neutral';
+    onConfirm: () => void;
+  } | null>(null);
+
   if (!currentUser) return null;
 
   const isWorker = currentUser.role === 'worker';
@@ -40,6 +52,12 @@ export default function Dashboard({
     : applications.filter(a => a.employerId === currentUser.id); // Applications received for posted jobs
 
   const myPostedJobs = jobs.filter(j => j.employerId === currentUser.id);
+  const jobStatusOptions: JobStatus[] = ['open', 'in_progress', 'completed', 'closed'];
+  const pendingConnections = myConnections.filter(c => c.status === 'pending').length;
+  const pendingApplications = myApplications.filter(a => a.status === 'pending').length;
+  const openJobs = myPostedJobs.filter(j => j.status === 'open').length;
+  const completedJobs = myPostedJobs.filter(j => j.status === 'completed').length;
+  const workerAcceptedApplications = myApplications.filter(a => a.status === 'accepted').length;
 
   const getStatusBadge = (status: 'pending' | 'accepted' | 'declined') => {
     switch (status) {
@@ -67,6 +85,32 @@ export default function Dashboard({
     }
   };
 
+  const getJobStatusBadge = (status: JobStatus) => {
+    const label = status.replace('_', ' ');
+    const styles = {
+      open: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      in_progress: 'bg-blue-50 text-blue-700 border-blue-100',
+      completed: 'bg-slate-100 text-slate-700 border-slate-200',
+      closed: 'bg-rose-50 text-rose-700 border-rose-100',
+    }[status];
+
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${styles}`}>
+        {label}
+      </span>
+    );
+  };
+
+  const openConfirmation = (action: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+    tone?: 'danger' | 'neutral';
+    onConfirm: () => void;
+  }) => {
+    setPendingAction(action);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in" id="dashboard-container">
       
@@ -91,10 +135,45 @@ export default function Dashboard({
         </div>
       </div>
 
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+        {[
+          { label: isWorker ? 'Pending Hire Requests' : 'Pending Connections', value: pendingConnections },
+          { label: isWorker ? 'Pending Applications' : 'Candidates Waiting', value: pendingApplications },
+          { label: isWorker ? 'Accepted Applications' : 'Open Jobs', value: isWorker ? workerAcceptedApplications : openJobs },
+          { label: isWorker ? 'Total Activity Items' : 'Completed Jobs', value: isWorker ? myConnections.length + myApplications.length : completedJobs },
+        ].map((metric) => (
+          <div key={metric.label} className="bg-white border border-slate-100 rounded-xl p-4 shadow-xs">
+            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">{metric.label}</span>
+            <span className="block text-2xl font-black text-slate-900 mt-1">{metric.value}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-100 pb-3">
+        {[
+          { key: 'connections' as const, label: isWorker ? 'Hire Requests' : 'Connections' },
+          { key: 'applications' as const, label: isWorker ? 'Applications' : 'Candidates' },
+          ...(!isWorker ? [{ key: 'jobs' as const, label: 'Posted Jobs' }] : []),
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-3 py-2 rounded-lg text-xs font-bold border cursor-pointer ${
+              activeTab === tab.key
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* Connections Section */}
-        <div className="lg:col-span-6 space-y-4">
+        {activeTab === 'connections' && (
+        <div className="lg:col-span-12 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center space-x-2">
               <Users className="h-5 w-5 text-blue-600" />
@@ -145,14 +224,26 @@ export default function Dashboard({
                     {isWorker && conn.status === 'pending' && (
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => onUpdateConnectionStatus(conn.id, 'declined')}
+                          onClick={() => openConfirmation({
+                            title: 'Decline this hire request?',
+                            description: `This will mark the request from ${conn.fromUserName} as declined.`,
+                            confirmLabel: 'Decline request',
+                            tone: 'danger',
+                            onConfirm: () => onUpdateConnectionStatus(conn.id, 'declined'),
+                          })}
                           className="p-1.5 border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-100 rounded-lg cursor-pointer"
                           title="Decline"
                         >
                           <X className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => onUpdateConnectionStatus(conn.id, 'accepted')}
+                          onClick={() => openConfirmation({
+                            title: 'Accept this hire request?',
+                            description: `This will reveal contact info for ${conn.fromUserName} and mark the request as accepted.`,
+                            confirmLabel: 'Accept request',
+                            tone: 'neutral',
+                            onConfirm: () => onUpdateConnectionStatus(conn.id, 'accepted'),
+                          })}
                           className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer"
                         >
                           <Check className="h-3.5 w-3.5" />
@@ -177,9 +268,11 @@ export default function Dashboard({
             </div>
           )}
         </div>
+        )}
 
         {/* Applications Section */}
-        <div className="lg:col-span-6 space-y-4">
+        {activeTab === 'applications' && (
+        <div className="lg:col-span-12 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center space-x-2">
               <FileText className="h-5 w-5 text-blue-600" />
@@ -235,14 +328,26 @@ export default function Dashboard({
                     {!isWorker && app.status === 'pending' && (
                       <div className="flex space-x-2 shrink-0">
                         <button
-                          onClick={() => onUpdateApplicationStatus(app.id, 'declined')}
+                          onClick={() => openConfirmation({
+                            title: 'Decline this candidate application?',
+                            description: `This will mark ${app.applicantName}'s application for "${app.jobTitle}" as declined.`,
+                            confirmLabel: 'Decline application',
+                            tone: 'danger',
+                            onConfirm: () => onUpdateApplicationStatus(app.id, 'declined'),
+                          })}
                           className="p-1.5 border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 hover:border-red-100 rounded-lg cursor-pointer"
                           title="Decline Candidate"
                         >
                           <X className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => onUpdateApplicationStatus(app.id, 'accepted')}
+                          onClick={() => openConfirmation({
+                            title: 'Accept this candidate application?',
+                            description: `This will mark ${app.applicantName} as accepted for "${app.jobTitle}".`,
+                            confirmLabel: 'Hire candidate',
+                            tone: 'neutral',
+                            onConfirm: () => onUpdateApplicationStatus(app.id, 'accepted'),
+                          })}
                           className="inline-flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs cursor-pointer"
                         >
                           <Check className="h-3.5 w-3.5" />
@@ -267,11 +372,12 @@ export default function Dashboard({
             </div>
           )}
         </div>
+        )}
 
       </div>
 
       {/* Posted Jobs section - Employers only */}
-      {!isWorker && (
+      {!isWorker && activeTab === 'jobs' && (
         <div className="mt-12 space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center space-x-2">
@@ -288,7 +394,10 @@ export default function Dashboard({
               {myPostedJobs.map((job) => (
                 <div key={job.id} className="bg-white p-5 rounded-xl border border-slate-100 shadow-xs flex flex-col justify-between">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">{job.title}</h3>
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="text-sm font-bold text-slate-900">{job.title}</h3>
+                      {getJobStatusBadge(job.status)}
+                    </div>
                     <div className="flex flex-wrap gap-2 mt-2">
                       <span className="inline-flex items-center text-[10px] font-semibold text-slate-600 bg-slate-50 px-2 py-0.5 rounded-md">
                         <MapPin className="h-3 w-3 text-slate-400 mr-1" />
@@ -306,6 +415,32 @@ export default function Dashboard({
                     <span>Contact: {job.phone}</span>
                     <span>{new Date(job.createdAt).toLocaleDateString()}</span>
                   </div>
+                  <div className="mt-3">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                      Job Status
+                    </label>
+                    <select
+                      value={job.status}
+                      onChange={(e) => {
+                        const nextStatus = e.target.value as JobStatus;
+                        if (nextStatus === job.status) return;
+                        openConfirmation({
+                          title: `Move this job to ${nextStatus.replace('_', ' ')}?`,
+                          description: `This updates the status for "${job.title}".`,
+                          confirmLabel: 'Update status',
+                          tone: 'neutral',
+                          onConfirm: () => onUpdateJobStatus(job.id, nextStatus),
+                        });
+                      }}
+                      className="w-full border border-slate-200 bg-slate-50 text-slate-700 rounded-lg px-2.5 py-2 text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 cursor-pointer"
+                    >
+                      {jobStatusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {status.replace('_', ' ')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               ))}
             </div>
@@ -315,6 +450,20 @@ export default function Dashboard({
             </div>
           )}
         </div>
+      )}
+
+      {pendingAction && (
+        <ConfirmDialog
+          title={pendingAction.title}
+          description={pendingAction.description}
+          confirmLabel={pendingAction.confirmLabel}
+          tone={pendingAction.tone}
+          onConfirm={() => {
+            pendingAction.onConfirm();
+            setPendingAction(null);
+          }}
+          onCancel={() => setPendingAction(null)}
+        />
       )}
     </div>
   );

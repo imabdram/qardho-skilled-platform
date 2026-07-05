@@ -10,8 +10,8 @@ import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
 import ConnectModal from './components/ConnectModal';
 import ApplyModal from './components/ApplyModal';
-import { User, Job, Connection, Application, Review } from './types';
-import { Sparkles, MapPin, AlertCircle, RefreshCw } from 'lucide-react';
+import { User, Job, JobStatus, Connection, Application, Review } from './types';
+import { Sparkles, MapPin, AlertCircle, RefreshCw, LogIn, Briefcase, CheckCircle2 } from 'lucide-react';
 
 export default function App() {
   const DEMO_PASSWORD = 'demo1234';
@@ -36,10 +36,30 @@ export default function App() {
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
   const [roleToast, setRoleToast] = useState<string | null>(null);
   const [isSwitchingRole, setIsSwitchingRole] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [appError, setAppError] = useState<string | null>(null);
+  const [appNotice, setAppNotice] = useState<string | null>(null);
+
+  const showAppError = (message: string) => {
+    setAppError(message);
+    setTimeout(() => setAppError(null), 6000);
+  };
+
+  const showAppNotice = (message: string) => {
+    setAppNotice(message);
+    setTimeout(() => setAppNotice(null), 4000);
+  };
+
+  const getApiError = async (res: Response, fallback: string) => {
+    const data = await res.json().catch(() => ({ error: fallback }));
+    return data.error || data.message || fallback;
+  };
 
   // Load and refresh all data from the SQLite database
   const refreshAllData = async () => {
     try {
+      setIsLoadingData(true);
+      setAppError(null);
       const [workersRes, jobsRes, connectionsRes, applicationsRes, reviewsRes] = await Promise.all([
         fetch('/api/workers').then(r => r.json()),
         fetch('/api/jobs').then(r => r.json()),
@@ -67,6 +87,9 @@ export default function App() {
       }
     } catch (e) {
       console.error("Failed to fetch fresh database states", e);
+      showAppError('Could not load platform data. Check that the local server is running.');
+    } finally {
+      setIsLoadingData(false);
     }
   };
 
@@ -89,6 +112,7 @@ export default function App() {
           localStorage.setItem('currentUser', JSON.stringify(data.user));
           setCurrentPage('dashboard');
           setRoleToast(`Demo Session: Active role set to Ahmed Mohamed Ali (Worker)`);
+          showAppNotice('Demo worker session loaded.');
           setTimeout(() => setRoleToast(null), 4000);
         }
       } catch (err) {
@@ -107,7 +131,33 @@ export default function App() {
           localStorage.setItem('currentUser', JSON.stringify(data.user));
           setCurrentPage('dashboard');
           setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
+          showAppNotice('Demo employer session loaded.');
           setTimeout(() => setRoleToast(null), 4000);
+        } else {
+          // Register first, then login
+          const regRes = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: 'employer-1',
+              name: 'Qardho Agricultural Co.',
+              email: 'employer1@qardho.com',
+              phone: '+252 90 700 1122',
+              password: DEMO_PASSWORD,
+              role: 'employer',
+              location: 'Kaambo',
+              bio: 'Local farming collective focusing on water-efficient agricultural systems in Karkaar.'
+            })
+          });
+          if (regRes.ok) {
+            const data = await regRes.json();
+            setCurrentUser(data.user);
+            localStorage.setItem('currentUser', JSON.stringify(data.user));
+            setCurrentPage('dashboard');
+            setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
+            showAppNotice('Demo employer session loaded.');
+            setTimeout(() => setRoleToast(null), 4000);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -132,6 +182,7 @@ export default function App() {
         setCurrentUser(data.user);
         localStorage.setItem('currentUser', JSON.stringify(data.user));
         setCurrentPage('dashboard');
+        showAppNotice('Logged in successfully.');
         return { success: true, message: 'Logged in successfully.' };
       }
       return { success: false, message: 'Invalid email/phone or password.' };
@@ -153,6 +204,7 @@ export default function App() {
       }
       const data = await res.json();
       if (data.success) {
+        showAppNotice('Account created. Please sign in.');
         return { success: true, message: 'Signup completed! Please sign in.' };
       }
       return { success: false, message: 'Registration failed.' };
@@ -173,6 +225,7 @@ export default function App() {
         setCurrentUser(data.user);
         localStorage.setItem('currentUser', JSON.stringify(data.user));
         await refreshAllData();
+        showAppNotice('Onboarding saved.');
 
         if (data.user.role === 'worker') {
           setCurrentPage('jobs');
@@ -188,7 +241,7 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
-    setCurrentPage('workers');
+    setCurrentPage('home');
   };
 
   const handleSwitchRole = async () => {
@@ -218,6 +271,7 @@ export default function App() {
           setCurrentUser(data.user);
           localStorage.setItem('currentUser', JSON.stringify(data.user));
           setRoleToast(`Success! Switched to ${newRole === 'worker' ? 'Worker Mode' : 'Employer Mode'}`);
+          showAppNotice(`Switched to ${newRole === 'worker' ? 'worker' : 'employer'} mode.`);
           await refreshAllData();
           
           if (newRole === 'worker') {
@@ -246,7 +300,7 @@ export default function App() {
       return;
     }
     if (currentUser.role !== 'employer') {
-      alert('Only Employers can initiate hiring connections.');
+      showAppError('Only employers can initiate hiring connections.');
       return;
     }
     setSelectedWorkerForConnect(worker);
@@ -264,6 +318,7 @@ export default function App() {
           fromUserName: currentUser.name,
           toUserId: selectedWorkerForConnect.id,
           toUserName: selectedWorkerForConnect.name,
+          actorId: currentUser.id,
           message,
           phone
         })
@@ -272,9 +327,13 @@ export default function App() {
         await refreshAllData();
         setSelectedWorkerForConnect(null);
         setCurrentPage('dashboard');
+        showAppNotice('Connection request sent.');
+      } else {
+        showAppError(await getApiError(res, 'Could not submit connection request.'));
       }
     } catch (e) {
       console.error(e);
+      showAppError('Could not submit connection request.');
     }
   };
 
@@ -285,7 +344,11 @@ export default function App() {
       return;
     }
     if (currentUser.role !== 'worker') {
-      alert('Only Workers can apply for jobs.');
+      showAppError('Only workers can apply for jobs.');
+      return;
+    }
+    if (job.status !== 'open') {
+      showAppError('This job is not open for new applications.');
       return;
     }
     setSelectedJobForApply(job);
@@ -305,6 +368,7 @@ export default function App() {
           applicantId: currentUser.id,
           applicantName: currentUser.name,
           applicantSkill: currentUser.skill || 'General Laborer',
+          actorId: currentUser.id,
           message,
           phone,
           location
@@ -314,9 +378,13 @@ export default function App() {
         await refreshAllData();
         setSelectedJobForApply(null);
         setCurrentPage('dashboard');
+        showAppNotice('Application submitted.');
+      } else {
+        showAppError(await getApiError(res, 'Could not submit application.'));
       }
     } catch (e) {
       console.error(e);
+      showAppError('Could not submit application.');
     }
   };
 
@@ -326,13 +394,17 @@ export default function App() {
       const res = await fetch(`/api/connections/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status, actorId: currentUser?.id })
       });
       if (res.ok) {
         await refreshAllData();
+        showAppNotice('Connection updated.');
+      } else {
+        showAppError(await getApiError(res, 'Could not update connection status.'));
       }
     } catch (e) {
       console.error(e);
+      showAppError('Could not update connection status.');
     }
   };
 
@@ -341,13 +413,36 @@ export default function App() {
       const res = await fetch(`/api/applications/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status, actorId: currentUser?.id })
       });
       if (res.ok) {
         await refreshAllData();
+        showAppNotice('Application updated.');
+      } else {
+        showAppError(await getApiError(res, 'Could not update application status.'));
       }
     } catch (e) {
       console.error(e);
+      showAppError('Could not update application status.');
+    }
+  };
+
+  const updateJobStatus = async (id: string, status: JobStatus) => {
+    try {
+      const res = await fetch(`/api/jobs/${id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, actorId: currentUser?.id })
+      });
+      if (res.ok) {
+        await refreshAllData();
+        showAppNotice('Job status updated.');
+      } else {
+        showAppError(await getApiError(res, 'Could not update job status.'));
+      }
+    } catch (e) {
+      console.error(e);
+      showAppError('Could not update job status.');
     }
   };
 
@@ -364,9 +459,13 @@ export default function App() {
         setCurrentUser(data.user);
         localStorage.setItem('currentUser', JSON.stringify(data.user));
         await refreshAllData();
+        showAppNotice('Profile updated.');
+      } else {
+        showAppError(await getApiError(res, 'Could not update profile.'));
       }
     } catch (e) {
       console.error(e);
+      showAppError('Could not update profile.');
     }
   };
 
@@ -381,14 +480,19 @@ export default function App() {
         body: JSON.stringify({
           employerId: currentUser.id,
           employerName: currentUser.name,
+          actorId: currentUser.id,
           ...jobData
         })
       });
       if (res.ok) {
         await refreshAllData();
+        showAppNotice('Job posted.');
+      } else {
+        showAppError(await getApiError(res, 'Could not post job.'));
       }
     } catch (e) {
       console.error(e);
+      showAppError('Could not post job.');
     }
   };
 
@@ -398,14 +502,20 @@ export default function App() {
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newReviewData)
+        body: JSON.stringify({ ...newReviewData, actorId: currentUser?.id })
       });
       if (res.ok) {
         await refreshAllData();
+        showAppNotice('Review published.');
+        return true;
+      } else {
+        showAppError(await getApiError(res, 'Could not add review.'));
       }
     } catch (e) {
       console.error(e);
+      showAppError('Could not add review.');
     }
+    return false;
   };
 
   const handleNavigate = (page: string) => {
@@ -483,6 +593,7 @@ export default function App() {
             jobs={jobs}
             onUpdateConnectionStatus={updateConnectionStatus}
             onUpdateApplicationStatus={updateApplicationStatus}
+            onUpdateJobStatus={updateJobStatus}
             onNavigate={handleNavigate}
             onSwitchRole={handleSwitchRole}
           />
@@ -506,24 +617,26 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col text-slate-800 antialiased font-sans" id="app-root-layout">
       {/* Top Banner indicating Preview Mode / Quick Login Panel */}
-      <div className="bg-emerald-600 text-white px-4 py-2 flex flex-col sm:flex-row items-center justify-between text-xs font-semibold shadow-xs" id="preview-alert-banner">
+      <div className="bg-slate-900 text-white px-4 py-2 flex flex-col sm:flex-row items-center justify-between text-xs font-semibold shadow-xs" id="preview-alert-banner">
         <div className="flex items-center space-x-1.5 mb-1.5 sm:mb-0">
-          <Sparkles className="h-4 w-4 animate-pulse shrink-0" />
-          <span><strong>Database Active:</strong> Real persistent SQLite database powering all workers, jobs, connections, and applications!</span>
+          <Sparkles className="h-4 w-4 text-sky-300 shrink-0" />
+          <span><strong>Demo Mode:</strong> Local SQLite data with worker, employer, job, and review flows.</span>
         </div>
         <div className="flex items-center space-x-2">
-          <span className="text-blue-100 hidden md:inline">Quick Test Actions:</span>
+          <span className="text-slate-300 hidden md:inline">Try a role:</span>
           <button
             onClick={() => loginAsDemoUser('worker')}
             className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md text-[10px] cursor-pointer transition-all border border-white/10"
           >
-            🔑 Log In as Ahmed (Worker)
+            <LogIn className="inline-block h-3 w-3 mr-1" />
+            Log In as Ahmed (Worker)
           </button>
           <button
             onClick={() => loginAsDemoUser('employer')}
             className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md text-[10px] cursor-pointer transition-all border border-white/10"
           >
-            💼 Log In as Farmer (Employer)
+            <Briefcase className="inline-block h-3 w-3 mr-1" />
+            Log In as Farmer (Employer)
           </button>
         </div>
       </div>
@@ -542,6 +655,28 @@ export default function App() {
         applications={applications}
       />
 
+      {(isLoadingData || appError) && (
+        <div className={`px-4 py-2 text-xs font-semibold border-b ${
+          appError
+            ? 'bg-rose-50 text-rose-700 border-rose-100'
+            : 'bg-blue-50 text-blue-700 border-blue-100'
+        }`}>
+          <div className="max-w-7xl mx-auto flex items-center gap-2">
+            {isLoadingData ? (
+              <>
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                <span>Loading latest workers, jobs, and dashboard activity...</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span>{appError}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Active Role Quick Toast Alert */}
       {roleToast && (
         <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
@@ -551,6 +686,19 @@ export default function App() {
             </div>
             <div>
               <p className="text-xs font-black tracking-tight">{roleToast}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {appNotice && (
+        <div className="fixed bottom-6 left-6 z-50 animate-fade-in">
+          <div className="bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-xl flex items-center space-x-3 border border-emerald-500/50">
+            <div className="p-1 bg-white/15 rounded-lg text-white">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-xs font-black tracking-tight">{appNotice}</p>
             </div>
           </div>
         </div>
@@ -583,7 +731,7 @@ export default function App() {
       {/* Soft platform footer */}
       <footer className="bg-white border-t border-slate-100 py-6 text-center text-xs text-slate-400 mt-auto">
         <div className="max-w-7xl mx-auto px-4">
-          <p>© 2026 Skills Hub Qardho. Connecting Somali trade skills and local industry.</p>
+          <p>(c) 2026 Skills Hub Qardho. Connecting Somali trade skills and local industry.</p>
         </div>
       </footer>
     </div>

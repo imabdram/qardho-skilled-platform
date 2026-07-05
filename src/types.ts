@@ -10,12 +10,16 @@ export interface User {
   phone: string;
   role?: 'worker' | 'employer' | 'pending';
   skill?: string;      // Required for workers (e.g. "Electrician", "Plumber")
-  location?: string;   // Qardho neighborhoods (e.g. "Horseed", "Wadajir", "Gashan")
+  location?: string;   // Qardho neighborhoods (e.g. "Kaambo", "Qoryacad", "Xorgoble")
   bio?: string;
   rate?: string;       // Expected rate for workers (e.g. "$15/day")
   createdAt?: string;
   smsNotificationsEnabled?: boolean;
+  availability?: 'available' | 'busy' | 'unavailable';
+  verified?: boolean;
 }
+
+export type JobStatus = 'open' | 'in_progress' | 'completed' | 'closed';
 
 export interface Job {
   id: string;
@@ -26,6 +30,7 @@ export interface Job {
   description: string;
   rate: string;        // Payment offer (e.g. "$20/day")
   phone: string;       // Direct contact phone
+  status: JobStatus;   // Lifecycle status for the job post
   createdAt: string;
 }
 

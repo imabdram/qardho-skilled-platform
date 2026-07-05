@@ -1,72 +1,64 @@
 # Qardho Skilled Platform
 
-Qardho Skilled Platform is a local skilled-labor marketplace for Qardho, Somalia. It connects workers such as solar technicians, plumbers, builders, tailors, and teachers with employers, farms, schools, businesses, and households that need local services.
+Qardho Skilled Platform is a local skilled-labor marketplace for Qardho, Somalia. It helps households, farms, schools, businesses, and employers find local workers such as solar technicians, plumbers, builders, tailors, teachers, electricians, and general trade professionals.
 
-The app supports worker discovery, job posting, applications, connection requests, profile management, reviews, role switching, and a role-based dashboard. Data is stored in a local SQLite database and served through an Express API.
+The project is currently an MVP/demo app with a real React frontend, Express API, and local SQLite database. It supports the core marketplace loop: browse workers, browse jobs, post a job, apply to a job, send hire connection requests, manage requests from a dashboard, edit profiles, and leave worker reviews.
 
-## Main Features
+## Current Status
 
-- Worker directory with search, skill filters, and neighborhood filters.
-- Job board for local opportunities in Qardho.
-- Employer-to-worker connection requests.
-- Worker job applications.
+- Working local MVP with persistent SQLite data.
+- Demo quick-login flows for both worker and employer roles.
+- Production build and TypeScript check currently pass.
+- Authentication is demo/local only: users sign in by registered phone or email plus password, but the app does not create production-grade sessions or protect all API routes.
+- API routes are intended for local prototype use and are not production-hardened.
+- SMS preferences are stored in profiles, but real SMS delivery is not integrated yet.
+
+## Features
+
+- Worker directory with search, skill filters, neighborhood filters, and availability filters.
+- Worker cards with skill, location, rate, availability, verified badge, and review summary.
+- Public worker profile view with bio, direct contact details, ratings, reviews, and trust signals.
+- Job board with search, neighborhood filtering, and lifecycle status filtering.
+- Job lifecycle statuses: `open`, `in_progress`, `completed`, and `closed`.
+- Employer job posting flow.
+- Worker job application flow.
+- Employer-to-worker connection request flow.
 - Accepted, declined, and pending status tracking.
-- Worker profiles with bio, skill, rate, location, phone, reviews, and SMS notification preference.
-- Employer dashboard for posted jobs and received applications.
-- Worker dashboard for received hire requests and submitted applications.
-- Demo quick-login actions for testing worker and employer flows.
-- Persistent local data through `database.sqlite`.
+- Role-based dashboard for workers and employers.
+- Dashboard metrics, tabs, action confirmations, and status updates.
+- Notification menu for recent connection and application activity.
+- Profile editing with role-specific fields.
+- Worker availability and SMS notification preference settings.
+- Review submission by employers with accepted hire connections.
+- Demo role switching for testing both sides of the marketplace.
+- Local seed data for workers, jobs, connections, applications, and reviews.
 
-## Technology Stack
+## Tech Stack
 
-### Frontend
-
-| Technology | Where it is used | Why it is used |
+| Area | Technology | Purpose |
 | --- | --- | --- |
-| React 19 | `src/main.tsx`, `src/App.tsx`, `src/pages/*`, `src/components/*` | Builds the interactive single-page app UI using reusable components and state-driven rendering. |
-| React DOM | `src/main.tsx` | Mounts the React application into the browser DOM. |
-| TypeScript | `src/*.tsx`, `src/types.ts`, `server.ts` | Adds static typing for users, jobs, applications, reviews, and server code. |
-| Vite | `vite.config.ts`, `index.html`, development middleware in `server.ts` | Provides fast local development, frontend bundling, and production frontend builds. |
-| Tailwind CSS 4 | `src/index.css`, Tailwind utility classes throughout components | Handles styling directly in the UI components with responsive utility classes. |
-| `@tailwindcss/vite` | `vite.config.ts` | Connects Tailwind CSS to the Vite build pipeline. |
-| `@vitejs/plugin-react` | `vite.config.ts` | Enables React support in Vite, including JSX transform and React development behavior. |
-| Lucide React | Most UI components and pages | Provides consistent icons for navigation, forms, jobs, profiles, status badges, and actions. |
+| Frontend | React 19 | Interactive single-page app UI. |
+| Frontend | TypeScript | Shared typing for users, jobs, applications, connections, reviews, and server code. |
+| Frontend | Vite | Development middleware and frontend production build. |
+| Frontend | Tailwind CSS 4 | Utility-first styling. |
+| Frontend | Lucide React | Icons for navigation, actions, status badges, forms, and dashboards. |
+| Backend | Node.js | Runtime for the local server. |
+| Backend | Express | API routes, JSON handling, Vite middleware in development, and static serving in production. |
+| Database | SQLite | Local persistent data store. |
+| Database | `sqlite` / `sqlite3` | Promise-based SQLite access and native database driver. |
+| Build | esbuild | Bundles `server.ts` into `dist/server.mjs`. |
 
-### Backend
+## Data Model
 
-| Technology | Where it is used | Why it is used |
-| --- | --- | --- |
-| Node.js | Runtime for `server.ts` and production `dist/server.cjs` | Runs the backend server and build scripts. |
-| Express | `server.ts` | Serves API routes, JSON request handling, Vite middleware in development, and static files in production. |
-| SQLite | `database.sqlite` | Stores app data locally without requiring an external database service. |
-| `sqlite` | `server.ts` | Provides a promise-based API for SQLite queries. |
-| `sqlite3` | `server.ts` | Provides the native SQLite database driver. |
-| `tsx` | `npm run dev` | Runs the TypeScript server directly during development. |
-| esbuild | `npm run build` | Bundles `server.ts` into `dist/server.cjs` for production. |
+The backend creates these SQLite tables when the app starts:
 
-### Data Model
-
-The backend creates these SQLite tables automatically when the app starts:
-
-- `users`: workers, employers, pending onboarding users, profile details, and notification preferences.
+- `users`: workers, employers, pending onboarding users, profile details, availability, verification, and notification preferences.
 - `jobs`: job posts created by employers.
-- `connections`: employer-to-worker contact requests.
+- `connections`: employer-to-worker hire/contact requests.
 - `applications`: worker applications to posted jobs.
 - `reviews`: employer reviews for workers.
 
-If the database is empty, `server.ts` seeds sample workers, jobs, connections, applications, and reviews.
-
-### Installed or Scaffolded Dependencies
-
-These packages are present in `package.json`, but are not currently wired into the runtime app code:
-
-| Technology | Current status | Intended use |
-| --- | --- | --- |
-| `@google/genai` | Installed, not currently imported | Could be used later for Gemini-powered AI features such as smart job matching or profile writing. |
-| Firebase | Installed, not currently imported | Could be used later for hosted authentication, Firestore, storage, or cloud deployment integrations. |
-| Motion | Installed, not currently imported | Could be used later for advanced UI animations. |
-| dotenv | Installed, not currently imported | Could be used later to load local environment variables from `.env` files. |
-| Autoprefixer | Installed as a dev dependency | Can help with CSS vendor prefixing if a PostCSS pipeline is added or expanded. |
+If `database.sqlite` is empty or missing, the server recreates the schema and seeds sample data.
 
 ## Project Structure
 
@@ -77,6 +69,7 @@ These packages are present in `package.json`, but are not currently wired into t
 |   +-- main.tsx                # React entry point
 |   +-- index.css               # Tailwind CSS import
 |   +-- types.ts                # Shared TypeScript interfaces
+|   +-- constants.ts            # Local constants such as Qardho neighborhoods
 |   +-- components/             # Reusable UI components
 |   +-- pages/                  # Main app screens
 +-- server.ts                   # Express server, SQLite schema, seed data, and API routes
@@ -89,11 +82,9 @@ These packages are present in `package.json`, but are not currently wired into t
 
 ## API Routes
 
-The frontend calls these local API routes:
-
 | Method | Route | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/workers` | List all users with the worker role. |
+| `GET` | `/api/workers` | List all worker users. |
 | `GET` | `/api/jobs` | List all jobs. |
 | `GET` | `/api/connections` | List connection requests. |
 | `GET` | `/api/applications` | List job applications. |
@@ -102,6 +93,7 @@ The frontend calls these local API routes:
 | `POST` | `/api/auth/login` | Log in by email or phone number plus password. |
 | `POST` | `/api/profile/update` | Update user profile and role details. |
 | `POST` | `/api/jobs` | Create a new job post. |
+| `POST` | `/api/jobs/:id/status` | Update a job lifecycle status. |
 | `POST` | `/api/connections` | Create a worker connection request. |
 | `POST` | `/api/connections/:id/status` | Accept or decline a connection request. |
 | `POST` | `/api/applications` | Apply to a job. |
@@ -112,7 +104,7 @@ The frontend calls these local API routes:
 
 ### Prerequisites
 
-- Node.js 20 or newer is recommended.
+- Node.js 20 or newer.
 - npm.
 
 ### Install Dependencies
@@ -123,16 +115,7 @@ npm install
 
 ### Environment Variables
 
-The app can run locally without external services because the current implementation uses local SQLite and does not call Gemini or Firebase.
-
-An example environment file is provided at `.env.example`:
-
-```bash
-GEMINI_API_KEY="MY_GEMINI_API_KEY"
-APP_URL="MY_APP_URL"
-```
-
-These values are scaffolded for possible AI Studio, Gemini, or hosted deployment use. They are not required for the current local marketplace flow.
+No environment variables are required for the current local MVP. The app uses a local SQLite database and does not require Firebase, SMS, email, or external API credentials.
 
 ### Run in Development
 
@@ -140,13 +123,13 @@ These values are scaffolded for possible AI Studio, Gemini, or hosted deployment
 npm run dev
 ```
 
-The Express server starts on:
+The app runs at:
 
 ```text
 http://localhost:3000
 ```
 
-In development, Express also mounts Vite middleware, so the same server handles both the API and the React app.
+In development, Express mounts Vite middleware, so the same server handles the API and the React app.
 
 ### Build for Production
 
@@ -157,7 +140,7 @@ npm run build
 This creates:
 
 - `dist/` frontend assets from Vite.
-- `dist/server.cjs` bundled backend server from esbuild.
+- `dist/server.mjs` bundled backend server from esbuild.
 
 ### Run the Production Build
 
@@ -165,7 +148,7 @@ This creates:
 npm start
 ```
 
-The production server serves the built React app and the API from:
+The production server serves the built React app and API from:
 
 ```text
 http://localhost:3000
@@ -181,7 +164,7 @@ This runs TypeScript checking with `tsc --noEmit`.
 
 ## Demo Usage
 
-After starting the app, use the quick test actions in the top banner:
+After starting the app, use the quick test actions in the top demo banner:
 
 - Log in as Ahmed to test the worker experience.
 - Log in as Farmer to test the employer experience.
@@ -193,19 +176,36 @@ The seeded demo credentials are:
 | Worker | `ahmed.mohamed@example.com` or `+252 90 779 1234` | `demo1234` |
 | Employer | `employer1@qardho.com` or `+252 90 700 1122` | `demo1234` |
 
-You can then test the complete marketplace loop:
+Suggested demo loop:
 
-1. Browse workers.
-2. Browse jobs.
-3. Post a job as an employer.
-4. Apply to a job as a worker.
-5. Send a connection request as an employer.
-6. Accept or decline requests from the dashboard.
-7. Edit profiles and reviews.
+1. Browse the worker directory.
+2. View a worker profile and reviews.
+3. Log in as an employer.
+4. Send a connection request to a worker.
+5. Post a job.
+6. Switch to a worker account.
+7. Browse jobs and submit an application.
+8. Open the dashboard to accept, decline, or track requests.
+9. Edit a profile and update availability or notification preferences.
 
-## Notes
+## Verification
 
-- Authentication is currently demo/local only. The server stores local SQLite password hashes and validates login passwords, but it does not create production-grade sessions or protect API routes.
-- API routes are currently unauthenticated and intended for local prototype use.
-- The SQLite database is local to this project folder.
-- If `database.sqlite` is deleted, the app recreates the schema and seeds sample data on the next server start.
+The current app has been checked with:
+
+```bash
+npm run build
+npm run lint
+```
+
+Both commands pass in the current workspace.
+
+## Production Gaps
+
+Before using this for real users, the app needs:
+
+- Real authentication, password or OTP flow, and server-side sessions.
+- Stronger authorization that does not trust client-supplied `actorId`.
+- Input validation and rate limiting on public routes.
+- Real SMS or WhatsApp notification integration if notification preferences are meant to send messages.
+- Deployment configuration for hosting, database backups, and environment management.
+- More formal automated tests for the main worker, employer, application, and connection flows.

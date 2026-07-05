@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, MapPin, DollarSign, Send, Phone, Star } from 'lucide-react';
+import { MapPin, DollarSign, Send, Star, ShieldCheck } from 'lucide-react';
 import { User as UserType, Review } from '../types';
 
 interface WorkerCardProps {
@@ -49,6 +49,12 @@ export default function WorkerCard({ worker, onConnect, onViewProfile, isCurrent
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
                 {worker.skill}
               </span>
+              {worker.verified && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                  <ShieldCheck className="h-3 w-3" />
+                  Verified
+                </span>
+              )}
               
               {/* Star Rating Badge */}
               <div className="flex items-center space-x-1 text-amber-500 bg-amber-50/70 border border-amber-100/50 px-1.5 py-0.5 rounded-md text-[11px] font-bold">
@@ -70,6 +76,16 @@ export default function WorkerCard({ worker, onConnect, onViewProfile, isCurrent
           <div className="flex items-center text-xs text-slate-600 font-semibold">
             <DollarSign className="h-3.5 w-3.5 text-emerald-600 mr-1.5 shrink-0" />
             <span className="text-emerald-700">Expects {worker.rate || '$15 / day'}</span>
+          </div>
+          <div className="flex items-center text-xs text-slate-600 font-semibold">
+            <span className={`h-2.5 w-2.5 rounded-full mr-2 ${
+              worker.availability === 'busy'
+                ? 'bg-amber-500'
+                : worker.availability === 'unavailable'
+                  ? 'bg-rose-500'
+                  : 'bg-emerald-500'
+            }`} />
+            <span className="capitalize">{worker.availability || 'available'}</span>
           </div>
         </div>
 

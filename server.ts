@@ -19,9 +19,11 @@ const DEMO_EMPLOYER = {
   phone: '+252 90 700 1122',
   role: 'employer',
   skill: null,
-  location: 'Wadajir',
+  location: 'Kaambo',
   bio: 'Local farming collective focusing on water-efficient agricultural systems in Karkaar.',
-  rate: null
+  rate: null,
+  availability: 'available',
+  verified: 0
 };
 
 function hashPassword(password: string) {
@@ -84,10 +86,11 @@ async function startServer() {
   app.use(express.json());
 
   const PORT = 3000;
+  const isProduction = process.env.NODE_ENV === 'production' || path.basename(__dirname) === 'dist';
 
   // Initialize SQLite database
   const db = await open({
-    filename: path.join(__dirname, 'database.sqlite'),
+    filename: path.join(process.cwd(), 'database.sqlite'),
     driver: sqlite3.Database
   });
 
@@ -105,7 +108,9 @@ async function startServer() {
       rate TEXT,
       createdAt TEXT,
       smsNotificationsEnabled INTEGER DEFAULT 0,
-      passwordHash TEXT
+      passwordHash TEXT,
+      availability TEXT DEFAULT 'available',
+      verified INTEGER DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS jobs (
@@ -117,6 +122,7 @@ async function startServer() {
       description TEXT NOT NULL,
       rate TEXT NOT NULL,
       phone TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
       createdAt TEXT NOT NULL
     );
 
@@ -163,6 +169,44 @@ async function startServer() {
     await db.exec('ALTER TABLE users ADD COLUMN passwordHash TEXT');
   }
 
+  const jobColumns = await db.all('PRAGMA table_info(jobs)');
+  if (!jobColumns.some((column: any) => column.name === 'status')) {
+    await db.run("ALTER TABLE jobs ADD COLUMN status TEXT NOT NULL DEFAULT 'open'");
+  }
+  await db.run("UPDATE jobs SET status = 'open' WHERE status IS NULL OR status = ''");
+
+  if (!userColumns.some((column: any) => column.name === 'availability')) {
+    await db.run("ALTER TABLE users ADD COLUMN availability TEXT DEFAULT 'available'");
+  }
+  if (!userColumns.some((column: any) => column.name === 'verified')) {
+    await db.run("ALTER TABLE users ADD COLUMN verified INTEGER DEFAULT 0");
+  }
+  await db.run("UPDATE users SET availability = 'available' WHERE availability IS NULL OR availability = ''");
+  const locationMappings = [
+    ['Wadajir', 'Kaambo'],
+    ['Horseed', 'Qoryacad'],
+    ['Gashan', 'Xorgoble'],
+    ['Bulsho', 'Xiingood'],
+    ['Rafto', 'Xiddo'],
+  ];
+  for (const [oldLocation, newLocation] of locationMappings) {
+    await db.run('UPDATE users SET location = ? WHERE location = ?', [newLocation, oldLocation]);
+    await db.run('UPDATE jobs SET location = ? WHERE location = ?', [newLocation, oldLocation]);
+    await db.run('UPDATE applications SET location = ? WHERE location = ?', [newLocation, oldLocation]);
+  }
+
+  const formatUser = (user: any) => ({
+    ...sanitizeUser(user),
+    smsNotificationsEnabled: !!user.smsNotificationsEnabled,
+    verified: !!user.verified,
+  });
+
+  const validRoles = ['worker', 'employer', 'pending'];
+  const validJobStatuses = ['open', 'in_progress', 'completed', 'closed'];
+  const validRequestStatuses = ['accepted', 'declined'];
+  const validAvailability = ['available', 'busy', 'unavailable'];
+  const isBlank = (value: any) => typeof value !== 'string' || value.trim().length === 0;
+
   // Seed data if empty
   const usersCount = await db.get('SELECT COUNT(*) as count FROM users');
   if (usersCount.count === 0) {
@@ -177,9 +221,11 @@ async function startServer() {
         phone: '+252 90 779 1234',
         role: 'worker',
         skill: 'Solar Technician',
-        location: 'Wadajir',
+        location: 'Kaambo',
         bio: 'Certified solar energy installer with over 5 years of experience in installing household panels and system repairs around Qardho.',
         rate: '$20 / day',
+        availability: 'available',
+        verified: 1,
         createdAt: new Date().toISOString()
       },
       {
@@ -189,9 +235,11 @@ async function startServer() {
         phone: '+252 90 655 4321',
         role: 'worker',
         skill: 'Professional Tailor',
-        location: 'Horseed',
+        location: 'Qoryacad',
         bio: 'Expert tailor specializing in traditional Somali garments, school uniforms, and custom embroidery. Fast turnaround and reliable quality.',
         rate: '$15 / day',
+        availability: 'busy',
+        verified: 1,
         createdAt: new Date().toISOString()
       },
       {
@@ -201,9 +249,11 @@ async function startServer() {
         phone: '+252 90 711 9988',
         role: 'worker',
         skill: 'Mason & Builder',
-        location: 'Gashan',
+        location: 'Xorgoble',
         bio: 'Experienced construction mason specializing in blockwork, plastering, and water reservoir/berked construction for homes and agricultural land.',
         rate: '$25 / day',
+        availability: 'available',
+        verified: 1,
         createdAt: new Date().toISOString()
       },
       {
@@ -213,9 +263,11 @@ async function startServer() {
         phone: '+252 90 782 5566',
         role: 'worker',
         skill: 'Primary School Teacher',
-        location: 'Bulsho',
+        location: 'Xiingood',
         bio: 'Dedicated primary school teacher specializing in Mathematics and Somali literature tutoring. Passionate about helping children succeed.',
         rate: '$12 / day',
+        availability: 'available',
+        verified: 0,
         createdAt: new Date().toISOString()
       },
       {
@@ -225,9 +277,11 @@ async function startServer() {
         phone: '+252 90 733 4455',
         role: 'worker',
         skill: 'Plumber & Pipefitter',
-        location: 'Wadajir',
+        location: 'Xiddo',
         bio: 'Reliable plumber with expertise in household piping, solar water heating systems, and water pumps installation.',
         rate: '$18 / day',
+        availability: 'unavailable',
+        verified: 1,
         createdAt: new Date().toISOString()
       },
       {
@@ -238,8 +292,22 @@ async function startServer() {
 
     for (const w of SAMPLE_WORKERS) {
       await db.run(
-        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)',
-        [w.id, w.name, w.email, w.phone, w.role, w.skill, w.location, w.bio, w.rate, w.createdAt, w.id === 'worker-1' || w.id === 'employer-1' ? hashPassword(DEMO_PASSWORD) : null]
+        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash, availability, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)',
+        [
+          w.id,
+          w.name,
+          w.email,
+          w.phone,
+          w.role,
+          w.skill,
+          w.location,
+          w.bio,
+          w.rate,
+          w.createdAt,
+          w.id === 'worker-1' || w.id === 'employer-1' ? hashPassword(DEMO_PASSWORD) : null,
+          w.availability || 'available',
+          w.verified || 0
+        ]
       );
     }
 
@@ -250,10 +318,11 @@ async function startServer() {
         title: 'Solar Panel System Installer Needed',
         employerId: 'employer-1',
         employerName: 'Qardho Agricultural Co.',
-        location: 'Wadajir',
+        location: 'Kaambo',
         description: 'We are looking for an experienced Solar Technician to install a 5KW solar pump system for a local farm outside Qardho. Panels and equipment are provided on site.',
         rate: '$250 Total',
         phone: '+252 90 700 1122',
+        status: 'open',
         createdAt: new Date(Date.now() - 86400000).toISOString()
       },
       {
@@ -261,10 +330,11 @@ async function startServer() {
         title: 'Custom Uniform Tailoring',
         employerId: 'employer-2',
         employerName: 'Darul-Hikmah School',
-        location: 'Horseed',
+        location: 'Qoryacad',
         description: 'Needs a professional tailor to sew 45 sets of student school uniforms. Material will be delivered to your workshop. Looking for high quality stitching.',
         rate: '$150 Total',
         phone: '+252 90 600 3344',
+        status: 'in_progress',
         createdAt: new Date(Date.now() - 172800000).toISOString()
       },
       {
@@ -272,18 +342,19 @@ async function startServer() {
         title: 'Concrete Plastering Work for Berked',
         employerId: 'employer-3',
         employerName: 'Hassan Gure Farms',
-        location: 'Gashan',
+        location: 'Xorgoble',
         description: 'Mason needed to complete plastering work on a newly built underground concrete water reservoir (berked) to ensure water-tight finish.',
         rate: '$30 / day',
         phone: '+252 90 790 9900',
+        status: 'open',
         createdAt: new Date().toISOString()
       }
     ];
 
     for (const j of SAMPLE_JOBS) {
       await db.run(
-        'INSERT INTO jobs (id, title, employerId, employerName, location, description, rate, phone, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [j.id, j.title, j.employerId, j.employerName, j.location, j.description, j.rate, j.phone, j.createdAt]
+        'INSERT INTO jobs (id, title, employerId, employerName, location, description, rate, phone, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [j.id, j.title, j.employerId, j.employerName, j.location, j.description, j.rate, j.phone, j.status, j.createdAt]
       );
     }
 
@@ -330,9 +401,9 @@ async function startServer() {
         applicantId: 'worker-1',
         applicantName: 'Ahmed Mohamed Ali',
         applicantSkill: 'Solar Technician',
-        message: 'Hi, I am extremely interested in this project. I have installed three similar agricultural pump systems in the past year in Wadajir and Gashan.',
+        message: 'Hi, I am extremely interested in this project. I have installed three similar agricultural pump systems in the past year in Kaambo and Xorgoble.',
         phone: '+252 90 779 1234',
-        location: 'Wadajir',
+        location: 'Kaambo',
         status: 'pending',
         createdAt: new Date().toISOString()
       }
@@ -392,11 +463,7 @@ async function startServer() {
   app.get('/api/workers', async (req, res) => {
     try {
       const workers = await db.all("SELECT * FROM users WHERE role = 'worker'");
-      const formattedWorkers = workers.map(w => ({
-        ...sanitizeUser(w),
-        smsNotificationsEnabled: !!w.smsNotificationsEnabled
-      }));
-      res.json(formattedWorkers);
+      res.json(workers.map(formatUser));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -444,29 +511,38 @@ async function startServer() {
 
   // Auth Operations
   app.post('/api/auth/register', async (req, res) => {
-    const { id, name, email, phone, password, role, skill, location, bio, rate, smsNotificationsEnabled } = req.body;
+    const { id, name, email, phone, password, role, skill, location, bio, rate, smsNotificationsEnabled, availability } = req.body;
     try {
-      if (!password) {
+      if (isBlank(name) || isBlank(phone)) {
+        return res.status(400).json({ error: 'Name and phone are required.' });
+      }
+      if (isBlank(password)) {
         return res.status(400).json({ error: 'Password is required.' });
+      }
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ error: 'Invalid user role.' });
+      }
+      if (availability && !validAvailability.includes(availability)) {
+        return res.status(400).json({ error: 'Invalid availability value.' });
       }
 
       const existingUser = await db.get('SELECT * FROM users WHERE phone = ? OR (email IS NOT NULL AND email = ?)', [phone, email]);
       if (existingUser) {
         return res.status(400).json({ error: 'A user with this phone or email already exists.' });
       }
-      
+
       const newId = id || `user-${Date.now()}`;
       const createdAt = new Date().toISOString();
       const passwordHash = hashPassword(password);
       await db.run(
-        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [newId, name, email || null, phone, role || 'pending', skill || null, location || null, bio || null, rate || null, createdAt, smsNotificationsEnabled ? 1 : 0, passwordHash]
+        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, createdAt, smsNotificationsEnabled, passwordHash, availability, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
+        [newId, name.trim(), email || null, phone.trim(), role || 'pending', skill || null, location || null, bio || null, rate || null, createdAt, smsNotificationsEnabled ? 1 : 0, passwordHash, availability || 'available']
       );
 
       const user = await db.get('SELECT * FROM users WHERE id = ?', [newId]);
       res.json({
         success: true,
-        user: { ...sanitizeUser(user), smsNotificationsEnabled: !!user.smsNotificationsEnabled }
+        user: formatUser(user)
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -487,7 +563,7 @@ async function startServer() {
       if (user && verifyPassword(password, user.passwordHash)) {
         return res.json({
           success: true,
-          user: { ...sanitizeUser(user), smsNotificationsEnabled: !!user.smsNotificationsEnabled }
+          user: formatUser(user)
         });
       }
       res.status(401).json({ success: false, error: 'Invalid email/phone or password.' });
@@ -498,8 +574,18 @@ async function startServer() {
 
   // Update profile
   app.post('/api/profile/update', async (req, res) => {
-    const { id, name, email, phone, role, skill, location, bio, rate, smsNotificationsEnabled } = req.body;
+    const { id, name, email, phone, role, skill, location, bio, rate, smsNotificationsEnabled, availability } = req.body;
     try {
+      if (isBlank(id) || isBlank(name) || isBlank(phone)) {
+        return res.status(400).json({ error: 'User id, name, and phone are required.' });
+      }
+      if (!validRoles.includes(role)) {
+        return res.status(400).json({ error: 'Invalid user role.' });
+      }
+      if (availability && !validAvailability.includes(availability)) {
+        return res.status(400).json({ error: 'Invalid availability value.' });
+      }
+
       await db.run(
         `UPDATE users SET 
           name = ?, 
@@ -510,15 +596,19 @@ async function startServer() {
           location = ?, 
           bio = ?, 
           rate = ?, 
-          smsNotificationsEnabled = ? 
+          smsNotificationsEnabled = ?,
+          availability = ?
         WHERE id = ?`,
-        [name, email || null, phone, role, skill || null, location || null, bio || null, rate || null, smsNotificationsEnabled ? 1 : 0, id]
+        [name, email || null, phone, role, skill || null, location || null, bio || null, rate || null, smsNotificationsEnabled ? 1 : 0, availability || 'available', id]
       );
 
       const user = await db.get('SELECT * FROM users WHERE id = ?', [id]);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
       res.json({
         success: true,
-        user: { ...sanitizeUser(user), smsNotificationsEnabled: !!user.smsNotificationsEnabled }
+        user: formatUser(user)
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -527,13 +617,21 @@ async function startServer() {
 
   // Post Job
   app.post('/api/jobs', async (req, res) => {
-    const { id, title, employerId, employerName, location, description, rate, phone } = req.body;
+    const { id, title, employerId, employerName, location, description, rate, phone, actorId } = req.body;
     try {
+      if ([title, employerId, employerName, location, description, rate, phone].some(isBlank)) {
+        return res.status(400).json({ error: 'Title, employer, location, description, rate, and phone are required.' });
+      }
+      const employer = await db.get('SELECT * FROM users WHERE id = ?', [actorId || employerId]);
+      if (!employer || employer.role !== 'employer' || employer.id !== employerId) {
+        return res.status(403).json({ error: 'Only the employer account can post this job.' });
+      }
+
       const newId = id || `job-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
-        'INSERT INTO jobs (id, title, employerId, employerName, location, description, rate, phone, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [newId, title, employerId, employerName, location, description, rate, phone, createdAt]
+        'INSERT INTO jobs (id, title, employerId, employerName, location, description, rate, phone, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [newId, title, employerId, employerName, location, description, rate, phone, 'open', createdAt]
       );
       const job = await db.get('SELECT * FROM jobs WHERE id = ?', [newId]);
       res.json({ success: true, job });
@@ -542,10 +640,46 @@ async function startServer() {
     }
   });
 
+  app.post('/api/jobs/:id/status', async (req, res) => {
+    const { id } = req.params;
+    const { status, actorId } = req.body;
+
+    if (!validJobStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid job status.' });
+    }
+
+    try {
+      const job = await db.get('SELECT * FROM jobs WHERE id = ?', [id]);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found.' });
+      }
+      if (job.employerId !== actorId) {
+        return res.status(403).json({ error: 'Only the job owner can update this job status.' });
+      }
+      await db.run('UPDATE jobs SET status = ? WHERE id = ?', [status, id]);
+      const updatedJob = await db.get('SELECT * FROM jobs WHERE id = ?', [id]);
+      res.json({ success: true, job: updatedJob });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Connection Requests
   app.post('/api/connections', async (req, res) => {
-    const { id, fromUserId, fromUserName, toUserId, toUserName, message, phone } = req.body;
+    const { id, fromUserId, fromUserName, toUserId, toUserName, message, phone, actorId } = req.body;
     try {
+      if ([fromUserId, fromUserName, toUserId, toUserName, phone].some(isBlank)) {
+        return res.status(400).json({ error: 'Connection requester, target worker, and phone are required.' });
+      }
+      const fromUser = await db.get('SELECT * FROM users WHERE id = ?', [actorId || fromUserId]);
+      const toUser = await db.get('SELECT * FROM users WHERE id = ?', [toUserId]);
+      if (!fromUser || fromUser.role !== 'employer' || fromUser.id !== fromUserId) {
+        return res.status(403).json({ error: 'Only employers can initiate hire connections.' });
+      }
+      if (!toUser || toUser.role !== 'worker') {
+        return res.status(400).json({ error: 'Connection target must be a worker.' });
+      }
+
       const newId = id || `conn-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
@@ -561,11 +695,21 @@ async function startServer() {
 
   app.post('/api/connections/:id/status', async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, actorId } = req.body;
+    if (!validRequestStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid connection status.' });
+    }
     try {
-      await db.run('UPDATE connections SET status = ? WHERE id = ?', [status, id]);
       const connection = await db.get('SELECT * FROM connections WHERE id = ?', [id]);
-      res.json({ success: true, connection });
+      if (!connection) {
+        return res.status(404).json({ error: 'Connection not found.' });
+      }
+      if (connection.toUserId !== actorId) {
+        return res.status(403).json({ error: 'Only the target worker can update this request.' });
+      }
+      await db.run('UPDATE connections SET status = ? WHERE id = ?', [status, id]);
+      const updatedConnection = await db.get('SELECT * FROM connections WHERE id = ?', [id]);
+      res.json({ success: true, connection: updatedConnection });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -573,8 +717,23 @@ async function startServer() {
 
   // Application Actions
   app.post('/api/applications', async (req, res) => {
-    const { id, jobId, jobTitle, employerId, applicantId, applicantName, applicantSkill, message, phone, location } = req.body;
+    const { id, jobId, jobTitle, employerId, applicantId, applicantName, applicantSkill, message, phone, location, actorId } = req.body;
     try {
+      if ([jobId, jobTitle, employerId, applicantId, applicantName, applicantSkill, message, phone, location].some(isBlank)) {
+        return res.status(400).json({ error: 'Application details, message, phone, and location are required.' });
+      }
+      const applicant = await db.get('SELECT * FROM users WHERE id = ?', [actorId || applicantId]);
+      const job = await db.get('SELECT * FROM jobs WHERE id = ?', [jobId]);
+      if (!applicant || applicant.role !== 'worker' || applicant.id !== applicantId) {
+        return res.status(403).json({ error: 'Only workers can apply for jobs.' });
+      }
+      if (!job || job.employerId !== employerId) {
+        return res.status(404).json({ error: 'Job not found.' });
+      }
+      if (job.status !== 'open') {
+        return res.status(400).json({ error: 'This job is not open for applications.' });
+      }
+
       const newId = id || `app-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
@@ -590,11 +749,21 @@ async function startServer() {
 
   app.post('/api/applications/:id/status', async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, actorId } = req.body;
+    if (!validRequestStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid application status.' });
+    }
     try {
-      await db.run('UPDATE applications SET status = ? WHERE id = ?', [status, id]);
       const application = await db.get('SELECT * FROM applications WHERE id = ?', [id]);
-      res.json({ success: true, application });
+      if (!application) {
+        return res.status(404).json({ error: 'Application not found.' });
+      }
+      if (application.employerId !== actorId) {
+        return res.status(403).json({ error: 'Only the job owner can update this application.' });
+      }
+      await db.run('UPDATE applications SET status = ? WHERE id = ?', [status, id]);
+      const updatedApplication = await db.get('SELECT * FROM applications WHERE id = ?', [id]);
+      res.json({ success: true, application: updatedApplication });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -602,8 +771,27 @@ async function startServer() {
 
   // Reviews
   app.post('/api/reviews', async (req, res) => {
-    const { id, workerId, employerId, employerName, rating, comment } = req.body;
+    const { id, workerId, employerId, employerName, rating, comment, actorId } = req.body;
     try {
+      if ([workerId, employerId, employerName, comment].some(isBlank) || typeof rating !== 'number' || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'Worker, employer, rating 1-5, and comment are required.' });
+      }
+      const employer = await db.get('SELECT * FROM users WHERE id = ?', [actorId || employerId]);
+      const worker = await db.get('SELECT * FROM users WHERE id = ?', [workerId]);
+      const acceptedConnection = await db.get(
+        "SELECT * FROM connections WHERE fromUserId = ? AND toUserId = ? AND status = 'accepted'",
+        [employerId, workerId]
+      );
+      if (!employer || employer.role !== 'employer' || employer.id !== employerId) {
+        return res.status(403).json({ error: 'Only employers can submit worker reviews.' });
+      }
+      if (!worker || worker.role !== 'worker') {
+        return res.status(400).json({ error: 'Reviews can only target workers.' });
+      }
+      if (!acceptedConnection) {
+        return res.status(403).json({ error: 'Reviews require an accepted hire connection.' });
+      }
+
       const newId = id || `rev-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
@@ -618,7 +806,7 @@ async function startServer() {
   });
 
   // --- Vite & Production Static File Serving Middleware ---
-  if (process.env.NODE_ENV !== "production") {
+  if (!isProduction) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

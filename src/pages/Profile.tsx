@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { User, Save, MapPin, Phone, Briefcase, DollarSign, Edit3, CheckCircle, RefreshCw, Bell, Smartphone, Star, ArrowLeft, Send } from 'lucide-react';
+import { User, Save, MapPin, Phone, Briefcase, DollarSign, Edit3, CheckCircle, Bell, Star, ArrowLeft, Send, ShieldCheck } from 'lucide-react';
 import { User as UserType, Review, Connection } from '../types';
+import { QARDHO_NEIGHBORHOODS } from '../constants';
 
 interface ProfileProps {
   currentUser: UserType | null;
@@ -8,7 +9,7 @@ interface ProfileProps {
   onUpdateProfile: (updatedProfile: UserType) => void;
   onSwitchRole: () => void;
   reviews: Review[];
-  onAddReview: (review: { workerId: string; employerId: string; employerName: string; rating: number; comment: string }) => void;
+  onAddReview: (review: { workerId: string; employerId: string; employerName: string; rating: number; comment: string }) => Promise<boolean>;
   connections: Connection[];
   onBack?: () => void;
   onConnect?: (worker: UserType) => void;
@@ -39,6 +40,7 @@ export default function Profile({
   const [skill, setSkill] = useState(currentUser.skill || '');
   const [bio, setBio] = useState(currentUser.bio || '');
   const [rate, setRate] = useState(currentUser.rate || '');
+  const [availability, setAvailability] = useState(currentUser.availability || 'available');
   const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(currentUser.smsNotificationsEnabled ?? true);
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -58,6 +60,7 @@ export default function Profile({
       skill: currentUser.role === 'worker' ? skill : undefined,
       bio,
       rate: currentUser.role === 'worker' ? rate : undefined,
+      availability: currentUser.role === 'worker' ? availability : currentUser.availability,
       smsNotificationsEnabled,
     };
     onUpdateProfile(updated);
@@ -66,11 +69,11 @@ export default function Profile({
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
-  const handleReviewSubmit = (e: React.FormEvent) => {
+  const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
-    onAddReview({
+    const saved = await onAddReview({
       workerId: targetUser.id,
       employerId: currentUser.id,
       employerName: currentUser.name,
@@ -78,10 +81,12 @@ export default function Profile({
       comment: newComment.trim(),
     });
 
-    setNewComment('');
-    setNewRating(5);
-    setReviewSuccess('Thank you! Your verified feedback and rating have been posted.');
-    setTimeout(() => setReviewSuccess(''), 4000);
+    if (saved) {
+      setNewComment('');
+      setNewRating(5);
+      setReviewSuccess('Thank you! Your verified feedback and rating have been posted.');
+      setTimeout(() => setReviewSuccess(''), 4000);
+    }
   };
 
   // Profile data for avatar initials
@@ -108,12 +113,6 @@ export default function Profile({
     c => c.fromUserId === currentUser.id && c.toUserId === targetUser.id && c.status === 'accepted'
   );
   
-  // Also support reviews if there's any active connection for better demo flexibility
-  const hasAnyConnection = connections.some(
-    c => (c.fromUserId === currentUser.id && c.toUserId === targetUser.id) || 
-         (c.toUserId === currentUser.id && c.fromUserId === targetUser.id)
-  );
-
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="profile-page">
       
@@ -153,6 +152,12 @@ export default function Profile({
                     <span>{avgRating}</span>
                   </div>
                 )}
+                {targetUser.role === 'worker' && targetUser.verified && (
+                  <div className="flex items-center space-x-1 text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg text-xs font-bold">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    <span>Verified</span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center mt-1.5 space-x-2">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
@@ -164,7 +169,7 @@ export default function Profile({
                 </span>
                 
                 {targetUser.role === 'worker' && targetUser.skill && (
-                  <span className="text-xs text-slate-500 font-semibold">• {targetUser.skill}</span>
+                  <span className="text-xs text-slate-500 font-semibold">- {targetUser.skill}</span>
                 )}
               </div>
             </div>
@@ -220,13 +225,16 @@ export default function Profile({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Neighborhood (Optional)</label>
-                  <input
-                    type="text"
+                  <select
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Horseed, Wadajir, Gashan..."
                     className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
+                  >
+                    <option value="">Select neighborhood</option>
+                    {QARDHO_NEIGHBORHOODS.map((neighborhood) => (
+                      <option key={neighborhood} value={neighborhood}>{neighborhood}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {currentUser.role === 'worker' && (
@@ -245,15 +253,29 @@ export default function Profile({
               </div>
 
               {currentUser.role === 'worker' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Expected Rate (e.g., Daily Rate)</label>
-                  <input
-                    type="text"
-                    value={rate}
-                    onChange={(e) => setRate(e.target.value)}
-                    placeholder="e.g. $15 / day, $200 total"
-                    className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Expected Rate (e.g., Daily Rate)</label>
+                    <input
+                      type="text"
+                      value={rate}
+                      onChange={(e) => setRate(e.target.value)}
+                      placeholder="e.g. $15 / day, $200 total"
+                      className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Availability</label>
+                    <select
+                      value={availability}
+                      onChange={(e) => setAvailability(e.target.value as 'available' | 'busy' | 'unavailable')}
+                      className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="available">Available</option>
+                      <option value="busy">Busy</option>
+                      <option value="unavailable">Unavailable</option>
+                    </select>
+                  </div>
                 </div>
               )}
 
@@ -351,6 +373,20 @@ export default function Profile({
                         <span>{targetUser.rate || 'Negotiable'}</span>
                       </div>
                     </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Availability</span>
+                      <div className="flex items-center text-sm font-semibold text-slate-800">
+                        <span className={`h-2.5 w-2.5 rounded-full mr-2 ${
+                          targetUser.availability === 'busy'
+                            ? 'bg-amber-500'
+                            : targetUser.availability === 'unavailable'
+                              ? 'bg-rose-500'
+                              : 'bg-emerald-500'
+                        }`} />
+                        <span className="capitalize">{targetUser.availability || 'available'}</span>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
@@ -431,7 +467,7 @@ export default function Profile({
                       )}
 
                       {/* Require Connection check for leaving reviews (with simple demo override) */}
-                      {hasHired || hasAnyConnection ? (
+                      {hasHired ? (
                         <form onSubmit={handleReviewSubmit} className="space-y-3.5">
                           <div>
                             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -495,7 +531,7 @@ export default function Profile({
                       ) : (
                         <div className="p-4 bg-slate-100/50 border border-slate-200/50 rounded-xl text-slate-600 text-xs">
                           <p className="leading-relaxed font-semibold mb-3">
-                            ⚠️ Only clients and employers who have connected with and hired <strong className="text-slate-800">{targetUser.name}</strong> can write reviews.
+                            Only clients and employers with an accepted hire connection to <strong className="text-slate-800">{targetUser.name}</strong> can write reviews.
                           </p>
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                             {onConnect && (
@@ -507,18 +543,6 @@ export default function Profile({
                                 <span>Connect & Hire Now</span>
                               </button>
                             )}
-                            <button
-                              onClick={() => setNewRating(5) || onAddReview({
-                                workerId: targetUser.id,
-                                employerId: currentUser.id,
-                                employerName: currentUser.name,
-                                rating: 5,
-                                comment: "Excellent work done! (Submitted via instant demo option)."
-                              })}
-                              className="inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-[11px] rounded-lg cursor-pointer"
-                            >
-                              <span>Submit Demo Review Instantly</span>
-                            </button>
                           </div>
                         </div>
                       )}

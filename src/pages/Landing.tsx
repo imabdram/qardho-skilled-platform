@@ -20,7 +20,7 @@ export default function Landing({ workersCount, jobsCount, onNavigate, currentUs
         <div className="relative max-w-5xl mx-auto text-center z-10 space-y-6">
           <div className="inline-flex items-center space-x-1.5 bg-blue-500/15 border border-blue-500/30 px-3 py-1 rounded-full text-blue-400 text-xs font-semibold uppercase tracking-wider">
             <MapPin className="h-3.5 w-3.5" />
-            <span>Karkaar Region • Qardho, Somalia</span>
+            <span>Karkaar Region - Qardho, Somalia</span>
           </div>
           
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none max-w-4xl mx-auto">
@@ -96,7 +96,7 @@ export default function Landing({ workersCount, jobsCount, onNavigate, currentUs
           {/* Employers Path */}
           <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-100 shadow-xs space-y-4">
             <div className="bg-blue-50 text-blue-600 h-12 w-12 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs mb-2">
-              💼
+              <Briefcase className="h-5 w-5" />
             </div>
             <h3 className="text-lg font-bold text-slate-900">For Homeowners & Businesses</h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
@@ -130,7 +130,7 @@ export default function Landing({ workersCount, jobsCount, onNavigate, currentUs
           {/* Workers Path */}
           <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-100 shadow-xs space-y-4">
             <div className="bg-emerald-50 text-emerald-600 h-12 w-12 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs mb-2">
-              🛠️
+              <Wrench className="h-5 w-5" />
             </div>
             <h3 className="text-lg font-bold text-slate-900">For Trade Professionals</h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
@@ -205,7 +205,7 @@ export default function Landing({ workersCount, jobsCount, onNavigate, currentUs
             <div>
               <h4 className="text-sm font-bold text-slate-900">Neighborhood-specific</h4>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Filter labor options in Horseed, Wadajir, Gashan, Bulsho, or Rafto to save travel time.
+                Filter labor options in Kaambo, Qoryacad, Xorgoble, Xiingood, Xiddo, Sheerbi, or Waaciye to save travel time.
               </p>
             </div>
           </div>

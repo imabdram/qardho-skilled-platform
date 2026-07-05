@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Send, Phone, MapPin } from 'lucide-react';
 import { Job, User } from '../types';
+import { QARDHO_NEIGHBORHOODS } from '../constants';
 
 interface ApplyModalProps {
   job: Job;
@@ -84,16 +85,19 @@ export default function ApplyModal({ job, currentUser, onClose, onSubmit }: Appl
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <MapPin className="h-4 w-4 text-slate-400" />
               </div>
-              <input
-                type="text"
+              <select
                 value={location}
                 onChange={(e) => {
                   setLocation(e.target.value);
                   setError('');
                 }}
-                placeholder="e.g. Horseed, Wadajir..."
                 className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
+              >
+                <option value="">Select neighborhood</option>
+                {QARDHO_NEIGHBORHOODS.map((neighborhood) => (
+                  <option key={neighborhood} value={neighborhood}>{neighborhood}</option>
+                ))}
+              </select>
             </div>
           </div>
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import JobCard from '../components/JobCard';
-import { User, Job } from '../types';
+import { User, Job, JobStatus } from '../types';
 import { Search, MapPin, Briefcase, Plus, ShieldAlert } from 'lucide-react';
+import { QARDHO_NEIGHBORHOODS } from '../constants';
 
 interface JobsProps {
   jobs: Job[];
@@ -13,6 +14,7 @@ interface JobsProps {
 export default function Jobs({ jobs, currentUser, onApply, onNavigate }: JobsProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState<JobStatus | 'All'>('open');
 
   // Filter lists based on inputs
   const filteredJobs = jobs.filter((job) => {
@@ -22,11 +24,19 @@ export default function Jobs({ jobs, currentUser, onApply, onNavigate }: JobsPro
       job.employerName.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesLocation = selectedLocation === 'All' || job.location === selectedLocation;
+    const matchesStatus = selectedStatus === 'All' || job.status === selectedStatus;
 
-    return matchesSearch && matchesLocation;
+    return matchesSearch && matchesLocation && matchesStatus;
   });
 
-  const uniqueLocations = ['All', ...Array.from(new Set(jobs.map(j => j.location).filter(Boolean)))];
+  const uniqueLocations = ['All', ...QARDHO_NEIGHBORHOODS];
+  const statusOptions: Array<{ value: JobStatus | 'All'; label: string }> = [
+    { value: 'open', label: 'Open Jobs' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'closed', label: 'Closed' },
+    { value: 'All', label: 'All Statuses' },
+  ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="jobs-page-container">
@@ -61,7 +71,7 @@ export default function Jobs({ jobs, currentUser, onApply, onNavigate }: JobsPro
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           
           {/* Main search input */}
-          <div className="md:col-span-8 relative">
+          <div className="md:col-span-5 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-slate-400" />
             </div>
@@ -75,7 +85,7 @@ export default function Jobs({ jobs, currentUser, onApply, onNavigate }: JobsPro
           </div>
 
           {/* Location Dropdown */}
-          <div className="md:col-span-4 relative">
+          <div className="md:col-span-3 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <MapPin className="h-4 w-4 text-slate-400" />
             </div>
@@ -87,6 +97,21 @@ export default function Jobs({ jobs, currentUser, onApply, onNavigate }: JobsPro
               <option value="All">All Neighborhoods</option>
               {uniqueLocations.filter(loc => loc !== 'All').map((loc) => (
                 <option key={loc} value={loc}>Qardho - {loc}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="md:col-span-4 relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Briefcase className="h-4 w-4 text-slate-400" />
+            </div>
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value as JobStatus | 'All')}
+              className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 bg-slate-50/50 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white cursor-pointer"
+            >
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
           </div>
@@ -122,6 +147,7 @@ export default function Jobs({ jobs, currentUser, onApply, onNavigate }: JobsPro
               onClick={() => {
                 setSearchQuery('');
                 setSelectedLocation('All');
+                setSelectedStatus('open');
               }}
               className="mt-3 text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
             >

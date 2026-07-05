@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, MapPin, Briefcase, DollarSign, FileText, ArrowRight, Check } from 'lucide-react';
 import { User as UserType } from '../types';
+import { QARDHO_NEIGHBORHOODS } from '../constants';
 
 interface OnboardingProps {
   currentUser: UserType;
@@ -142,13 +143,16 @@ export default function Onboarding({ currentUser, onCompleteOnboarding }: Onboar
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <MapPin className="h-4 w-4 text-slate-400" />
                     </div>
-                    <input
-                      type="text"
+                    <select
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
-                      placeholder="e.g. Horseed, Wadajir, Gashan, Bulsho..."
                       className="block w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500"
-                    />
+                    >
+                      <option value="">Select neighborhood</option>
+                      {QARDHO_NEIGHBORHOODS.map((neighborhood) => (
+                        <option key={neighborhood} value={neighborhood}>{neighborhood}</option>
+                      ))}
+                    </select>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">
                     Enter your specific Qardho neighborhood to receive offers nearby.

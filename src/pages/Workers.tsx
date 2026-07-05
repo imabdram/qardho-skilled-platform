@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import WorkerCard from '../components/WorkerCard';
 import { User, Review } from '../types';
 import { Search, MapPin, SlidersHorizontal, Users, Sparkles } from 'lucide-react';
+import { QARDHO_NEIGHBORHOODS } from '../constants';
 
 interface WorkersProps {
   workers: User[];
@@ -16,6 +17,7 @@ export default function Workers({ workers, currentUser, onConnect, onNavigate, r
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('All');
   const [selectedSkill, setSelectedSkill] = useState('All');
+  const [selectedAvailability, setSelectedAvailability] = useState('All');
 
   // Filter lists based on inputs
   const filteredWorkers = workers.filter((worker) => {
@@ -26,13 +28,14 @@ export default function Workers({ workers, currentUser, onConnect, onNavigate, r
     
     const matchesLocation = selectedLocation === 'All' || worker.location === selectedLocation;
     const matchesSkill = selectedSkill === 'All' || worker.skill === selectedSkill;
+    const matchesAvailability = selectedAvailability === 'All' || (worker.availability || 'available') === selectedAvailability;
 
-    return matchesSearch && matchesLocation && matchesSkill;
+    return matchesSearch && matchesLocation && matchesSkill && matchesAvailability;
   });
 
   // Get unique skills and locations for dropdown options
   const uniqueSkills = ['All', ...Array.from(new Set(workers.map(w => w.skill).filter(Boolean)))];
-  const uniqueLocations = ['All', ...Array.from(new Set(workers.map(w => w.location).filter(Boolean)))];
+  const uniqueLocations = ['All', ...QARDHO_NEIGHBORHOODS];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="workers-page-container">
@@ -70,7 +73,7 @@ export default function Workers({ workers, currentUser, onConnect, onNavigate, r
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
           
           {/* Main search input */}
-          <div className="md:col-span-5 relative">
+          <div className="md:col-span-4 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-slate-400" />
             </div>
@@ -84,7 +87,7 @@ export default function Workers({ workers, currentUser, onConnect, onNavigate, r
           </div>
 
           {/* Location Dropdown */}
-          <div className="md:col-span-3 relative">
+          <div className="md:col-span-2 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <MapPin className="h-4 w-4 text-slate-400" />
             </div>
@@ -101,7 +104,7 @@ export default function Workers({ workers, currentUser, onConnect, onNavigate, r
           </div>
 
           {/* Skill Dropdown */}
-          <div className="md:col-span-4 relative">
+          <div className="md:col-span-3 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <SlidersHorizontal className="h-4 w-4 text-slate-400" />
             </div>
@@ -114,6 +117,19 @@ export default function Workers({ workers, currentUser, onConnect, onNavigate, r
               {uniqueSkills.filter(s => s !== 'All').map((skill) => (
                 <option key={skill} value={skill}>{skill}</option>
               ))}
+            </select>
+          </div>
+
+          <div className="md:col-span-3 relative">
+            <select
+              value={selectedAvailability}
+              onChange={(e) => setSelectedAvailability(e.target.value)}
+              className="block w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 bg-slate-50/50 focus:outline-hidden focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white cursor-pointer"
+            >
+              <option value="All">All Availability</option>
+              <option value="available">Available</option>
+              <option value="busy">Busy</option>
+              <option value="unavailable">Unavailable</option>
             </select>
           </div>
         </div>
@@ -151,6 +167,7 @@ export default function Workers({ workers, currentUser, onConnect, onNavigate, r
                 setSearchQuery('');
                 setSelectedLocation('All');
                 setSelectedSkill('All');
+                setSelectedAvailability('All');
               }}
               className="mt-3 text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
             >
