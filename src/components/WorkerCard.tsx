@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapPin, DollarSign, Send, Star, ShieldCheck } from 'lucide-react';
+import { DollarSign, Send, Star, ShieldCheck } from 'lucide-react';
 import { User as UserType, Review } from '../types';
 
 interface WorkerCardProps {
@@ -67,12 +67,8 @@ export default function WorkerCard({ worker, onConnect, onViewProfile, isCurrent
           </div>
         </div>
 
-        {/* Location & Rate details */}
+        {/* Rate and availability details */}
         <div className="mt-4 space-y-2 border-b border-slate-50 pb-4">
-          <div className="flex items-center text-xs text-slate-600 font-medium">
-            <MapPin className="h-3.5 w-3.5 text-slate-400 mr-1.5 shrink-0" />
-            <span>Qardho ({worker.location})</span>
-          </div>
           <div className="flex items-center text-xs text-slate-600 font-semibold">
             <DollarSign className="h-3.5 w-3.5 text-emerald-600 mr-1.5 shrink-0" />
             <span className="text-emerald-700">Expects {worker.rate || '$15 / day'}</span>

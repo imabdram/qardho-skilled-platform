@@ -44,22 +44,22 @@ export default function JobCard({ job, onApply, isOwner }: JobCardProps) {
       id={`job-card-${job.id}`}
     >
       <div>
-        {/* Header Metadata */}
-        <div className="flex justify-between items-start gap-2">
-          <div className="min-w-0">
-            <h3 className="text-lg font-bold text-slate-900 leading-snug hover:text-blue-600 transition-colors">
-              {job.title}
-            </h3>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block font-mono mt-1">
-              By: {job.employerName}
-            </span>
-          </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            {getJobStatusBadge(job.status)}
-            <div className="inline-flex items-center space-x-1 text-slate-400 text-xs font-semibold">
-              <Calendar className="h-3 w-3" />
-              <span className="text-[11px] font-medium">{formatDate(job.createdAt)}</span>
-            </div>
+        {/* Header */}
+        <div>
+          <h3 className="text-lg font-bold text-slate-900 leading-snug hover:text-blue-600 transition-colors">
+            {job.title}
+          </h3>
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block font-mono mt-1">
+            By: {job.employerName}
+          </span>
+        </div>
+
+        {/* Status Metadata */}
+        <div className="flex justify-between items-center gap-2 mt-3">
+          <div>{getJobStatusBadge(job.status)}</div>
+          <div className="inline-flex items-center space-x-1 text-slate-400 text-xs font-semibold shrink-0">
+            <Calendar className="h-3 w-3" />
+            <span className="text-[11px] font-medium">{formatDate(job.createdAt)}</span>
           </div>
         </div>
 

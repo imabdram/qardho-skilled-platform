@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Connection, Application, Job, JobStatus, User } from '../types';
 import { 
   Users, Briefcase, FileText, Check, X, Phone, MapPin, 
-  Clock, AlertCircle, Sparkles, Send, CheckCircle2, RefreshCw 
+  Clock, AlertCircle, Sparkles, Send, CheckCircle2, RefreshCw, PlusCircle 
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 
@@ -16,6 +16,7 @@ interface DashboardProps {
   onUpdateJobStatus: (id: string, status: JobStatus) => void;
   onNavigate: (page: string) => void;
   onSwitchRole: () => void;
+  isSwitchingRole?: boolean;
 }
 
 export default function Dashboard({
@@ -27,7 +28,8 @@ export default function Dashboard({
   onUpdateApplicationStatus,
   onUpdateJobStatus,
   onNavigate,
-  onSwitchRole
+  onSwitchRole,
+  isSwitchingRole = false
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'connections' | 'applications' | 'jobs'>('connections');
   const [pendingAction, setPendingAction] = useState<{
@@ -115,7 +117,7 @@ export default function Dashboard({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in" id="dashboard-container">
       
       {/* Dashboard Summary Header */}
-      <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-2xl mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="bg-slate-900 text-white p-6 sm:p-8 rounded-2xl mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
         <div>
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <h1 className="text-xl sm:text-2xl font-black">My Dashboard Panel</h1>
@@ -132,6 +134,32 @@ export default function Dashboard({
               ? 'Manage incoming hire requests and track your active job applications.' 
               : 'Monitor the jobs you posted and review candidates who applied.'}
           </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center md:justify-end">
+          {!isWorker && (
+            <button
+              onClick={() => onNavigate('post-job')}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-xs font-black text-slate-900 shadow-xs transition-colors hover:bg-slate-100 cursor-pointer"
+              id="dashboard-post-job-btn"
+            >
+              <PlusCircle className="h-4 w-4 text-blue-600" />
+              <span>Post a Job</span>
+            </button>
+          )}
+          <button
+            onClick={onSwitchRole}
+            disabled={isSwitchingRole}
+            className={`inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-xs font-black transition-colors ${
+              isSwitchingRole
+                ? 'border-white/10 bg-white/5 text-slate-400 cursor-not-allowed'
+                : 'border-white/15 bg-white/10 text-white hover:bg-white/15 cursor-pointer'
+            }`}
+            id="dashboard-switch-role-btn"
+          >
+            <RefreshCw className={`h-4 w-4 ${isSwitchingRole ? 'animate-spin' : ''}`} />
+            <span>{isSwitchingRole ? 'Switching...' : `Switch to ${isWorker ? 'Employer' : 'Worker'}`}</span>
+          </button>
         </div>
       </div>
 
@@ -394,8 +422,10 @@ export default function Dashboard({
               {myPostedJobs.map((job) => (
                 <div key={job.id} className="bg-white p-5 rounded-xl border border-slate-100 shadow-xs flex flex-col justify-between">
                   <div>
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="text-sm font-bold text-slate-900">{job.title}</h3>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 leading-snug">{job.title}</h3>
+                    </div>
+                    <div className="mt-2">
                       {getJobStatusBadge(job.status)}
                     </div>
                     <div className="flex flex-wrap gap-2 mt-2">
@@ -468,3 +498,5 @@ export default function Dashboard({
     </div>
   );
 }
+
+

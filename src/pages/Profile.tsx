@@ -297,7 +297,7 @@ export default function Profile({
                   <span>Notification Settings</span>
                 </h3>
                 <p className="text-xs text-slate-500 mb-3">
-                  Choose how you want to be notified of new activity on Skills Hub Qardho.
+                  Choose how you want to be notified of new activity on Xirfad Qardho.
                 </p>
                 
                 <label className="flex items-start space-x-3 p-3.5 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100/80 transition-colors border border-slate-100">

@@ -107,7 +107,7 @@ export default function Auth({ onLogin, onSignup }: AuthProps) {
           
           <div className="text-center pb-2">
             <h2 className="text-lg font-black text-slate-900">
-              {isLoginTab ? 'Welcome Back!' : 'Join Skills Hub Qardho'}
+              {isLoginTab ? 'Welcome Back!' : 'Join Xirfad Qardho'}
             </h2>
             <p className="text-xs text-slate-500 mt-1">
               {isLoginTab 
