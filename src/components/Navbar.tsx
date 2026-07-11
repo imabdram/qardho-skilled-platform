@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Briefcase, User, LogOut, LogIn, LayoutDashboard, PlusCircle, RefreshCw, Bell } from 'lucide-react';
+import { Briefcase, User, LogOut, LogIn, LayoutDashboard, Bell } from 'lucide-react';
 import { User as UserType, Connection, Application } from '../types';
 
 interface NavbarProps {
@@ -133,7 +133,7 @@ export default function Navbar({
             >
               <div className="text-left">
                 <span className="text-lg font-black text-slate-900 tracking-tight block leading-none">
-                  Skills Hub
+                  Xirfad
                 </span>
                 <span className="text-xs font-bold text-blue-600 tracking-wider block uppercase mt-0.5">
                   Qardho
@@ -201,20 +201,6 @@ export default function Navbar({
                   <span>Dashboard</span>
                 </button>
 
-                {currentUser.role === 'employer' && (
-                  <button
-                    onClick={() => onNavigate('post-job')}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center space-x-1.5 ${
-                      currentPage === 'post-job'
-                        ? 'bg-slate-50 text-blue-600 font-semibold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    }`}
-                    id="nav-post-job-btn"
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                    <span>Post a Job</span>
-                  </button>
-                )}
 
                 {/* Notifications Bell next to Profile */}
                 <div className="relative inline-block text-left" id="notifications-menu">
@@ -331,46 +317,23 @@ export default function Navbar({
                   </span>
                 </div>
 
-                {/* Clean, icon-free Active Role badge next to Switch Role button */}
                 <div className="hidden md:block">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border shadow-xs ${
-                    currentUser.role === 'worker'
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
-                      : 'bg-indigo-50 text-indigo-800 border-indigo-200/80'
-                  }`}>
-                    Active Mode: {currentUser.role}
+                  <span
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border shadow-xs ${
+                      currentUser.role === 'worker'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200/80'
+                        : 'bg-indigo-50 text-indigo-800 border-indigo-200/80'
+                    }`}
+                    title={`Active mode: ${currentUser.role === 'worker' ? 'Worker' : 'Employer'}`}
+                    aria-label={`Active mode: ${currentUser.role === 'worker' ? 'Worker' : 'Employer'}`}
+                  >
+                    {currentUser.role === 'worker' ? (
+                      <User className="h-4 w-4" />
+                    ) : (
+                      <Briefcase className="h-4 w-4" />
+                    )}
                   </span>
                 </div>
-
-                 <button
-                  onClick={onSwitchRole}
-                  disabled={isSwitchingRole}
-                  className={`hidden md:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-black border transition-all cursor-pointer ${
-                    isSwitchingRole
-                      ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
-                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300'
-                  }`}
-                  title={`Switch to ${currentUser.role === 'worker' ? 'Employer' : 'Worker'} role`}
-                  id="nav-switch-role-desktop"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isSwitchingRole ? 'animate-spin' : ''}`} />
-                  <span>{isSwitchingRole ? 'Switching...' : `Switch to ${currentUser.role === 'worker' ? 'Employer' : 'Worker'}`}</span>
-                </button>
-                
-                {/* Mobile action icons or quick Nav buttons */}
-                <button
-                  onClick={onSwitchRole}
-                  disabled={isSwitchingRole}
-                  className={`md:hidden p-2 rounded-lg cursor-pointer border transition-all ${
-                    isSwitchingRole
-                      ? 'text-slate-400 bg-slate-50 border-slate-200 cursor-not-allowed'
-                      : 'text-slate-600 bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300'
-                  }`}
-                  title={`Switch to ${currentUser.role === 'worker' ? 'Employer' : 'Worker'}`}
-                  id="nav-switch-role-mobile"
-                >
-                  <RefreshCw className={`h-4 w-4 shrink-0 ${isSwitchingRole ? 'animate-spin' : ''}`} />
-                </button>
 
                 {/* Mobile Notification Button next to Profile */}
                 <div className="relative md:hidden inline-block text-left mr-1" id="notifications-menu-mobile">
@@ -526,16 +489,7 @@ export default function Navbar({
               >
                 <span>Dashboard</span>
               </button>
-              {currentUser.role === 'employer' && (
-                <button
-                  onClick={() => onNavigate('post-job')}
-                  className={`flex-1 text-center py-1 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
-                    currentPage === 'post-job' ? 'text-blue-600 bg-slate-50' : 'text-slate-600'
-                  }`}
-                >
-                  <span>Post Job</span>
-                </button>
-              )}
+
               <button
                 onClick={() => onNavigate('profile')}
                 className={`flex-1 text-center py-1 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
@@ -551,3 +505,4 @@ export default function Navbar({
     </nav>
   );
 }
+

@@ -52,7 +52,7 @@ export default function Onboarding({ currentUser, onCompleteOnboarding }: Onboar
             <span>Profile Setup</span>
           </div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            Welcome to Skills Hub Qardho, {currentUser.name}!
+            Welcome to Xirfad Qardho, {currentUser.name}!
           </h1>
           <p className="text-sm text-slate-500 max-w-md mx-auto">
             Let's customize your experience. Complete your profile to start connecting with employers or skilled talent in the Karkaar region.

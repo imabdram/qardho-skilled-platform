@@ -119,7 +119,7 @@ npm install
 Create a local `.env` file or set this variable in your deployment provider:
 
 ```bash
-DATABASE_URL="postgresql://USER:PASSWORD@HOST/neondb?sslmode=require"
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/neondb?sslmode=verify-full"
 ```
 
 Keep the real Neon URL in local/deployment secrets. Do not commit it to Git.

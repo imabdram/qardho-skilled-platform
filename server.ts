@@ -49,10 +49,25 @@ function sanitizeUser(user: any) {
   return safeUser;
 }
 
+function normalizePostgresUrl(databaseUrl: string) {
+  try {
+    const url = new URL(databaseUrl);
+    const sslMode = url.searchParams.get('sslmode');
+
+    if (sslMode && ['prefer', 'require', 'verify-ca'].includes(sslMode)) {
+      url.searchParams.set('sslmode', 'verify-full');
+    }
+
+    return url.toString();
+  } catch {
+    return databaseUrl;
+  }
+}
+
 function createPostgresDb(databaseUrl: string) {
+  const normalizedDatabaseUrl = normalizePostgresUrl(databaseUrl);
   const pool = new Pool({
-    connectionString: databaseUrl,
-    ssl: databaseUrl.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+    connectionString: normalizedDatabaseUrl,
   });
 
   return {

@@ -596,6 +596,7 @@ export default function App() {
             onUpdateJobStatus={updateJobStatus}
             onNavigate={handleNavigate}
             onSwitchRole={handleSwitchRole}
+            isSwitchingRole={isSwitchingRole}
           />
         );
       case 'post-job':
@@ -731,9 +732,10 @@ export default function App() {
       {/* Soft platform footer */}
       <footer className="bg-white border-t border-slate-100 py-6 text-center text-xs text-slate-400 mt-auto">
         <div className="max-w-7xl mx-auto px-4">
-          <p>(c) 2026 Skills Hub Qardho. Connecting Somali trade skills and local industry.</p>
+          <p>(c) 2026 Xirfad Qardho. Connecting Somali trade skills and local industry.</p>
         </div>
       </footer>
     </div>
   );
 }
+

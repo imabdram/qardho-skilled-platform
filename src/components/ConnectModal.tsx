@@ -11,7 +11,7 @@ interface ConnectModalProps {
 
 export default function ConnectModal({ worker, currentUser, onClose, onSubmit }: ConnectModalProps) {
   const [message, setMessage] = useState(
-    `Hello ${worker.name}, I found your profile on Skills Hub Qardho and would like to talk to you about a potential job. Please let me know your availability.`
+    `Hello ${worker.name}, I found your profile on Xirfad Qardho and would like to talk to you about a potential job. Please let me know your availability.`
   );
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [error, setError] = useState('');

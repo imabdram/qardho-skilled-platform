@@ -18,7 +18,7 @@ export default function Hero() {
         </h1>
         
         <p className="mt-4 text-base sm:text-lg text-slate-300 max-w-2xl mx-auto font-medium">
-          Connecting specialized carpenters, solar technicians, builders, tailors, and teachers in Qardho with homeowners and local businesses.
+          Xirfad Qardho connects specialized carpenters, solar technicians, builders, tailors, and teachers with homeowners and local businesses.
         </p>
 
         <div className="mt-8 flex flex-wrap justify-center gap-4 text-xs sm:text-sm text-slate-400">
