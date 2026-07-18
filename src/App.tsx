@@ -3,6 +3,7 @@ import Navbar from './components/Navbar';
 import Landing from './pages/Landing';
 import Workers from './pages/Workers';
 import Jobs from './pages/Jobs';
+import JobDetail from './pages/JobDetail';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import PostJob from './pages/PostJob';
@@ -10,18 +11,32 @@ import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
 import ConnectModal from './components/ConnectModal';
 import ApplyModal from './components/ApplyModal';
+import NotFound from './pages/NotFound';
 import { User, Job, JobStatus, Connection, Application, Review } from './types';
-import { Sparkles, MapPin, AlertCircle, RefreshCw, LogIn, Briefcase, CheckCircle2 } from 'lucide-react';
+import { Sparkles, MapPin, AlertCircle, RefreshCw, LogIn, Briefcase, CheckCircle2, X } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { getPageForPath, getRouteForPage, PageId } from './routes';
 
 export default function App() {
   const DEMO_PASSWORD = 'demo1234';
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const loadSavedUser = (): User | null => {
+    const saved = localStorage.getItem('currentUser');
+    if (!saved) return null;
+
+    try {
+      return JSON.parse(saved);
+    } catch {
+      localStorage.removeItem('currentUser');
+      return null;
+    }
+  };
 
   // Navigation & User session states
-  const [currentPage, setCurrentPage] = useState<string>('home');
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('currentUser');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [currentPage, setCurrentPage] = useState<PageId>(() => getPageForPath(location.pathname));
+  const [currentUser, setCurrentUser] = useState<User | null>(() => loadSavedUser());
   const [viewingProfileUser, setViewingProfileUser] = useState<User | null>(null);
 
   // App data list states (initialized empty, populated dynamically from PostgreSQL)
@@ -36,6 +51,8 @@ export default function App() {
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
   const [roleToast, setRoleToast] = useState<string | null>(null);
   const [isSwitchingRole, setIsSwitchingRole] = useState(false);
+  const [showRoleSwitchModal, setShowRoleSwitchModal] = useState(false);
+  const [roleSwitchConfirmation, setRoleSwitchConfirmation] = useState('');
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [appError, setAppError] = useState<string | null>(null);
   const [appNotice, setAppNotice] = useState<string | null>(null);
@@ -55,39 +72,65 @@ export default function App() {
     return data.error || data.message || fallback;
   };
 
+  const fetchJson = async <T,>(url: string, fallback: string): Promise<T> => {
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(await getApiError(res, fallback));
+    }
+    return res.json();
+  };
+
+  const navigateTo = (page: PageId) => {
+    const route = getRouteForPage(page);
+    setCurrentPage(page);
+    if (location.pathname !== route) {
+      navigate(route);
+    }
+  };
+
+  useEffect(() => {
+    setCurrentPage(getPageForPath(location.pathname));
+  }, [location.pathname]);
+
   // Load and refresh all data from the PostgreSQL database
   const refreshAllData = async () => {
     try {
       setIsLoadingData(true);
       setAppError(null);
       const [workersRes, jobsRes, connectionsRes, applicationsRes, reviewsRes] = await Promise.all([
-        fetch('/api/workers').then(r => r.json()),
-        fetch('/api/jobs').then(r => r.json()),
-        fetch('/api/connections').then(r => r.json()),
-        fetch('/api/applications').then(r => r.json()),
-        fetch('/api/reviews').then(r => r.json()),
+        fetchJson<User[]>('/api/workers', 'Could not load workers.'),
+        fetchJson<Job[]>('/api/jobs', 'Could not load jobs.'),
+        fetchJson<Connection[]>('/api/connections', 'Could not load connection requests.'),
+        fetchJson<Application[]>('/api/applications', 'Could not load applications.'),
+        fetchJson<Review[]>('/api/reviews', 'Could not load reviews.'),
       ]);
 
-      setWorkers(workersRes || []);
-      setJobs(jobsRes || []);
-      setConnections(connectionsRes || []);
-      setApplications(applicationsRes || []);
-      setReviews(reviewsRes || []);
+      const workerList = Array.isArray(workersRes) ? workersRes : [];
+      const jobList = Array.isArray(jobsRes) ? jobsRes : [];
+      const connectionList = Array.isArray(connectionsRes) ? connectionsRes : [];
+      const applicationList = Array.isArray(applicationsRes) ? applicationsRes : [];
+      const reviewList = Array.isArray(reviewsRes) ? reviewsRes : [];
 
-      // Keep current user state perfectly updated with latest database values
-      const savedUserStr = localStorage.getItem('currentUser');
-      if (savedUserStr) {
-        const savedUser = JSON.parse(savedUserStr);
-        // Look up latest record in workers or fetch/re-authenticate
-        const latestWorker = (workersRes || []).find((w: User) => w.id === savedUser.id);
-        if (latestWorker) {
-          setCurrentUser(latestWorker);
-          localStorage.setItem('currentUser', JSON.stringify(latestWorker));
+      setWorkers(workerList);
+      setJobs(jobList);
+      setConnections(connectionList);
+      setApplications(applicationList);
+      setReviews(reviewList);
+
+      // Keep current user state updated with latest loaded values without crashing on stale storage.
+      const savedUser = loadSavedUser();
+      if (savedUser) {
+        const latestWorker = workerList.find((w) => w.id === savedUser.id);
+        const ownsJob = jobList.some((job) => job.employerId === savedUser.id);
+        if (latestWorker || ownsJob) {
+          const latestUser = latestWorker || savedUser;
+          setCurrentUser(latestUser);
+          localStorage.setItem('currentUser', JSON.stringify(latestUser));
         }
       }
     } catch (e) {
       console.error("Failed to fetch fresh database states", e);
-      showAppError('Could not load platform data. Check that the local server is running.');
+      showAppError(e instanceof Error ? e.message : 'Could not load platform data. Check that the local server is running.');
     } finally {
       setIsLoadingData(false);
     }
@@ -110,7 +153,7 @@ export default function App() {
           const data = await res.json();
           setCurrentUser(data.user);
           localStorage.setItem('currentUser', JSON.stringify(data.user));
-          setCurrentPage('dashboard');
+          navigateTo('dashboard');
           setRoleToast(`Demo Session: Active role set to Ahmed Mohamed Ali (Worker)`);
           showAppNotice('Demo worker session loaded.');
           setTimeout(() => setRoleToast(null), 4000);
@@ -129,7 +172,7 @@ export default function App() {
           const data = await res.json();
           setCurrentUser(data.user);
           localStorage.setItem('currentUser', JSON.stringify(data.user));
-          setCurrentPage('dashboard');
+          navigateTo('dashboard');
           setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
           showAppNotice('Demo employer session loaded.');
           setTimeout(() => setRoleToast(null), 4000);
@@ -153,7 +196,7 @@ export default function App() {
             const data = await regRes.json();
             setCurrentUser(data.user);
             localStorage.setItem('currentUser', JSON.stringify(data.user));
-            setCurrentPage('dashboard');
+            navigateTo('dashboard');
             setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
             showAppNotice('Demo employer session loaded.');
             setTimeout(() => setRoleToast(null), 4000);
@@ -181,7 +224,7 @@ export default function App() {
       if (data.success) {
         setCurrentUser(data.user);
         localStorage.setItem('currentUser', JSON.stringify(data.user));
-        setCurrentPage('dashboard');
+        navigateTo('dashboard');
         showAppNotice('Logged in successfully.');
         return { success: true, message: 'Logged in successfully.' };
       }
@@ -228,9 +271,9 @@ export default function App() {
         showAppNotice('Onboarding saved.');
 
         if (data.user.role === 'worker') {
-          setCurrentPage('jobs');
+          navigateTo('jobs');
         } else if (data.user.role === 'employer') {
-          setCurrentPage('workers');
+          navigateTo('post-job');
         }
       }
     } catch (e) {
@@ -241,62 +284,95 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
-    setCurrentPage('home');
+    navigateTo('home');
   };
 
-  const handleSwitchRole = async () => {
+  const getRoleSwitchTarget = () => currentUser?.role === 'worker' ? 'employer' : 'worker';
+
+  const getRoleSwitchProfileCheck = () => {
+    if (!currentUser) return { blocking: ['You must be signed in.'], warnings: [] as string[] };
+
+    const blocking = [
+      !currentUser.name?.trim() ? 'Add your full name.' : null,
+      !currentUser.phone?.trim() ? 'Add a contact phone number.' : null,
+      !currentUser.location?.trim() ? 'Choose your Qardho neighborhood.' : null,
+      !currentUser.bio?.trim() ? 'Add a short profile bio.' : null,
+    ].filter(Boolean) as string[];
+
+    const targetRole = getRoleSwitchTarget();
+    const warnings = targetRole === 'worker'
+      ? [
+          !currentUser.skill?.trim() ? 'Worker skill will need to be updated after switching.' : null,
+          !currentUser.rate?.trim() ? 'Worker rate will need to be updated after switching.' : null,
+          !currentUser.availability ? 'Worker availability will default to available.' : null,
+        ].filter(Boolean) as string[]
+      : [];
+
+    return { blocking, warnings };
+  };
+
+  const handleSwitchRole = () => {
     if (!currentUser || isSwitchingRole) return;
-    
-    setIsSwitchingRole(true);
-    const targetRoleName = currentUser.role === 'worker' ? 'Employer' : 'Worker';
-    setRoleToast(`Switching to ${targetRoleName} Mode...`);
-    
-    setTimeout(async () => {
-      const newRole = currentUser.role === 'worker' ? 'employer' : 'worker';
-      const updatedUser: User = {
-        ...currentUser,
-        role: newRole,
-        skill: newRole === 'worker' ? (currentUser.skill || 'General Laborer') : undefined,
-        rate: newRole === 'worker' ? (currentUser.rate || '$15/day') : undefined,
-      };
-      
-      try {
-        const res = await fetch('/api/profile/update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedUser)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setCurrentUser(data.user);
-          localStorage.setItem('currentUser', JSON.stringify(data.user));
-          setRoleToast(`Success! Switched to ${newRole === 'worker' ? 'Worker Mode' : 'Employer Mode'}`);
-          showAppNotice(`Switched to ${newRole === 'worker' ? 'worker' : 'employer'} mode.`);
-          await refreshAllData();
-          
-          if (newRole === 'worker') {
-            if (currentPage === 'workers') {
-              setCurrentPage('jobs');
-            }
-          } else {
-            if (currentPage === 'jobs') {
-              setCurrentPage('workers');
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Error switching role:', err);
-      } finally {
-        setTimeout(() => setRoleToast(null), 4000);
-        setIsSwitchingRole(false);
-      }
-    }, 1200);
+    setShowRoleSwitchModal(true);
   };
 
+  const confirmSwitchRole = async () => {
+    if (!currentUser || isSwitchingRole) return;
+
+    const profileCheck = getRoleSwitchProfileCheck();
+    if (profileCheck.blocking.length > 0) {
+      showAppError('Complete the required profile fields before switching roles.');
+      return;
+    }
+
+    const newRole = getRoleSwitchTarget();
+    const targetRoleName = newRole === 'worker' ? 'Worker' : 'Employer';
+    const updatedUser: User = {
+      ...currentUser,
+      role: newRole,
+      skill: newRole === 'worker' ? (currentUser.skill || 'General Laborer') : undefined,
+      rate: newRole === 'worker' ? (currentUser.rate || '$15/day') : undefined,
+      availability: newRole === 'worker' ? (currentUser.availability || 'available') : currentUser.availability,
+    };
+
+    setIsSwitchingRole(true);
+    setShowRoleSwitchModal(false);
+    setRoleToast(`Switching to ${targetRoleName} Mode...`);
+
+    try {
+      const res = await fetch('/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedUser)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentUser(data.user);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        setRoleToast(`Success! Switched to ${targetRoleName} Mode`);
+        showAppNotice(`Switched to ${newRole === 'worker' ? 'worker' : 'employer'} mode.`);
+        await refreshAllData();
+
+        if (newRole === 'worker' && currentPage === 'workers') {
+          navigateTo('jobs');
+        } else if (newRole === 'employer' && currentPage === 'jobs') {
+          navigateTo('workers');
+        }
+      } else {
+        showAppError(await getApiError(res, 'Could not switch role.'));
+      }
+    } catch (err) {
+      console.error('Error switching role:', err);
+      showAppError('Could not switch role.');
+    } finally {
+      setTimeout(() => setRoleToast(null), 4000);
+      setIsSwitchingRole(false);
+    }
+  };
   // Connection Request Action
   const triggerConnect = (worker: User) => {
     if (!currentUser) {
-      setCurrentPage('auth');
+      navigateTo('auth');
       return;
     }
     if (currentUser.role !== 'employer') {
@@ -326,7 +402,7 @@ export default function App() {
       if (res.ok) {
         await refreshAllData();
         setSelectedWorkerForConnect(null);
-        setCurrentPage('dashboard');
+        navigateTo('dashboard');
         showAppNotice('Connection request sent.');
       } else {
         showAppError(await getApiError(res, 'Could not submit connection request.'));
@@ -340,11 +416,17 @@ export default function App() {
   // Application Submission Action
   const triggerApply = (job: Job) => {
     if (!currentUser) {
-      setCurrentPage('auth');
+      navigateTo('auth');
       return;
     }
     if (currentUser.role !== 'worker') {
       showAppError('Only workers can apply for jobs.');
+      return;
+    }
+    const existingApplication = applications.find((app) => app.jobId === job.id && app.applicantId === currentUser.id);
+    if (existingApplication) {
+      showAppNotice(`You already applied for this job. Current status: ${existingApplication.status}.`);
+      navigateTo('dashboard');
       return;
     }
     if (job.status !== 'open') {
@@ -377,7 +459,7 @@ export default function App() {
       if (res.ok) {
         await refreshAllData();
         setSelectedJobForApply(null);
-        setCurrentPage('dashboard');
+        navigateTo('dashboard');
         showAppNotice('Application submitted.');
       } else {
         showAppError(await getApiError(res, 'Could not submit application.'));
@@ -497,7 +579,7 @@ export default function App() {
   };
 
   // Add Review Handler
-  const handleAddReview = async (newReviewData: { workerId: string; employerId: string; employerName: string; rating: number; comment: string }) => {
+  const handleAddReview = async (newReviewData: { workerId: string; employerId: string; employerName: string; jobId: string; jobTitle: string; rating: number; comment: string }) => {
     try {
       const res = await fetch('/api/reviews', {
         method: 'POST',
@@ -518,9 +600,33 @@ export default function App() {
     return false;
   };
 
+
+  const resetDemoData = async () => {
+    try {
+      const res = await fetch('/api/demo/reset', { method: 'POST' });
+      if (!res.ok) {
+        showAppError(await getApiError(res, 'Could not reset demo data.'));
+        return;
+      }
+      await refreshAllData();
+      showAppNotice('Demo data reset.');
+      navigateTo('dashboard');
+    } catch (err) {
+      console.error(err);
+      showAppError('Could not reset demo data.');
+    }
+  };
   const handleNavigate = (page: string) => {
     setViewingProfileUser(null);
-    setCurrentPage(page);
+    navigateTo(page as PageId);
+  };
+
+  const handleViewWorkerProfile = (worker: User) => {
+    setViewingProfileUser(worker);
+    navigateTo('profile');
+    window.setTimeout(() => {
+      document.getElementById('rating-review-system')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
   };
 
   // Active page renderer
@@ -538,9 +644,20 @@ export default function App() {
       case 'home':
         return (
           <Landing
+            workers={workers}
+            jobs={jobs}
+            reviews={reviews}
             workersCount={workers.length}
             jobsCount={jobs.length}
             onNavigate={handleNavigate}
+            onViewWorkerProfile={(worker) => {
+              if (!currentUser) {
+                navigateTo('auth');
+                return;
+              }
+              setViewingProfileUser(worker);
+              navigateTo('profile');
+            }}
             currentUser={currentUser}
           />
         );
@@ -552,10 +669,8 @@ export default function App() {
             onConnect={triggerConnect}
             onNavigate={handleNavigate}
             reviews={reviews}
-            onViewProfile={(worker) => {
-              setViewingProfileUser(worker);
-              setCurrentPage('profile');
-            }}
+            onViewProfile={handleViewWorkerProfile}
+            isLoading={isLoadingData}
           />
         );
       case 'jobs':
@@ -565,8 +680,23 @@ export default function App() {
             currentUser={currentUser}
             onApply={triggerApply}
             onNavigate={handleNavigate}
+            applications={applications}
+            isLoading={isLoadingData}
           />
         );
+      case 'job-detail': {
+        const jobId = decodeURIComponent(location.pathname.split('/').filter(Boolean)[1] || '');
+        const job = jobs.find((item) => item.id === jobId);
+        return (
+          <JobDetail
+            job={job}
+            currentUser={currentUser}
+            applications={applications}
+            onApply={triggerApply}
+            onNavigate={handleNavigate}
+          />
+        );
+      }
       case 'profile':
         return (
           <Profile
@@ -575,11 +705,13 @@ export default function App() {
             onUpdateProfile={updateProfile}
             onSwitchRole={handleSwitchRole}
             reviews={reviews}
+            jobs={jobs}
+            applications={applications}
             onAddReview={handleAddReview}
             connections={connections}
             onBack={viewingProfileUser ? () => {
               setViewingProfileUser(null);
-              setCurrentPage('workers');
+              navigateTo('workers');
             } : undefined}
             onConnect={triggerConnect}
           />
@@ -588,33 +720,56 @@ export default function App() {
         return (
           <Dashboard
             currentUser={currentUser}
+            workers={workers}
             connections={connections}
             applications={applications}
             jobs={jobs}
+            reviews={reviews}
             onUpdateConnectionStatus={updateConnectionStatus}
             onUpdateApplicationStatus={updateApplicationStatus}
             onUpdateJobStatus={updateJobStatus}
             onNavigate={handleNavigate}
+            onViewWorkerProfile={handleViewWorkerProfile}
             onSwitchRole={handleSwitchRole}
             isSwitchingRole={isSwitchingRole}
+            isLoading={isLoadingData}
           />
         );
       case 'post-job':
         return <PostJob currentUser={currentUser} onPostJob={postNewJob} onNavigate={handleNavigate} />;
       case 'auth':
+      case 'register':
         return <Auth onLogin={handleLogin} onSignup={handleSignup} />;
+      case 'not-found':
+        return <NotFound />;
       default:
         return (
           <Landing
+            workers={workers}
+            jobs={jobs}
+            reviews={reviews}
             workersCount={workers.length}
             jobsCount={jobs.length}
             onNavigate={handleNavigate}
+            onViewWorkerProfile={(worker) => {
+              if (!currentUser) {
+                navigateTo('auth');
+                return;
+              }
+              setViewingProfileUser(worker);
+              navigateTo('profile');
+            }}
             currentUser={currentUser}
           />
         );
     }
   };
 
+  const roleSwitchTarget = getRoleSwitchTarget();
+  const roleSwitchTargetName = roleSwitchTarget === 'worker' ? 'Worker' : 'Employer';
+  const roleSwitchProfileCheck = getRoleSwitchProfileCheck();
+  const hasTypedRoleSwitchConfirmation = roleSwitchConfirmation.trim().toUpperCase() === 'CONFIRM';
+  const canConfirmRoleSwitch = roleSwitchProfileCheck.blocking.length === 0 && !!currentUser;
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col text-slate-800 antialiased font-sans" id="app-root-layout">
       {/* Top Banner indicating Preview Mode / Quick Login Panel */}
@@ -639,6 +794,12 @@ export default function App() {
             <Briefcase className="inline-block h-3 w-3 mr-1" />
             Log In as Farmer (Employer)
           </button>
+          <button
+            onClick={resetDemoData}
+            className="bg-amber-400 text-slate-950 hover:bg-amber-300 px-2 py-1 rounded-md text-[10px] cursor-pointer transition-all border border-amber-300 font-black"
+          >
+            Reset Demo
+          </button>
         </div>
       </div>
 
@@ -654,6 +815,8 @@ export default function App() {
         isSwitchingRole={isSwitchingRole}
         connections={connections}
         applications={applications}
+        jobs={jobs}
+        reviews={reviews}
       />
 
       {(isLoadingData || appError) && (
@@ -706,7 +869,7 @@ export default function App() {
       )}
 
       {/* Main Page Layout Frame */}
-      <main className="flex-1 pb-16">
+      <main className="flex-1 pb-0">
         {renderPage()}
       </main>
 
@@ -729,6 +892,119 @@ export default function App() {
         />
       )}
 
+      {showRoleSwitchModal && currentUser && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
+              <div className="rounded-xl bg-blue-50 p-2 text-blue-700">
+                <RefreshCw className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Role switch confirmation</p>
+                <h3 className="mt-0.5 text-base font-black text-slate-950">Switch to {roleSwitchTargetName} mode?</h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  Your dashboard, main actions, and public profile will change to match the {roleSwitchTargetName.toLowerCase()} role.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowRoleSwitchModal(false); setRoleSwitchConfirmation(''); }}
+                disabled={isSwitchingRole}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Close role switch confirmation"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div className="rounded-xl border border-slate-100 bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900">Profile check</h4>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">Basic public profile fields are required before switching.</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${canConfirmRoleSwitch ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                    {canConfirmRoleSwitch ? 'Ready' : 'Incomplete'}
+                  </span>
+                </div>
+
+                {roleSwitchProfileCheck.blocking.length > 0 ? (
+                  <ul className="mt-3 space-y-2">
+                    {roleSwitchProfileCheck.blocking.map(item => (
+                      <li key={item} className="flex items-start gap-2 text-xs font-semibold text-amber-800">
+                        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-xs font-semibold text-emerald-700">Your basic profile is ready for role switching.</p>
+                )}
+
+                {canConfirmRoleSwitch && (
+                  <div className="mt-4">
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-500">Type CONFIRM to continue</label>
+                    <input
+                      type="text"
+                      value={roleSwitchConfirmation}
+                      onChange={(e) => setRoleSwitchConfirmation(e.target.value)}
+                      placeholder="CONFIRM"
+                      className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      autoComplete="off"
+                    />
+                    <p className="mt-1 text-[11px] font-semibold text-slate-400">This prevents accidental role changes.</p>
+                  </div>
+                )}
+
+                {roleSwitchProfileCheck.warnings.length > 0 && (
+                  <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                    <p className="text-[11px] font-black uppercase tracking-wider text-blue-700">After switching</p>
+                    <ul className="mt-2 space-y-1.5">
+                      {roleSwitchProfileCheck.warnings.map(item => (
+                        <li key={item} className="text-xs font-semibold text-blue-800">{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => { setShowRoleSwitchModal(false); setRoleSwitchConfirmation(''); }}
+                disabled={isSwitchingRole}
+                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              {!canConfirmRoleSwitch ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRoleSwitchModal(false);
+                    handleNavigate('profile');
+                  }}
+                  className="flex-1 rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-black text-white hover:bg-amber-700"
+                >
+                  Complete profile
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={confirmSwitchRole}
+                  disabled={isSwitchingRole || !hasTypedRoleSwitchConfirmation}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isSwitchingRole ? 'animate-spin' : ''}`} />
+                  {isSwitchingRole ? 'Switching...' : hasTypedRoleSwitchConfirmation ? `Confirm ${roleSwitchTargetName} mode` : 'Type CONFIRM first'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Soft platform footer */}
       <footer className="bg-white border-t border-slate-100 py-6 text-center text-xs text-slate-400 mt-auto">
         <div className="max-w-7xl mx-auto px-4">
@@ -738,4 +1014,26 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

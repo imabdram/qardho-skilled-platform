@@ -7,8 +7,10 @@ interface ApplyModalProps {
   job: Job;
   currentUser: User | null;
   onClose: () => void;
-  onSubmit: (data: { message: string; phone: string; location: string }) => void;
+  onSubmit: (data: { message: string; phone: string; location: string }) => void | Promise<void>;
 }
+
+type FieldErrors = Partial<Record<'phone' | 'message', string>>;
 
 export default function ApplyModal({ job, currentUser, onClose, onSubmit }: ApplyModalProps) {
   const [message, setMessage] = useState(
@@ -16,26 +18,37 @@ export default function ApplyModal({ job, currentUser, onClose, onSubmit }: Appl
   );
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [location, setLocation] = useState(currentUser?.location || '');
-  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const clearFieldError = (field: keyof FieldErrors) => {
+    if (fieldErrors[field]) {
+      setFieldErrors((current) => ({ ...current, [field]: undefined }));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone.trim()) {
-      setError('Please provide a contact phone number.');
-      return;
+    if (isSubmitting) return;
+
+    const nextErrors: FieldErrors = {};
+    if (!phone.trim()) nextErrors.phone = 'Contact phone is required.';
+    if (!message.trim()) nextErrors.message = 'Application message is required.';
+
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setIsSubmitting(true);
+    try {
+      await Promise.resolve(onSubmit({ message: message.trim(), phone: phone.trim(), location: location.trim() }));
+    } finally {
+      setIsSubmitting(false);
     }
-    if (!message.trim()) {
-      setError('Please write a short application letter.');
-      return;
-    }
-    onSubmit({ message, phone, location: location.trim() });
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" id="apply-modal-overlay">
       <div className="bg-white rounded-2xl shadow-xl border border-slate-100 max-w-md w-full overflow-hidden" id="apply-modal-container">
-        
-        {/* Modal Header */}
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
           <div>
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">
@@ -47,14 +60,15 @@ export default function ApplyModal({ job, currentUser, onClose, onSubmit }: Appl
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 cursor-pointer"
+            disabled={isSubmitting}
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Close application form"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" noValidate>
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Your Phone Number *
@@ -68,13 +82,14 @@ export default function ApplyModal({ job, currentUser, onClose, onSubmit }: Appl
                 value={phone}
                 onChange={(e) => {
                   setPhone(e.target.value);
-                  setError('');
+                  clearFieldError('phone');
                 }}
                 placeholder="+252 90 XXXXXXX"
-                className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                required
+                className={`block w-full pl-10 pr-3 py-2 border rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${fieldErrors.phone ? 'border-red-300 bg-red-50/40' : 'border-slate-200'}`}
+                aria-invalid={!!fieldErrors.phone}
               />
             </div>
+            {fieldErrors.phone && <p className="mt-1 text-[11px] font-semibold text-red-600">{fieldErrors.phone}</p>}
           </div>
 
           <div>
@@ -87,10 +102,7 @@ export default function ApplyModal({ job, currentUser, onClose, onSubmit }: Appl
               </div>
               <select
                 value={location}
-                onChange={(e) => {
-                  setLocation(e.target.value);
-                  setError('');
-                }}
+                onChange={(e) => setLocation(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
               >
                 <option value="">Select neighborhood</option>
@@ -110,35 +122,31 @@ export default function ApplyModal({ job, currentUser, onClose, onSubmit }: Appl
               value={message}
               onChange={(e) => {
                 setMessage(e.target.value);
-                setError('');
+                clearFieldError('message');
               }}
               placeholder="Introduce your skills, qualifications, and when you can start..."
-              className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              required
+              className={`block w-full px-3 py-2 border rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 ${fieldErrors.message ? 'border-red-300 bg-red-50/40' : 'border-slate-200'}`}
+              aria-invalid={!!fieldErrors.message}
             ></textarea>
+            {fieldErrors.message && <p className="mt-1 text-[11px] font-semibold text-red-600">{fieldErrors.message}</p>}
           </div>
 
-          {error && (
-            <div className="text-xs font-semibold text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">
-              {error}
-            </div>
-          )}
-
-          {/* Action buttons */}
           <div className="flex space-x-3 pt-3 border-t border-slate-100 mt-6">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 px-4 border border-slate-200 text-slate-700 font-semibold text-xs rounded-lg hover:bg-slate-50 cursor-pointer"
+              disabled={isSubmitting}
+              className="flex-1 py-2 px-4 border border-slate-200 text-slate-700 font-semibold text-xs rounded-lg hover:bg-slate-50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 inline-flex items-center justify-center space-x-2 py-2 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg shadow-xs cursor-pointer"
+              disabled={isSubmitting}
+              className="flex-1 inline-flex items-center justify-center space-x-2 py-2 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg shadow-xs cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-400"
             >
               <Send className="h-3.5 w-3.5" />
-              <span>Submit Application</span>
+              <span>{isSubmitting ? 'Submitting...' : 'Submit Application'}</span>
             </button>
           </div>
         </form>

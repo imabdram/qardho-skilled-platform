@@ -1,0 +1,35 @@
+﻿import test from 'node:test';
+import assert from 'node:assert/strict';
+import { isEmailLike, isSomaliPhone, isValidRating, normalizeOptionalEmail, normalizePhone } from '../src/validation';
+
+test('normalizes phone numbers by removing spaces and dashes', () => {
+  assert.equal(normalizePhone('+252 90-700 1122'), '+252907001122');
+});
+
+test('accepts common Somali phone formats', () => {
+  assert.equal(isSomaliPhone('+252907001122'), true);
+  assert.equal(isSomaliPhone('907001122'), true);
+});
+
+test('rejects invalid phone formats', () => {
+  assert.equal(isSomaliPhone('123'), false);
+  assert.equal(isSomaliPhone('+15551234567'), false);
+});
+
+test('normalizes optional emails', () => {
+  assert.equal(normalizeOptionalEmail(' USER@Example.COM '), 'user@example.com');
+  assert.equal(normalizeOptionalEmail('   '), null);
+});
+
+test('validates email-like values and allows blank optional email', () => {
+  assert.equal(isEmailLike('name@example.com'), true);
+  assert.equal(isEmailLike(''), true);
+  assert.equal(isEmailLike('not-an-email'), false);
+});
+
+test('validates review ratings from 1 to 5', () => {
+  assert.equal(isValidRating(1), true);
+  assert.equal(isValidRating(5), true);
+  assert.equal(isValidRating(0), false);
+  assert.equal(isValidRating(6), false);
+});

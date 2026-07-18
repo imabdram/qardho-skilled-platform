@@ -1,6 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { Briefcase, User, LogOut, LogIn, LayoutDashboard, Bell } from 'lucide-react';
-import { User as UserType, Connection, Application } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Bell, Briefcase, LayoutDashboard, LogIn, LogOut, Menu, User, X } from 'lucide-react';
+import { User as UserType, Connection, Application, Job, Review } from '../types';
+import { PAGE_ROUTES } from '../routes';
 
 interface NavbarProps {
   currentUser: UserType | null;
@@ -13,6 +15,8 @@ interface NavbarProps {
   isSwitchingRole?: boolean;
   connections?: Connection[];
   applications?: Application[];
+  jobs?: Job[];
+  reviews?: Review[];
 }
 
 export default function Navbar({ 
@@ -25,10 +29,31 @@ export default function Navbar({
   onSwitchRole,
   isSwitchingRole = false,
   connections = [],
-  applications = []
+  applications = [],
+  jobs = [],
+  reviews = []
 }: NavbarProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setHasScrolled(window.scrollY > 8);
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const closeMenus = () => {
+    setIsMobileMenuOpen(false);
+    setShowNotifications(false);
+  };
+
+  const navigate = (page: string) => {
+    onNavigate(page);
+    closeMenus();
+  };
 
   // Compute active notifications / new actions based on connections and applications
   const notifications = useMemo(() => {
@@ -36,7 +61,7 @@ export default function Navbar({
 
     const list: Array<{
       id: string;
-      type: 'connection' | 'application';
+      type: 'connection' | 'application' | 'job' | 'review';
       title: string;
       description: string;
       date: string;
@@ -75,6 +100,18 @@ export default function Navbar({
             status: a.status,
           });
         });
+
+      jobs
+        .filter(j => j.assignedWorkerId === currentUser.id && j.status === 'in_progress' && j.completionRequestedAt)
+        .forEach(j => {
+          list.push({ id: `job-complete-request-${j.id}`, type: 'job', title: 'Work Completion Requested', description: `Employer marked "${j.title}" ready. Confirm completion if the work is finished.`, date: j.completionRequestedAt || j.createdAt, status: 'pending' });
+        });
+
+      jobs
+        .filter(j => j.assignedWorkerId === currentUser.id && j.status === 'completed')
+        .forEach(j => {
+          list.push({ id: `job-completed-${j.id}`, type: 'job', title: 'Job Completed', description: `"${j.title}" is completed.`, date: j.workerCompletedAt || j.createdAt, status: 'accepted' });
+        });
     } else if (currentUser.role === 'employer') {
       // 1. Incoming job applications (from workers applying to this employer's jobs)
       applications
@@ -107,6 +144,18 @@ export default function Navbar({
             status: c.status,
           });
         });
+
+      jobs
+        .filter(j => j.employerId === currentUser.id && j.status === 'in_progress' && j.completionRequestedAt)
+        .forEach(j => {
+          list.push({ id: `job-waiting-worker-${j.id}`, type: 'job', title: 'Waiting for Worker Confirmation', description: `"${j.title}" is waiting for the worker to confirm completion.`, date: j.completionRequestedAt || j.createdAt, status: 'pending' });
+        });
+
+      jobs
+        .filter(j => j.employerId === currentUser.id && j.status === 'completed' && !reviews.some(r => r.jobId === j.id && r.employerId === currentUser.id))
+        .forEach(j => {
+          list.push({ id: `review-needed-${j.id}`, type: 'review', title: 'Review Needed', description: `Leave feedback for the completed job "${j.title}".`, date: j.workerCompletedAt || j.createdAt, status: 'pending' });
+        });
     }
 
     // Sort by date (latest first) or status pending first
@@ -115,20 +164,21 @@ export default function Navbar({
       if (a.status !== 'pending' && b.status === 'pending') return 1;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [connections, applications, currentUser]);
+  }, [connections, applications, jobs, reviews, currentUser]);
 
   const activeNotifications = notifications.filter(n => !dismissedIds.includes(n.id));
   const pendingCount = activeNotifications.filter(n => n.status === 'pending').length;
 
   return (
-    <nav className="bg-white border-b border-slate-100 sticky top-0 z-50 shadow-xs" id="main-navbar">
+    <header className={`bg-white/95 backdrop-blur-md sticky top-0 z-50 transition-shadow duration-200 ${hasScrolled ? 'border-b border-slate-200 shadow-sm' : 'border-b border-slate-100'}`} id="main-navbar">
+      <nav aria-label="Main navigation">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex items-center justify-between h-[70px] gap-4">
           {/* Logo Brand */}
           <div className="flex items-center">
             <button
-              onClick={() => onNavigate('home')}
-              className="flex items-center focus:outline-hidden cursor-pointer"
+              onClick={() => navigate('home')}
+              className="flex items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 cursor-pointer"
               id="brand-logo-btn"
             >
               <div className="text-left">
@@ -145,51 +195,53 @@ export default function Navbar({
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-1">
             {(!currentUser || currentUser.role === 'employer') && (
-              <button
-                onClick={() => onNavigate('workers')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center space-x-1.5 ${
+              <Link
+                to={PAGE_ROUTES.workers}
+                onClick={closeMenus}
+                className={`flex min-h-11 items-center space-x-2.5 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                   currentPage === 'workers'
-                    ? 'bg-slate-50 text-blue-600 font-semibold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'border-blue-300 bg-blue-50 text-blue-700 shadow-sm'
+                    : 'border-slate-400 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100'
                 }`}
                 id="nav-workers-btn"
               >
                 <span>Find Skilled Workers</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-black ${
                   currentPage === 'workers'
-                    ? 'bg-blue-100 text-blue-600'
+                    ? 'bg-blue-100 text-blue-700'
                     : 'bg-slate-100 text-slate-600'
                 }`}>
                   {workersCount}
                 </span>
-              </button>
+              </Link>
             )}
 
             {(!currentUser || currentUser.role === 'worker') && (
-              <button
-                onClick={() => onNavigate('jobs')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center space-x-1.5 ${
+              <Link
+                to={PAGE_ROUTES.jobs}
+                onClick={closeMenus}
+                className={`flex min-h-11 items-center space-x-2.5 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                   currentPage === 'jobs'
-                    ? 'bg-slate-50 text-blue-600 font-semibold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'border-blue-300 bg-blue-50 text-blue-700 shadow-sm'
+                    : 'border-slate-400 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100'
                 }`}
                 id="nav-jobs-btn"
               >
                 <span>Browse Job Postings</span>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-black ${
                   currentPage === 'jobs'
-                    ? 'bg-blue-100 text-blue-600'
+                    ? 'bg-blue-100 text-blue-700'
                     : 'bg-slate-100 text-slate-600'
                 }`}>
                   {jobsCount}
                 </span>
-              </button>
+              </Link>
             )}
 
             {currentUser && (
               <>
                 <button
-                  onClick={() => onNavigate('dashboard')}
+                  onClick={() => navigate('dashboard')}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center space-x-1.5 ${
                     currentPage === 'dashboard'
                       ? 'bg-slate-50 text-blue-600 font-semibold'
@@ -203,7 +255,7 @@ export default function Navbar({
 
 
                 {/* Notifications Bell next to Profile */}
-                <div className="relative inline-block text-left" id="notifications-menu">
+                <div className='relative hidden md:inline-block text-left' id='notifications-menu'>
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
                     className={`p-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center justify-center relative ${
@@ -292,7 +344,7 @@ export default function Navbar({
                 </div>
 
                 <button
-                  onClick={() => onNavigate('profile')}
+                  onClick={() => navigate('profile')}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center space-x-1.5 ${
                     currentPage === 'profile'
                       ? 'bg-slate-50 text-blue-600 font-semibold'
@@ -308,16 +360,26 @@ export default function Navbar({
           </div>
 
           {/* Right Action buttons */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(prev => !prev)}
+              className="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-controls="mobile-navigation-menu"
+              aria-expanded={isMobileMenuOpen}
+              aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            >
+              {isMobileMenuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+            </button>
             {currentUser ? (
               <div className="flex items-center space-x-3">
-                <div className="hidden md:flex flex-col text-right">
+                <div className='hidden md:flex order-1 flex-col text-right'>
                   <span className="text-xs font-black text-slate-900 leading-none">
                     {currentUser.name}
                   </span>
                 </div>
 
-                <div className="hidden md:block">
+                <div className='hidden md:block order-3'>
                   <span
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border shadow-xs ${
                       currentUser.role === 'worker'
@@ -336,7 +398,7 @@ export default function Navbar({
                 </div>
 
                 {/* Mobile Notification Button next to Profile */}
-                <div className="relative md:hidden inline-block text-left mr-1" id="notifications-menu-mobile">
+                <div className='relative order-2 inline-block text-left mr-1' id='notifications-menu-mobile'>
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
                     className={`p-2 rounded-lg cursor-pointer flex items-center justify-center relative ${
@@ -356,7 +418,7 @@ export default function Navbar({
                   {showNotifications && (
                     <>
                       <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setShowNotifications(false)} />
-                      <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 py-1 overflow-hidden animate-fade-in">
+                      <div className="fixed left-3 right-3 top-[76px] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 py-1 overflow-hidden animate-fade-in">
                         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                           <span className="text-xs font-black text-slate-800 uppercase tracking-wider">New Actions ({pendingCount})</span>
                           {activeNotifications.length > 0 && (
@@ -369,7 +431,7 @@ export default function Navbar({
                           )}
                         </div>
                         
-                        <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+                        <div className="max-h-[60vh] overflow-y-auto divide-y divide-slate-100">
                           {activeNotifications.length === 0 ? (
                             <div className="p-5 text-center text-slate-400">
                               <Bell className="h-6 w-6 mx-auto stroke-1 mb-2 text-slate-300" />
@@ -416,7 +478,7 @@ export default function Navbar({
                 </div>
 
                 <button
-                  onClick={() => onNavigate('profile')}
+                  onClick={() => navigate('profile')}
                   className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-50 cursor-pointer"
                   title="Profile"
                   id="nav-profile-mobile"
@@ -426,7 +488,7 @@ export default function Navbar({
 
                 <button
                   onClick={onLogout}
-                  className="inline-flex items-center space-x-1 px-3 py-1.5 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors cursor-pointer"
+                  className='order-5 inline-flex items-center space-x-1 px-3 py-1.5 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-colors cursor-pointer'
                   id="nav-logout-btn"
                 >
                   <LogOut className="h-3.5 w-3.5" />
@@ -434,55 +496,59 @@ export default function Navbar({
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => onNavigate('auth')}
-                  className="inline-flex items-center space-x-1 px-4 py-2 text-sm font-semibold text-slate-700 hover:text-slate-900 cursor-pointer"
+              <div className="hidden sm:flex items-center space-x-2">
+                <Link
+                  to={PAGE_ROUTES.auth}
+                  onClick={closeMenus}
+                  className="inline-flex items-center space-x-1 px-4 py-2 text-sm font-semibold text-slate-700 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   id="nav-signin-btn"
                 >
                   <LogIn className="h-4 w-4 text-slate-500" />
                   <span>Sign In</span>
-                </button>
-                <button
-                  onClick={() => onNavigate('auth')}
-                  className="inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-lg shadow-sm cursor-pointer"
+                </Link>
+                <Link
+                  to={PAGE_ROUTES.register}
+                  onClick={closeMenus}
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
                   id="nav-signup-btn"
                 >
                   Register
-                </button>
+                </Link>
               </div>
             )}
           </div>
         </div>
 
         {/* Mobile Navigation bar bottom drawer */}
-        <div className="md:hidden flex items-center justify-around py-2 border-t border-slate-100 overflow-x-auto space-x-1 bg-white" id="mobile-navbar-actions">
+        <div className="md:hidden sticky top-[70px] z-40 flex items-center justify-around py-2 border-t border-slate-100 overflow-x-auto space-x-1 bg-white/95 backdrop-blur" id="mobile-navbar-actions">
           {(!currentUser || currentUser.role === 'employer') && (
-            <button
-              onClick={() => onNavigate('workers')}
-              className={`flex-1 text-center py-1 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
-                currentPage === 'workers' ? 'text-blue-600 bg-slate-50' : 'text-slate-600'
+            <Link
+              to={PAGE_ROUTES.workers}
+              onClick={closeMenus}
+              className={`flex-1 rounded-lg border px-2 py-2 text-center text-xs font-semibold transition-colors flex flex-col items-center justify-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                currentPage === 'workers' ? 'border-blue-300 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-400 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100'
               }`}
             >
-              <span>Workers</span>
+              <span className="leading-tight">Find Skilled Workers</span>
               <span className="text-[10px] px-1.5 bg-blue-50 text-blue-600 rounded-full font-bold">{workersCount}</span>
-            </button>
+            </Link>
           )}
           {(!currentUser || currentUser.role === 'worker') && (
-            <button
-              onClick={() => onNavigate('jobs')}
-              className={`flex-1 text-center py-1 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
-                currentPage === 'jobs' ? 'text-blue-600 bg-slate-50' : 'text-slate-600'
+            <Link
+              to={PAGE_ROUTES.jobs}
+              onClick={closeMenus}
+              className={`flex-1 rounded-lg border px-2 py-2 text-center text-xs font-semibold transition-colors flex flex-col items-center justify-center gap-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                currentPage === 'jobs' ? 'border-blue-300 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-400 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:bg-blue-100'
               }`}
             >
-              <span>Jobs</span>
+              <span className="leading-tight">Browse Job Postings</span>
               <span className="text-[10px] px-1.5 bg-slate-100 text-slate-600 rounded-full font-bold">{jobsCount}</span>
-            </button>
+            </Link>
           )}
           {currentUser && (
             <>
               <button
-                onClick={() => onNavigate('dashboard')}
+                onClick={() => navigate('dashboard')}
                 className={`flex-1 text-center py-1 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                   currentPage === 'dashboard' ? 'text-blue-600 bg-slate-50' : 'text-slate-600'
                 }`}
@@ -491,7 +557,7 @@ export default function Navbar({
               </button>
 
               <button
-                onClick={() => onNavigate('profile')}
+                onClick={() => navigate('profile')}
                 className={`flex-1 text-center py-1 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                   currentPage === 'profile' ? 'text-blue-600 bg-slate-50' : 'text-slate-600'
                 }`}
@@ -502,7 +568,14 @@ export default function Navbar({
           )}
         </div>
       </div>
-    </nav>
+      </nav>
+    </header>
   );
 }
+
+
+
+
+
+
 

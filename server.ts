@@ -117,8 +117,7 @@ async function ensureDemoCredentials(db: any) {
   await db.run(
     `UPDATE users
       SET "passwordHash" = $1
-      WHERE id IN ('worker-1', 'employer-1')
-        AND ("passwordHash" IS NULL OR "passwordHash" = '')`,
+      WHERE id IN ('worker-1', 'employer-1')`,
     [demoPasswordHash]
   );
 }
@@ -165,6 +164,10 @@ async function startServer() {
       description TEXT NOT NULL,
       rate TEXT NOT NULL,
       phone TEXT NOT NULL,
+      "assignedWorkerId" TEXT,
+      "assignedWorkerName" TEXT,
+      "completionRequestedAt" TEXT,
+      "workerCompletedAt" TEXT,
       status TEXT NOT NULL DEFAULT 'open',
       "createdAt" TEXT NOT NULL
     );
@@ -201,6 +204,8 @@ async function startServer() {
       "workerId" TEXT NOT NULL,
       "employerId" TEXT NOT NULL,
       "employerName" TEXT NOT NULL,
+      "jobId" TEXT,
+      "jobTitle" TEXT,
       rating INTEGER NOT NULL,
       comment TEXT NOT NULL,
       "createdAt" TEXT NOT NULL
@@ -212,9 +217,24 @@ async function startServer() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT 'available';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false;
     ALTER TABLE jobs ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open';
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "assignedWorkerId" TEXT;
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "assignedWorkerName" TEXT;
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "completionRequestedAt" TEXT;
+    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "workerCompletedAt" TEXT;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "jobId" TEXT;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "jobTitle" TEXT;
   `);
 
   await db.run("UPDATE jobs SET status = 'open' WHERE status IS NULL OR status = ''");
+  await db.run(`
+    UPDATE jobs j
+      SET "assignedWorkerId" = a."applicantId",
+          "assignedWorkerName" = a."applicantName"
+      FROM applications a
+      WHERE a."jobId" = j.id
+        AND a.status = 'accepted'
+        AND (j."assignedWorkerId" IS NULL OR j."assignedWorkerId" = '')
+  `);
 
   await db.run("UPDATE users SET availability = 'available' WHERE availability IS NULL OR availability = ''");
   const locationMappings = [
@@ -544,6 +564,38 @@ async function startServer() {
     }
   });
 
+
+  app.post('/api/demo/reset', async (_req, res) => {
+    try {
+      await db.run('DELETE FROM reviews');
+      await db.run('DELETE FROM applications');
+      await db.run('DELETE FROM connections');
+      await db.run('DELETE FROM jobs');
+
+      const createdAt = new Date().toISOString();
+      await db.run(
+        `INSERT INTO jobs (id, title, "employerId", "employerName", location, description, rate, phone, status, "createdAt") VALUES
+          ($1, $2, $3, $4, $5, $6, $7, $8, 'open', $9),
+          ($10, $11, $12, $13, $14, $15, $16, $17, 'open', $18)`,
+        [
+          'job-demo-1', 'Solar Panel System Installer Needed', 'employer-1', 'Qardho Agricultural Co.', 'Kaambo', 'Install a 5KW solar pump system for a local farm outside Qardho.', '$250 Total', '+252 90 700 1122', createdAt,
+          'job-demo-2', 'Concrete Plastering Work for Berked', 'employer-1', 'Qardho Agricultural Co.', 'Xorgoble', 'Mason needed to complete plastering on a water reservoir.', '$30 / day', '+252 90 700 1122', createdAt
+        ]
+      );
+      await db.run(
+        'INSERT INTO applications (id, "jobId", "jobTitle", "employerId", "applicantId", "applicantName", "applicantSkill", message, phone, location, status, "createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+        ['app-demo-1', 'job-demo-1', 'Solar Panel System Installer Needed', 'employer-1', 'worker-1', 'Ahmed Mohamed Ali', 'Solar Technician', 'I have installed similar solar pump systems around Kaambo and can start this week.', '+252 90 779 1234', 'Kaambo', 'pending', createdAt]
+      );
+      await db.run(
+        'INSERT INTO connections (id, "fromUserId", "fromUserName", "toUserId", "toUserName", status, message, phone, "createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+        ['conn-demo-1', 'employer-1', 'Qardho Agricultural Co.', 'worker-1', 'Ahmed Mohamed Ali', 'pending', 'We would like to discuss a solar installation job.', '+252 90 700 1122', createdAt]
+      );
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
   // Auth Operations
   app.post('/api/auth/register', async (req, res) => {
     const { id, name, email, phone, password, role, skill, location, bio, rate, smsNotificationsEnabled, availability } = req.body;
@@ -591,9 +643,14 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Email/phone and password are required.' });
       }
 
+      const trimmedIdentifier = String(identifier).trim();
+      const normalizedPhoneIdentifier = trimmedIdentifier.replace(/[\s-]/g, '');
       const user = await db.get(
-        'SELECT * FROM users WHERE LOWER(email) = LOWER($1) OR phone = $2',
-        [identifier, identifier]
+        `SELECT * FROM users
+          WHERE LOWER(email) = LOWER($1)
+            OR phone = $2
+            OR REPLACE(REPLACE(phone, ' ', ''), '-', '') = $3`,
+        [trimmedIdentifier, trimmedIdentifier, normalizedPhoneIdentifier]
       );
       if (user && verifyPassword(password, user.passwordHash)) {
         return res.json({
@@ -688,17 +745,39 @@ async function startServer() {
       if (!job) {
         return res.status(404).json({ error: 'Job not found.' });
       }
-      if (job.employerId !== actorId) {
-        return res.status(403).json({ error: 'Only the job owner can update this job status.' });
+
+      const actorIsEmployer = job.employerId === actorId;
+      const actorIsAssignedWorker = job.assignedWorkerId === actorId;
+      if (!actorIsEmployer && !actorIsAssignedWorker) {
+        return res.status(403).json({ error: 'Only the job owner or assigned worker can update this job status.' });
       }
-      await db.run('UPDATE jobs SET status = $1 WHERE id = $2', [status, id]);
+      if (status === 'completed' && (job.status !== 'in_progress' || !job.assignedWorkerId)) {
+        return res.status(400).json({ error: 'Only assigned in-progress jobs can be completed.' });
+      }
+      if (status === 'in_progress' && (!actorIsEmployer || !job.assignedWorkerId)) {
+        return res.status(400).json({ error: 'Accept a worker application before marking this job in progress.' });
+      }
+      if (job.status === 'completed' && status !== 'completed') {
+        return res.status(400).json({ error: 'Completed jobs cannot be reopened from the dashboard.' });
+      }
+
+      if (status === 'completed' && actorIsEmployer) {
+        await db.run('UPDATE jobs SET "completionRequestedAt" = $1 WHERE id = $2', [new Date().toISOString(), id]);
+      } else if (status === 'completed' && actorIsAssignedWorker) {
+        if (!job.completionRequestedAt) {
+          return res.status(400).json({ error: 'Employer must request completion before the worker confirms.' });
+        }
+        await db.run('UPDATE jobs SET status = $1, "workerCompletedAt" = $2 WHERE id = $3', [status, new Date().toISOString(), id]);
+      } else {
+        await db.run('UPDATE jobs SET status = $1, "completionRequestedAt" = NULL, "workerCompletedAt" = NULL WHERE id = $2', [status, id]);
+      }
+
       const updatedJob = await db.get('SELECT * FROM jobs WHERE id = $1', [id]);
       res.json({ success: true, job: updatedJob });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
-
   // Connection Requests
   app.post('/api/connections', async (req, res) => {
     const { id, fromUserId, fromUserName, toUserId, toUserName, message, phone, actorId } = req.body;
@@ -768,6 +847,13 @@ async function startServer() {
       if (job.status !== 'open') {
         return res.status(400).json({ error: 'This job is not open for applications.' });
       }
+      const existingApplication = await db.get(
+        'SELECT * FROM applications WHERE "jobId" = $1 AND "applicantId" = $2',
+        [jobId, applicantId]
+      );
+      if (existingApplication) {
+        return res.status(400).json({ error: 'You have already applied to this job.' });
+      }
 
       const newId = id || `app-${Date.now()}`;
       const createdAt = new Date().toISOString();
@@ -796,26 +882,49 @@ async function startServer() {
       if (application.employerId !== actorId) {
         return res.status(403).json({ error: 'Only the job owner can update this application.' });
       }
-      await db.run('UPDATE applications SET status = $1 WHERE id = $2', [status, id]);
+      if (status === 'accepted') {
+        const existingAccepted = await db.get(
+          'SELECT * FROM applications WHERE "jobId" = $1 AND status = $2 AND id <> $3',
+          [application.jobId, 'accepted', id]
+        );
+        if (existingAccepted) {
+          return res.status(400).json({ error: 'This job already has an accepted worker.' });
+        }
+        await db.run('UPDATE applications SET status = $1 WHERE id = $2', [status, id]);
+        await db.run('UPDATE applications SET status = $1 WHERE "jobId" = $2 AND id <> $3 AND status = $4', ['declined', application.jobId, id, 'pending']);
+        await db.run(
+          'UPDATE jobs SET status = $1, "assignedWorkerId" = $2, "assignedWorkerName" = $3 WHERE id = $4 AND status = $5',
+          ['in_progress', application.applicantId, application.applicantName, application.jobId, 'open']
+        );
+      } else {
+        await db.run('UPDATE applications SET status = $1 WHERE id = $2', [status, id]);
+      }
       const updatedApplication = await db.get('SELECT * FROM applications WHERE id = $1', [id]);
       res.json({ success: true, application: updatedApplication });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
-
   // Reviews
   app.post('/api/reviews', async (req, res) => {
-    const { id, workerId, employerId, employerName, rating, comment, actorId } = req.body;
+    const { id, workerId, employerId, employerName, jobId, jobTitle, rating, comment, actorId } = req.body;
     try {
-      if ([workerId, employerId, employerName, comment].some(isBlank) || typeof rating !== 'number' || rating < 1 || rating > 5) {
-        return res.status(400).json({ error: 'Worker, employer, rating 1-5, and comment are required.' });
+      if ([workerId, employerId, employerName, jobId, jobTitle, comment].some(isBlank) || typeof rating !== 'number' || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: 'Completed job, worker, employer, rating 1-5, and comment are required.' });
       }
       const employer = await db.get('SELECT * FROM users WHERE id = $1', [actorId || employerId]);
       const worker = await db.get('SELECT * FROM users WHERE id = $1', [workerId]);
-      const acceptedConnection = await db.get(
-        'SELECT * FROM connections WHERE "fromUserId" = $1 AND "toUserId" = $2 AND status = \'accepted\'',
-        [employerId, workerId]
+      const completedJob = await db.get(
+        'SELECT * FROM jobs WHERE id = $1 AND "employerId" = $2 AND status = $3',
+        [jobId, employerId, 'completed']
+      );
+      const acceptedApplication = await db.get(
+        'SELECT * FROM applications WHERE "jobId" = $1 AND "employerId" = $2 AND "applicantId" = $3 AND status = $4',
+        [jobId, employerId, workerId, 'accepted']
+      );
+      const existingReview = await db.get(
+        'SELECT * FROM reviews WHERE "jobId" = $1 AND "workerId" = $2 AND "employerId" = $3',
+        [jobId, workerId, employerId]
       );
       if (!employer || employer.role !== 'employer' || employer.id !== employerId) {
         return res.status(403).json({ error: 'Only employers can submit worker reviews.' });
@@ -823,15 +932,18 @@ async function startServer() {
       if (!worker || worker.role !== 'worker') {
         return res.status(400).json({ error: 'Reviews can only target workers.' });
       }
-      if (!acceptedConnection) {
-        return res.status(403).json({ error: 'Reviews require an accepted hire connection.' });
+      if (!completedJob || !acceptedApplication) {
+        return res.status(403).json({ error: 'Reviews require a completed job with an accepted application for this worker.' });
+      }
+      if (existingReview) {
+        return res.status(400).json({ error: 'This completed job has already been reviewed.' });
       }
 
       const newId = id || `rev-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
-        'INSERT INTO reviews (id, "workerId", "employerId", "employerName", rating, comment, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [newId, workerId, employerId, employerName, rating, comment, createdAt]
+        'INSERT INTO reviews (id, "workerId", "employerId", "employerName", "jobId", "jobTitle", rating, comment, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+        [newId, workerId, employerId, employerName, completedJob.id, completedJob.title || jobTitle, rating, comment, createdAt]
       );
       const review = await db.get('SELECT * FROM reviews WHERE id = $1', [newId]);
       res.json({ success: true, review });
@@ -839,7 +951,6 @@ async function startServer() {
       res.status(500).json({ error: err.message });
     }
   });
-
   // --- Vite & Production Static File Serving Middleware ---
   if (!isProduction) {
     const vite = await createViteServer({
@@ -863,3 +974,11 @@ async function startServer() {
 startServer().catch(err => {
   console.error("Failed to start server", err);
 });
+
+
+
+
+
+
+
+

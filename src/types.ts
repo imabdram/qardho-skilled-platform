@@ -30,6 +30,10 @@ export interface Job {
   description: string;
   rate: string;        // Payment offer (e.g. "$20/day")
   phone: string;       // Direct contact phone
+  assignedWorkerId?: string;
+  assignedWorkerName?: string;
+  completionRequestedAt?: string;
+  workerCompletedAt?: string;
   status: JobStatus;   // Lifecycle status for the job post
   createdAt: string;
 }
@@ -66,7 +70,13 @@ export interface Review {
   workerId: string;
   employerId: string;
   employerName: string;
+  jobId?: string;
+  jobTitle?: string;
   rating: number; // 1 to 5 stars
   comment: string;
   createdAt: string;
 }
+
+
+
+

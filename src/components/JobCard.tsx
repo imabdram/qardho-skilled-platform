@@ -1,18 +1,20 @@
 import React from 'react';
-import { MapPin, DollarSign, Calendar, ArrowRight } from 'lucide-react';
-import { Job, JobStatus } from '../types';
+import { MapPin, DollarSign, Calendar, ArrowRight, CheckCircle2, Clock, X } from 'lucide-react';
+import { Application, Job, JobStatus } from '../types';
 
 interface JobCardProps {
   key?: string;
   job: Job;
+  application?: Application;
   onApply: (job: Job) => void;
+  onViewDetails?: (job: Job) => void;
   isOwner: boolean;
 }
 
-export default function JobCard({ job, onApply, isOwner }: JobCardProps) {
+export default function JobCard({ job, application, onApply, onViewDetails, isOwner }: JobCardProps) {
   const isOpen = job.status === 'open';
+  const canApply = isOpen && !application;
 
-  // Format Date simply
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
@@ -38,13 +40,29 @@ export default function JobCard({ job, onApply, isOwner }: JobCardProps) {
     );
   };
 
+  const getApplicationBadge = (status: Application['status']) => {
+    const Icon = status === 'accepted' ? CheckCircle2 : status === 'declined' ? X : Clock;
+    const styles = {
+      pending: 'border-amber-100 bg-amber-50 text-amber-700',
+      accepted: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      declined: 'border-rose-100 bg-rose-50 text-rose-700',
+    }[status];
+    const label = status === 'pending' ? 'Applied: waiting' : `Applied: ${status}`;
+
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${styles}`}>
+        <Icon className="h-3 w-3" />
+        {label}
+      </span>
+    );
+  };
+
   return (
-    <div 
+    <div
       className="bg-white rounded-xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200 transition-all duration-200 p-5 flex flex-col justify-between"
       id={`job-card-${job.id}`}
     >
       <div>
-        {/* Header */}
         <div>
           <h3 className="text-lg font-bold text-slate-900 leading-snug hover:text-blue-600 transition-colors">
             {job.title}
@@ -54,16 +72,17 @@ export default function JobCard({ job, onApply, isOwner }: JobCardProps) {
           </span>
         </div>
 
-        {/* Status Metadata */}
-        <div className="flex justify-between items-center gap-2 mt-3">
-          <div>{getJobStatusBadge(job.status)}</div>
+        <div className="flex flex-wrap justify-between items-center gap-2 mt-3">
+          <div className="flex flex-wrap gap-1.5">
+            {getJobStatusBadge(job.status)}
+            {application && getApplicationBadge(application.status)}
+          </div>
           <div className="inline-flex items-center space-x-1 text-slate-400 text-xs font-semibold shrink-0">
             <Calendar className="h-3 w-3" />
             <span className="text-[11px] font-medium">{formatDate(job.createdAt)}</span>
           </div>
         </div>
 
-        {/* Info Tags */}
         <div className="flex flex-wrap gap-3 mt-3 pb-3 border-b border-slate-50">
           <div className="flex items-center text-xs text-slate-600 font-medium bg-slate-50 px-2.5 py-1 rounded-md">
             <MapPin className="h-3 w-3 text-slate-400 mr-1 shrink-0" />
@@ -75,14 +94,21 @@ export default function JobCard({ job, onApply, isOwner }: JobCardProps) {
           </div>
         </div>
 
-        {/* Job Description */}
         <p className="mt-4 text-xs text-slate-600 leading-relaxed font-normal line-clamp-3">
           {job.description}
         </p>
       </div>
 
-      {/* Apply Action Buttons */}
-      <div className="mt-6 pt-2">
+      <div className="mt-6 space-y-2 pt-2">
+        {onViewDetails && (
+          <button
+            onClick={() => onViewDetails(job)}
+            className="w-full inline-flex items-center justify-center space-x-1.5 px-4 py-2.5 font-semibold text-xs rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all"
+          >
+            <span>View Details</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        )}
         {isOwner ? (
           <div className="text-center text-xs font-semibold text-blue-600 bg-blue-50/50 py-2.5 rounded-lg border border-blue-100">
             Your Job Listing
@@ -90,16 +116,16 @@ export default function JobCard({ job, onApply, isOwner }: JobCardProps) {
         ) : (
           <button
             onClick={() => onApply(job)}
-            disabled={!isOpen}
+            disabled={!canApply}
             className={`w-full inline-flex items-center justify-center space-x-1.5 px-4 py-2.5 font-semibold text-xs rounded-lg shadow-xs transition-all ${
-              isOpen
+              canApply
                 ? 'bg-slate-900 hover:bg-slate-800 text-white hover:shadow-md cursor-pointer'
                 : 'bg-slate-100 text-slate-400 cursor-not-allowed'
             }`}
             id={`btn-apply-${job.id}`}
           >
-            <span>{isOpen ? 'Apply Now' : 'Not Accepting Applications'}</span>
-            {isOpen && <ArrowRight className="h-3.5 w-3.5" />}
+            <span>{application ? `Already applied: ${application.status}` : isOpen ? 'Apply Now' : 'Not Accepting Applications'}</span>
+            {canApply && <ArrowRight className="h-3.5 w-3.5" />}
           </button>
         )}
       </div>

@@ -1,224 +1,393 @@
-import React from 'react';
-import { Wrench, Briefcase, Users, ArrowRight, ShieldCheck, MapPin, CheckCircle2 } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  ArrowRight,
+  BookOpen,
+  Briefcase,
+  CheckCircle2,
+  Construction,
+  DollarSign,
+  GraduationCap,
+  Hammer,
+  Leaf,
+  MapPin,
+  Plug,
+  Scissors,
+  Search,
+  ShieldCheck,
+  Star,
+  SunMedium,
+  Users,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react';
+import { Job, Review, User } from '../types';
+import { PAGE_ROUTES } from '../routes';
 
 interface LandingProps {
+  workers: User[];
+  jobs: Job[];
+  reviews: Review[];
   workersCount: number;
   jobsCount: number;
   onNavigate: (page: string) => void;
-  currentUser: any;
+  onViewWorkerProfile: (worker: User) => void;
+  currentUser: User | null;
 }
 
-export default function Landing({ workersCount, jobsCount, onNavigate, currentUser }: LandingProps) {
+interface SectionHeadingProps {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  align?: 'left' | 'center';
+}
+
+interface CategoryConfig {
+  name: string;
+  aliases: string[];
+  icon: LucideIcon;
+}
+
+const categoryConfig: CategoryConfig[] = [
+  { name: 'Plumbing', aliases: ['plumb', 'pipe'], icon: Wrench },
+  { name: 'Electrical Work', aliases: ['electric'], icon: Plug },
+  { name: 'Solar Installation', aliases: ['solar'], icon: SunMedium },
+  { name: 'Construction', aliases: ['mason', 'builder', 'construction'], icon: Construction },
+  { name: 'Tailoring', aliases: ['tailor'], icon: Scissors },
+  { name: 'Teaching', aliases: ['teacher', 'tutor'], icon: GraduationCap },
+  { name: 'Farming', aliases: ['farm', 'agric'], icon: Leaf },
+  { name: 'General Repair', aliases: ['repair', 'labor', 'general'], icon: Hammer },
+];
+
+const formatDate = (dateStr: string) => {
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return 'Recent';
+  }
+};
+
+const getInitials = (name: string) => name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase();
+
+function SectionHeading({ eyebrow, title, description, align = 'left' }: SectionHeadingProps) {
   return (
-    <div className="bg-slate-50/50" id="landing-page-container">
-      
-      {/* Hero Section */}
+    <div className={align === 'center' ? 'text-center max-w-2xl mx-auto' : 'max-w-2xl'}>
+      {eyebrow && <p className="text-xs font-black text-blue-600 uppercase tracking-[0.18em]">{eyebrow}</p>}
+      <h2 className="mt-2 text-2xl sm:text-3xl font-black tracking-tight text-slate-950">{title}</h2>
+      {description && <p className="mt-3 text-sm sm:text-base leading-7 text-slate-600">{description}</p>}
+    </div>
+  );
+}
+
+function HeroButton({ children, onClick, variant = 'primary' }: { children: React.ReactNode; onClick: () => void; variant?: 'primary' | 'secondary' }) {
+  const classes = variant === 'primary'
+    ? 'bg-blue-600 text-white hover:bg-blue-500 active:bg-blue-700 shadow-lg shadow-blue-950/25'
+    : 'bg-white/10 text-white border border-white/30 hover:bg-white/16 active:bg-white/20 backdrop-blur-md';
+
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 sm:px-6 text-sm font-bold transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${classes}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function StatCard({ value, label }: { value: string | number; label: string }) {
+  return (
+    <div className="min-w-[132px] flex-1 rounded-xl border border-white/15 bg-slate-950/35 px-4 py-3 text-left shadow-sm backdrop-blur-md">
+      <span className="block text-2xl font-black leading-none text-white">{value}</span>
+      <span className="mt-1 block text-xs font-semibold text-slate-300">{label}</span>
+    </div>
+  );
+}
+
+function CategoryCard({ category, count }: { category: CategoryConfig; count: number }) {
+  const Icon = category.icon;
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+      <div className="flex items-start gap-3">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-black text-slate-950">{category.name}</h3>
+          <p className="mt-1 text-xs font-semibold text-slate-500">{count} {count === 1 ? 'worker' : 'workers'}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepCard({ audience, accent, icon: Icon, steps, cta, to }: { audience: string; accent: 'blue' | 'green'; icon: LucideIcon; steps: string[]; cta: string; to: string }) {
+  const styles = accent === 'blue'
+    ? { icon: 'bg-blue-50 text-blue-600', marker: 'bg-blue-600 text-white', button: 'bg-blue-600 text-white shadow-sm shadow-blue-950/15 hover:bg-blue-700 active:bg-blue-800 focus-visible:ring-blue-500' }
+    : { icon: 'bg-emerald-50 text-emerald-600', marker: 'bg-emerald-600 text-white', button: 'bg-emerald-600 text-white shadow-sm shadow-emerald-950/15 hover:bg-emerald-700 active:bg-emerald-800 focus-visible:ring-emerald-500' };
+
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+      <div className="flex items-center gap-3">
+        <span className={`inline-flex h-11 w-11 items-center justify-center rounded-xl ${styles.icon}`}>
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <h3 className="text-lg font-black text-slate-950">{audience}</h3>
+      </div>
+      <ol className="mt-5 space-y-3">
+        {steps.map((step, index) => (
+          <li key={step} className="flex items-start gap-3 text-sm font-medium leading-6 text-slate-650">
+            <span className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black ${styles.marker}`}>{index + 1}</span>
+            <span>{step}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-auto pt-6">
+        <Link
+          to={to}
+          className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${styles.button}`}
+        >
+          {cta}
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function FeaturedWorkerCard({ worker, reviews, onView }: { worker: User; reviews: Review[]; onView: () => void }) {
+  const workerReviews = reviews.filter(review => review.workerId === worker.id);
+  const avgRating = workerReviews.length > 0
+    ? (workerReviews.reduce((sum, review) => sum + review.rating, 0) / workerReviews.length).toFixed(1)
+    : null;
+
+  return (
+    <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:border-blue-200 hover:shadow-md">
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-black text-slate-700">
+          {getInitials(worker.name)}
+        </div>
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-black text-slate-950">{worker.name}</h3>
+          {worker.skill && <p className="mt-1 truncate text-sm font-semibold text-blue-700">{worker.skill}</p>}
+          {worker.location && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-slate-500"><MapPin className="h-3.5 w-3.5" aria-hidden="true" />{worker.location}</p>}
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+        {avgRating && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-amber-800">
+            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" aria-hidden="true" />
+            {avgRating} ({workerReviews.length})
+          </span>
+        )}
+        {worker.rate && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800"><DollarSign className="h-3.5 w-3.5" aria-hidden="true" />{worker.rate}</span>}
+        {worker.availability && <span className="rounded-full bg-slate-100 px-2.5 py-1 capitalize text-slate-700">{worker.availability}</span>}
+      </div>
+      {worker.bio && <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">{worker.bio}</p>}
+      <button
+        onClick={onView}
+        className="mt-auto inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-black text-slate-800 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      >
+        View Profile
+      </button>
+    </article>
+  );
+}
+
+function JobPreviewCard({ job, onView }: { job: Job; onView: () => void }) {
+  return (
+    <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:border-blue-200 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="line-clamp-2 text-base font-black leading-6 text-slate-950">{job.title}</h3>
+          <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">{formatDate(job.createdAt)}</p>
+        </div>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase text-emerald-700">{job.status.replace('_', ' ')}</span>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+        <span className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-1"><MapPin className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />{job.location}</span>
+        {job.rate && <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-700"><DollarSign className="h-3.5 w-3.5" aria-hidden="true" />{job.rate}</span>}
+      </div>
+      <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">{job.description}</p>
+      <button
+        onClick={onView}
+        className="mt-auto inline-flex min-h-11 items-center justify-center rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+      >
+        View Job
+      </button>
+    </article>
+  );
+}
+
+export default function Landing({ workers, jobs, reviews, workersCount, jobsCount, onNavigate, onViewWorkerProfile, currentUser }: LandingProps) {
+  const categoryCounts = useMemo(() => categoryConfig.map(category => ({
+    category,
+    count: workers.filter(worker => {
+      const skill = (worker.skill || '').toLowerCase();
+      return category.aliases.some(alias => skill.includes(alias));
+    }).length,
+  })), [workers]);
+
+  const featuredWorkers = useMemo(() => workers.slice(0, 4), [workers]);
+  const recentJobs = useMemo(() => [...jobs].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 3), [jobs]);
+
+  return (
+    <div className="bg-slate-50" id="landing-page-container">
       <section
-        className="relative min-h-[620px] overflow-hidden text-white px-4 py-20 sm:py-28 flex items-center bg-slate-950"
+        className="relative flex min-h-[580px] overflow-hidden bg-slate-950 text-white lg:min-h-[620px]"
+        aria-labelledby="hero-heading"
         style={{
           backgroundImage: "url('/assets/xirfad-qardho-tradesman-hero.png')",
           backgroundSize: 'cover',
           backgroundPosition: 'center right',
         }}
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/78 to-slate-950/24"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/72 via-transparent to-slate-950/20"></div>
-
-        <div className="relative max-w-7xl mx-auto w-full z-10">
-          <div className="max-w-2xl space-y-6">
-            <div className="inline-flex items-center space-x-1.5 bg-white/10 border border-white/20 px-3 py-1 rounded-full text-sky-100 text-xs font-semibold uppercase tracking-wider backdrop-blur-sm">
-              <MapPin className="h-3.5 w-3.5" />
-              <span>Karkaar Region - Qardho, Somalia</span>
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/82 to-slate-950/35" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/72 via-slate-950/12 to-slate-950/20" />
+        <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center px-4 py-16 sm:px-6 lg:px-8">
+          <div className="max-w-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-sky-100 backdrop-blur-md">
+              <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+              Qardho, Karkaar Region
             </div>
-            
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-none max-w-3xl">
+            <h1 id="hero-heading" className="mt-6 max-w-4xl text-[2.4rem] font-black leading-[1.04] tracking-tight sm:text-[3rem] md:text-[3.35rem] lg:text-[3.85rem]">
               Xirfad Qardho
-              <span className="block mt-3 text-2xl sm:text-4xl text-sky-200 leading-tight">
+              <span className="mt-3 block text-[1.55rem] leading-tight text-sky-200 sm:text-[2rem] md:text-[2.35rem] lg:text-[2.65rem]">
                 Local skilled work, direct connections.
               </span>
             </h1>
-            
-            <p className="text-base sm:text-xl text-slate-200 max-w-xl font-medium leading-relaxed">
-              The direct community bridge connecting expert plumbers, solar technicians, builders, tailors, and teachers in Qardho with local employers.
+            <p className="mt-6 max-w-[600px] text-base font-medium leading-8 text-slate-100 sm:text-lg">
+              Connect with plumbers, solar technicians, builders, tailors, teachers, and local employers across Qardho without agency barriers.
             </p>
-
-            {/* Quick CTA Actions */}
-            <div className="flex flex-wrap gap-4 pt-4">
-              {(!currentUser || currentUser.role === 'employer') && (
-                <button
-                  onClick={() => onNavigate('workers')}
-                  className="inline-flex items-center space-x-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-950/30 hover:shadow-xl transition-all cursor-pointer"
-                  id="landing-cta-workers"
-                >
-                  <Users className="h-4 w-4" />
-                  <span>Hire Skilled Workers</span>
-                  <span className="bg-blue-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">
-                    {workersCount}
-                  </span>
-                </button>
-              )}
-              {(!currentUser || currentUser.role === 'worker') && (
-                <button
-                  onClick={() => onNavigate('jobs')}
-                  className="inline-flex items-center space-x-2 px-6 py-3.5 bg-white/10 hover:bg-white/15 text-slate-100 border border-white/20 font-bold text-sm rounded-xl hover:text-white transition-all cursor-pointer backdrop-blur-sm"
-                  id="landing-cta-jobs"
-                >
-                  <Briefcase className="h-4 w-4 text-sky-300" />
-                  <span>Browse Job Board</span>
-                  <span className="bg-white/10 text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-1">
-                    {jobsCount}
-                  </span>
-                </button>
-              )}
+            <div className="mt-8 flex flex-wrap gap-3">
+              <HeroButton onClick={() => onNavigate('workers')}>
+                <Users className="h-5 w-5" aria-hidden="true" />
+                Find Skilled Workers
+              </HeroButton>
+              <HeroButton onClick={() => onNavigate('jobs')} variant="secondary">
+                <Briefcase className="h-5 w-5" aria-hidden="true" />
+                Browse Job Board
+              </HeroButton>
             </div>
-
-            {/* Key Stat Badges */}
-            <div className="grid grid-cols-3 max-w-xl gap-3 pt-10 text-center text-xs text-slate-300">
-              <div className="bg-white/10 p-3 rounded-xl border border-white/15 backdrop-blur-sm">
-                <span className="block text-lg sm:text-xl font-bold text-white font-mono">{workersCount}</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider">Tradesmen</span>
-              </div>
-              <div className="bg-white/10 p-3 rounded-xl border border-white/15 backdrop-blur-sm">
-                <span className="block text-lg sm:text-xl font-bold text-white font-mono">{jobsCount}</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider">Active Jobs</span>
-              </div>
-              <div className="bg-white/10 p-3 rounded-xl border border-white/15 backdrop-blur-sm">
-                <span className="block text-lg sm:text-xl font-bold text-emerald-400 font-mono">100%</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider">Local Focus</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-sky-500 to-emerald-500"></div>
-      </section>
-
-      {/* How it Works Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block font-mono">Simple Steps</span>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">How Xirfad Qardho Works</h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Find a local worker, send a message, and agree on the job directly.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Employers Path */}
-          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-100 shadow-xs space-y-4">
-            <div className="bg-blue-50 text-blue-600 h-12 w-12 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs mb-2">
-              <Briefcase className="h-5 w-5" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900">For people who need work done</h3>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-              Need a repair, solar work, tailoring, building work, or farm help? Find a local worker or post your job.
-            </p>
-            <ul className="space-y-2 pt-2 text-xs text-slate-600">
-              <li className="flex items-center space-x-2 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
-                <span>Search by skill or location</span>
-              </li>
-              <li className="flex items-center space-x-2 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
-                <span>Send a free message with your phone number</span>
-              </li>
-              <li className="flex items-center space-x-2 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0" />
-                <span>Post a job and get replies</span>
-              </li>
-            </ul>
-            <div className="pt-4">
-              <button
-                onClick={() => onNavigate('workers')}
-                className="inline-flex items-center space-x-1.5 text-xs font-bold text-blue-600 hover:text-blue-700 group cursor-pointer"
-              >
-                <span>Find workers</span>
-                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-          </div>
-
-          {/* Workers Path */}
-          <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-100 shadow-xs space-y-4">
-            <div className="bg-emerald-50 text-emerald-600 h-12 w-12 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs mb-2">
-              <Wrench className="h-5 w-5" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900">For workers</h3>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-normal">
-              Show your skill, location, and price. People in Qardho can contact you for work.
-            </p>
-            <ul className="space-y-2 pt-2 text-xs text-slate-600">
-              <li className="flex items-center space-x-2 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                <span>Create your worker profile</span>
-              </li>
-              <li className="flex items-center space-x-2 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                <span>Receive job messages from customers</span>
-              </li>
-              <li className="flex items-center space-x-2 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                <span>Find jobs and apply</span>
-              </li>
-            </ul>
-            <div className="pt-4">
-              {currentUser ? (
-                <button
-                  onClick={() => onNavigate('dashboard')}
-                  className="inline-flex items-center space-x-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 group cursor-pointer"
-                >
-                  <span>Open Dashboard</span>
-                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
-                </button>
-              ) : (
-                <button
-                  onClick={() => onNavigate('auth')}
-                  className="inline-flex items-center space-x-1.5 text-xs font-bold text-emerald-600 hover:text-emerald-700 group cursor-pointer"
-                >
-                  <span>Join as Worker</span>
-                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
-                </button>
-              )}
+            <div className="mt-10 flex max-w-2xl flex-wrap gap-3" aria-label="Platform statistics">
+              <StatCard value={workersCount} label="Skilled Workers" />
+              <StatCard value={jobsCount} label="Active Jobs" />
+              <StatCard value="100%" label="Qardho Focus" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Featured Trust Badges */}
-      <section className="bg-slate-100/50 border-y border-slate-100 py-12 px-4">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
-          <div className="flex items-start space-x-3.5">
-            <div className="bg-blue-100 text-blue-600 p-2.5 rounded-xl shrink-0">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-900">Verified Local Talents</h4>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Connect with reputable craftsmen with roots in the Qardho community.
-              </p>
-            </div>
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-labelledby="category-heading">
+        <SectionHeading title="Find help by skill" description="Browse the trade areas represented by current worker profiles." />
+        <div className="mt-7 grid grid-cols-1 gap-4 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {categoryCounts.map(({ category, count }) => (
+            <React.Fragment key={category.name}>
+              <CategoryCard category={category} count={count} />
+            </React.Fragment>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8" aria-labelledby="how-heading">
+        <SectionHeading eyebrow="Simple steps" title="How Xirfad Qardho works" description="Two clear paths for hiring local help or finding work nearby." align="center" />
+        <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
+          <StepCard
+            audience="For people who need work done"
+            accent="blue"
+            icon={Briefcase}
+            steps={['Search by skill or location', 'Contact a suitable worker', 'Agree directly and complete the work']}
+            cta="Find Workers"
+            to={PAGE_ROUTES.workers}
+          />
+          <StepCard
+            audience="For workers"
+            accent="green"
+            icon={Wrench}
+            steps={['Create a worker profile', 'Show skills, location, and price', 'Receive messages and apply for jobs']}
+            cta={currentUser ? 'Open Dashboard' : 'Join as Worker'}
+            to={currentUser ? PAGE_ROUTES.dashboard : PAGE_ROUTES.register}
+          />
+        </div>
+      </section>
+
+      <section className="border-y border-slate-200 bg-white py-12" aria-labelledby="benefits-heading">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            {[
+              { title: 'Local Worker Profiles', desc: 'Review skills, area, bio, price, and availability when workers provide them.', icon: ShieldCheck, color: 'bg-blue-50 text-blue-600' },
+              { title: 'Direct Negotiation', desc: 'Message workers or applicants directly and agree on scope, timing, and payment.', icon: CheckCircle2, color: 'bg-emerald-50 text-emerald-600' },
+              { title: 'Neighborhood-Specific Results', desc: 'Find help around Kaambo, Qoryacad, Xorgoble, Xiingood, Xiddo, Sheerbi, and Waaciye.', icon: MapPin, color: 'bg-amber-50 text-amber-600' },
+            ].map(item => {
+              const Icon = item.icon;
+              return (
+                <div key={item.title} className="flex gap-4">
+                  <span className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${item.color}`}>
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-black text-slate-950">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{item.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div className="flex items-start space-x-3.5">
-            <div className="bg-emerald-100 text-emerald-600 p-2.5 rounded-xl shrink-0">
-              <Wrench className="h-5 w-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-900">Direct Negotiations</h4>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                No intermediate commission or fees. Deal and coordinate straight with workers.
-              </p>
-            </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-labelledby="featured-workers-heading">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <SectionHeading title="Featured Skilled Workers" description="A short preview of worker profiles currently available in the platform." />
+          <button onClick={() => onNavigate('workers')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-black text-blue-700 hover:text-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+            View all workers <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        {featuredWorkers.length > 0 ? (
+          <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {featuredWorkers.map(worker => (
+              <React.Fragment key={worker.id}>
+                <FeaturedWorkerCard worker={worker} reviews={reviews} onView={() => onViewWorkerProfile(worker)} />
+              </React.Fragment>
+            ))}
           </div>
-          <div className="flex items-start space-x-3.5">
-            <div className="bg-amber-100 text-amber-600 p-2.5 rounded-xl shrink-0">
-              <MapPin className="h-5 w-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-slate-900">Neighborhood-specific</h4>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Filter labor options in Kaambo, Qoryacad, Xorgoble, Xiingood, Xiddo, Sheerbi, or Waaciye to save travel time.
-              </p>
-            </div>
+        ) : (
+          <div className="mt-7 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-500">No worker profiles are available yet.</div>
+        )}
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-labelledby="active-jobs-heading">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <SectionHeading title="Available Jobs in Qardho" description="Recent local job posts from employers in the platform." />
+          <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-black text-blue-700 hover:text-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+            Browse all jobs <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        {recentJobs.length > 0 ? (
+          <div className="mt-7 grid grid-cols-1 gap-5 md:grid-cols-3">
+            {recentJobs.map(job => (
+              <React.Fragment key={job.id}>
+                <JobPreviewCard job={job} onView={() => onNavigate('jobs')} />
+              </React.Fragment>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-7 rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+            <Briefcase className="mx-auto h-9 w-9 text-slate-300" aria-hidden="true" />
+            <p className="mt-3 text-sm font-black text-slate-700">No jobs are posted right now.</p>
+            <p className="mt-1 text-sm text-slate-500">Check back later or create an employer account to post local work.</p>
+          </div>
+        )}
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-14 pt-4 sm:px-6 lg:px-8" aria-labelledby="final-cta-heading">
+        <div className="rounded-2xl bg-slate-950 px-5 py-8 text-white sm:px-8 md:flex md:items-center md:justify-between md:gap-8">
+          <div>
+            <h2 id="final-cta-heading" className="text-2xl font-black tracking-tight sm:text-3xl">Ready to find skilled help in Qardho?</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Search local profiles or create a worker account so nearby employers can contact you.</p>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3 md:mt-0 md:shrink-0">
+            <button onClick={() => onNavigate('workers')} className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-600 px-5 text-sm font-black text-white transition hover:bg-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Find Skilled Workers</button>
+            <Link to={PAGE_ROUTES.register} className="inline-flex min-h-12 items-center justify-center rounded-xl border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Create Worker Profile</Link>
           </div>
         </div>
       </section>

@@ -1,0 +1,38 @@
+ 1. Improve role switching
+     Make switching Worker/Employer require a confirmation modal and profile check. Right now it still
+     feels too casual.
+
+  2. Add job detail page
+     Instead of only job cards, each job should have a full page with description, employer info,
+     status timeline, apply/status button, and contact info when allowed.
+
+  3. Improve review navigation
+     “Leave review” currently sends employer to workers page. Better: send directly to the assigned
+     worker profile and scroll/open the review form.
+
+  4. Add field-level form errors
+     Signup, profile, post job, apply, and connect forms should show exactly what is wrong under each
+     field.
+
+  5. Add duplicate action protection everywhere
+     Some loading states exist now, but all forms/actions should disable while saving to prevent
+     double submissions.
+
+  6. Add real empty states
+     Some are improved, but more pages need helpful next actions, especially workers/jobs/profile.
+
+  7. Add report/safety buttons
+     Simple public app needs “Report job,” “Report worker,” or “Report review” even if it only stores
+     a report for admin later.
+
+  8. Add admin view
+     A basic admin dashboard for users, jobs, reports, and suspicious content.
+
+  9. Add real auth/session protection
+     Current auth is still prototype-level. For public use, API routes need real session checks.
+
+  10. Add notifications persistence
+     Notifications should be stored/read/unread, not only calculated from current app data.
+
+  My recommendation: do #3 review navigation next. It is small, useful, and directly improves the
+  workflow you just built.
