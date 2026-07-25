@@ -767,7 +767,7 @@ async function startServer() {
 
   // Update profile
   app.post('/api/profile/update', async (req, res) => {
-    const { id, name, email, phone, role, skill, location, bio, rate, smsNotificationsEnabled, availability } = req.body;
+    const { id, name, email, phone, role, skill, location, bio, rate, smsNotificationsEnabled, availability, actorId } = req.body;
     try {
       if (isBlank(id) || isBlank(name) || isBlank(phone)) {
         return res.status(400).json({ error: 'User id, name, and phone are required.' });
@@ -779,6 +779,11 @@ async function startServer() {
       if (!existing) {
         return res.status(404).json({ error: 'User not found.' });
       }
+      const actor = await requireUser(actorId);
+      if (!actor || actor.id !== id) {
+        return res.status(403).json({ error: 'You can only update your own profile.' });
+      }
+
       if (existing.role === 'admin' && role !== 'admin') {
         return res.status(403).json({ error: 'Admin role cannot be changed here.' });
       }
@@ -986,7 +991,7 @@ async function startServer() {
       if ([title, employerId, employerName, location, description, rate, phone].some(isBlank)) {
         return res.status(400).json({ error: 'Title, employer, location, description, rate, and phone are required.' });
       }
-      const employer = await db.get('SELECT * FROM users WHERE id = $1', [actorId || employerId]);
+      const employer = await db.get('SELECT * FROM users WHERE id = $1', [actorId]);
       if (!employer || (employer.role !== 'employer' && employer.role !== 'admin') || employer.id !== employerId) {
         return res.status(403).json({ error: 'Only the employer account can post this job.' });
       }
@@ -1057,7 +1062,7 @@ async function startServer() {
       if ([fromUserId, fromUserName, toUserId, toUserName, phone].some(isBlank)) {
         return res.status(400).json({ error: 'Connection requester, target worker, and phone are required.' });
       }
-      const fromUser = await db.get('SELECT * FROM users WHERE id = $1', [actorId || fromUserId]);
+      const fromUser = await db.get('SELECT * FROM users WHERE id = $1', [actorId]);
       const toUser = await db.get('SELECT * FROM users WHERE id = $1', [toUserId]);
       if (!fromUser || fromUser.role !== 'employer' || fromUser.id !== fromUserId) {
         return res.status(403).json({ error: 'Only employers can initiate hire connections.' });
@@ -1108,7 +1113,7 @@ async function startServer() {
       if ([jobId, jobTitle, employerId, applicantId, applicantName, applicantSkill, message, phone, location].some(isBlank)) {
         return res.status(400).json({ error: 'Application details, message, phone, and location are required.' });
       }
-      const applicant = await db.get('SELECT * FROM users WHERE id = $1', [actorId || applicantId]);
+      const applicant = await db.get('SELECT * FROM users WHERE id = $1', [actorId]);
       const job = await db.get('SELECT * FROM jobs WHERE id = $1', [jobId]);
       if (!applicant || applicant.role !== 'worker' || applicant.id !== applicantId) {
         return res.status(403).json({ error: 'Only workers can apply for jobs.' });
@@ -1184,7 +1189,7 @@ async function startServer() {
       if ([workerId, employerId, employerName, jobId, jobTitle, comment].some(isBlank) || typeof rating !== 'number' || rating < 1 || rating > 5) {
         return res.status(400).json({ error: 'Completed job, worker, employer, rating 1-5, and comment are required.' });
       }
-      const employer = await db.get('SELECT * FROM users WHERE id = $1', [actorId || employerId]);
+      const employer = await db.get('SELECT * FROM users WHERE id = $1', [actorId]);
       const worker = await db.get('SELECT * FROM users WHERE id = $1', [workerId]);
       const completedJob = await db.get(
         'SELECT * FROM jobs WHERE id = $1 AND "employerId" = $2 AND status = $3',

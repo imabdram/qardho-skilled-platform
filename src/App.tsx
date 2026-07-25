@@ -324,7 +324,7 @@ export default function App() {
       const res = await fetch('/api/profile/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedUser)
+        body: JSON.stringify({ ...updatedUser, actorId: updatedUser.id })
       });
       if (res.ok) {
         const data = await res.json();
@@ -438,7 +438,7 @@ export default function App() {
       const res = await fetch('/api/profile/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedUser)
+        body: JSON.stringify({ ...updatedUser, actorId: updatedUser.id })
       });
       if (res.ok) {
         const data = await res.json();
@@ -629,7 +629,7 @@ export default function App() {
       const res = await fetch('/api/profile/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedProfile)
+        body: JSON.stringify({ ...updatedProfile, actorId: currentUser?.id })
       });
       if (res.ok) {
         const data = await res.json();

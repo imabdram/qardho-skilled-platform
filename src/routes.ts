@@ -1,4 +1,4 @@
-export type PageId = 'home' | 'workers' | 'jobs' | 'job-detail' | 'profile' | 'dashboard' | 'post-job' | 'auth' | 'register' | 'not-found';
+export type PageId = 'home' | 'workers' | 'jobs' | 'job-detail' | 'profile' | 'dashboard' | 'admin' | 'post-job' | 'auth' | 'register' | 'not-found';
 
 export const PAGE_ROUTES: Record<PageId, string> = {
   home: '/',
@@ -7,6 +7,7 @@ export const PAGE_ROUTES: Record<PageId, string> = {
   'job-detail': '/jobs',
   profile: '/profile',
   dashboard: '/dashboard',
+  admin: '/admin',
   'post-job': '/post-job',
   auth: '/login',
   register: '/register',
@@ -19,6 +20,7 @@ export const ROUTE_PAGES: Record<string, PageId> = {
   '/jobs': 'jobs',
   '/profile': 'profile',
   '/dashboard': 'dashboard',
+  '/admin': 'admin',
   '/post-job': 'post-job',
   '/login': 'auth',
   '/auth': 'auth',

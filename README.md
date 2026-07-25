@@ -14,6 +14,7 @@ The project is currently an MVP/demo app with a real React frontend, Express API
 - Authentication is demo/local only: users sign in by registered phone or email plus password, but the app does not create production-grade sessions or protect all API routes.
 - API routes are intended for local prototype use and are not production-hardened.
 - SMS preferences are stored in profiles, but real SMS delivery is not integrated yet.
+- The app does not include direct chat, payments, escrow, scheduling, or admin moderation tools yet.
 
 ## Features
 
@@ -34,6 +35,22 @@ The project is currently an MVP/demo app with a real React frontend, Express API
 - Review submission by employers with accepted hire connections.
 - Demo role switching for testing both sides of the marketplace.
 - Local seed data for workers, jobs, connections, applications, and reviews.
+
+## Missing Features and Limitations
+
+The app is usable as an MVP, but these production features are still missing:
+
+- Real authentication with secure sessions or token-based auth.
+- Server-side authorization that does not rely on client-supplied IDs.
+- Input validation and rate limiting on public endpoints.
+- Direct messaging between employers and workers.
+- SMS, email, or WhatsApp delivery for notifications.
+- Payments, invoices, escrow, and transaction tracking.
+- Scheduling, milestones, and job completion workflows.
+- Admin moderation, dispute handling, and trust-and-safety tooling.
+- Saved searches, bookmarks, recommendations, and richer discovery tools.
+- Full localization support, including Somali language UI.
+- A complete automated end-to-end test suite for the main marketplace flows.
 
 ## Tech Stack
 
@@ -205,6 +222,7 @@ The seeded demo credentials are:
 | --- | --- | --- |
 | Worker | `ahmed.mohamed@example.com` or `+252 90 779 1234` | `demo1234` |
 | Employer | `employer1@qardho.com` or `+252 90 700 1122` | `demo1234` |
+| Admin | `admin@qardho.com` or `+252 90 700 1100` | `demo1234` |
 
 Suggested demo loop:
 
@@ -228,14 +246,3 @@ npm run lint
 ```
 
 Both commands pass in the current workspace.
-
-## Production Gaps
-
-Before using this for real users, the app needs:
-
-- Real authentication, password or OTP flow, and server-side sessions.
-- Stronger authorization that does not trust client-supplied `actorId`.
-- Input validation and rate limiting on public routes.
-- Real SMS or WhatsApp notification integration if notification preferences are meant to send messages.
-- Deployment configuration for hosting, database backups, and environment management.
-- More formal automated tests for the main worker, employer, application, and connection flows.
