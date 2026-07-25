@@ -8,7 +8,7 @@ export interface User {
   name: string;
   email?: string;
   phone: string;
-  role?: 'worker' | 'employer' | 'pending';
+  role?: 'worker' | 'employer' | 'admin' | 'pending';
   skill?: string;      // Required for workers (e.g. "Electrician", "Plumber")
   location?: string;   // Qardho neighborhoods (e.g. "Kaambo", "Qoryacad", "Xorgoble")
   bio?: string;
@@ -17,8 +17,32 @@ export interface User {
   smsNotificationsEnabled?: boolean;
   availability?: 'available' | 'busy' | 'unavailable';
   verified?: boolean;
+  suspended?: boolean;
 }
 
+export const PROFILE_FIELD_KEYS = [
+  'name',
+  'phone',
+  'email',
+  'role',
+  'location',
+  'bio',
+  'skill',
+  'rate',
+  'availability',
+] as const;
+
+export type ProfileFieldKey = typeof PROFILE_FIELD_KEYS[number];
+
+export interface VerificationMessage {
+  userId: string;
+  adminId: string;
+  adminName: string;
+  missingFields: ProfileFieldKey[];
+  note?: string;
+  sentAt: string;
+  readAt?: string;
+}
 export type JobStatus = 'open' | 'in_progress' | 'completed' | 'closed';
 
 export interface Job {
@@ -76,7 +100,3 @@ export interface Review {
   comment: string;
   createdAt: string;
 }
-
-
-
-

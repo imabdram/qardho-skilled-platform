@@ -1,6 +1,6 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isEmailLike, isSomaliPhone, isValidRating, normalizeOptionalEmail, normalizePhone } from '../src/validation';
+import { buildVerificationMessageText, getMissingProfileFields, isEmailLike, isSomaliPhone, isValidRating, normalizeOptionalEmail, normalizePhone } from '../src/validation';
 
 test('normalizes phone numbers by removing spaces and dashes', () => {
   assert.equal(normalizePhone('+252 90-700 1122'), '+252907001122');
@@ -32,4 +32,32 @@ test('validates review ratings from 1 to 5', () => {
   assert.equal(isValidRating(5), true);
   assert.equal(isValidRating(0), false);
   assert.equal(isValidRating(6), false);
+});
+test('detects common and worker-specific missing profile fields', () => {
+  assert.deepEqual(getMissingProfileFields({
+    name: 'Amina',
+    phone: '+252907001122',
+    role: 'worker',
+    location: '',
+    bio: '',
+    skill: '',
+    rate: '',
+    availability: undefined,
+  }), ['location', 'bio', 'skill', 'rate', 'availability']);
+});
+
+test('does not require worker-only fields from employers', () => {
+  assert.deepEqual(getMissingProfileFields({
+    name: 'Qardho Shop',
+    phone: '+252907001122',
+    role: 'employer',
+    location: 'Kaambo',
+    bio: 'Local employer',
+  }), []);
+});
+
+test('builds a readable verification message from selected fields and a note', () => {
+  const message = buildVerificationMessageText('Amina', ['location', 'bio'], 'Add a clear description of your experience.');
+  assert.match(message, /Location, Profile bio/);
+  assert.match(message, /clear description/);
 });
