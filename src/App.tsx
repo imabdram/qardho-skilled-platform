@@ -14,13 +14,12 @@ import ConnectModal from './components/ConnectModal';
 import ApplyModal from './components/ApplyModal';
 import NotFound from './pages/NotFound';
 import { User, Job, JobStatus, Connection, Application, Review, ProfileFieldKey, VerificationMessage } from './types';
-import { Sparkles, MapPin, AlertCircle, RefreshCw, LogIn, Briefcase, CheckCircle2, X, ShieldAlert } from 'lucide-react';
+import { MapPin, AlertCircle, RefreshCw, CheckCircle2, X } from 'lucide-react';
 import ConfirmDialog from './components/ConfirmDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getPageForPath, getRouteForPage, PageId } from './routes';
 
 export default function App() {
-  const DEMO_PASSWORD = 'demo1234';
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -184,93 +183,6 @@ export default function App() {
     const data = await res.json();
     setVerificationMessage(data.message || null);
   };
-  // Quick Switch Roles helper for demo/testing
-  const loginAsDemoUser = async (role: 'worker' | 'employer' | 'admin') => {
-    if (role === 'worker') {
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: '+252 90 779 1234', password: DEMO_PASSWORD }) // Ahmed's phone
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setCurrentUser(data.user);
-          localStorage.setItem('currentUser', JSON.stringify(data.user));
-          navigateTo(data.user.role === 'admin' ? 'admin' : 'dashboard');
-          setRoleToast(`Demo Session: Active role set to Ahmed Mohamed Ali (Worker)`);
-          showAppNotice('Demo worker session loaded.');
-          setTimeout(() => setRoleToast(null), 4000);
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    } else {
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: 'employer1@qardho.com', password: DEMO_PASSWORD })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setCurrentUser(data.user);
-          localStorage.setItem('currentUser', JSON.stringify(data.user));
-          navigateTo(data.user.role === 'admin' ? 'admin' : 'dashboard');
-          setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
-          showAppNotice('Demo employer session loaded.');
-          setTimeout(() => setRoleToast(null), 4000);
-        } else if (role === 'employer') {
-          // Register first, then login
-          const regRes = await fetch('/api/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              id: 'employer-1',
-              name: 'Qardho Agricultural Co.',
-              email: 'employer1@qardho.com',
-              phone: '+252 90 700 1122',
-              password: DEMO_PASSWORD,
-              role: 'employer',
-              location: 'Kaambo',
-              bio: 'Local farming collective focusing on water-efficient agricultural systems in Karkaar.'
-            })
-          });
-          if (regRes.ok) {
-            const data = await regRes.json();
-            setCurrentUser(data.user);
-            localStorage.setItem('currentUser', JSON.stringify(data.user));
-            navigateTo('dashboard');
-            setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
-            showAppNotice('Demo employer session loaded.');
-            setTimeout(() => setRoleToast(null), 4000);
-          }
-        } else {
-          try {
-            const adminRes = await fetch('/api/auth/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ identifier: 'admin@qardho.com', password: DEMO_PASSWORD })
-            });
-            if (adminRes.ok) {
-              const data = await adminRes.json();
-              setCurrentUser(data.user);
-              localStorage.setItem('currentUser', JSON.stringify(data.user));
-              navigateTo('admin');
-              setRoleToast('Demo Session: Active role set to Platform Admin');
-              showAppNotice('Demo admin session loaded.');
-              setTimeout(() => setRoleToast(null), 4000);
-            }
-          } catch (err) {
-            console.error(err);
-          }
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-  };
-
   // Auth Operations
   const handleLogin = async ({ identifier, password }: any) => {
     try {
@@ -696,21 +608,6 @@ export default function App() {
   };
 
 
-  const resetDemoData = async () => {
-    try {
-      const res = await fetch('/api/demo/reset', { method: 'POST' });
-      if (!res.ok) {
-        showAppError(await getApiError(res, 'Could not reset demo data.'));
-        return;
-      }
-      await refreshAllData();
-      showAppNotice('Demo data reset.');
-      navigateTo('dashboard');
-    } catch (err) {
-      console.error(err);
-      showAppError('Could not reset demo data.');
-    }
-  };
   const handleNavigate = (page: string) => {
     setViewingProfileUser(null);
     navigateTo(page as PageId);
@@ -932,44 +829,6 @@ export default function App() {
   const canConfirmRoleSwitch = roleSwitchProfileCheck.blocking.length === 0 && !!currentUser;
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col text-slate-800 antialiased font-sans" id="app-root-layout">
-      {/* Top Banner indicating Preview Mode / Quick Login Panel */}
-      <div className="bg-slate-900 text-white px-4 py-2 flex flex-col sm:flex-row items-center justify-between text-xs font-semibold shadow-xs" id="preview-alert-banner">
-        <div className="flex items-center space-x-1.5 mb-1.5 sm:mb-0">
-          <Sparkles className="h-4 w-4 text-sky-300 shrink-0" />
-          <span><strong>Demo Mode:</strong> PostgreSQL data with worker, employer, job, and review flows.</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-slate-300 hidden md:inline">Try a role:</span>
-          <button
-            onClick={() => loginAsDemoUser('worker')}
-            className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md text-[10px] cursor-pointer transition-all border border-white/10"
-          >
-            <LogIn className="inline-block h-3 w-3 mr-1" />
-            Log In as Ahmed (Worker)
-          </button>
-          <button
-            onClick={() => loginAsDemoUser('employer')}
-            className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md text-[10px] cursor-pointer transition-all border border-white/10"
-          >
-            <Briefcase className="inline-block h-3 w-3 mr-1" />
-            Log In as Farmer (Employer)
-          </button>
-          <button
-            onClick={() => loginAsDemoUser('admin')}
-            className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md text-[10px] cursor-pointer transition-all border border-white/10"
-          >
-            <ShieldAlert className="inline-block h-3 w-3 mr-1" />
-            Log In as Admin
-          </button>
-          <button
-            onClick={resetDemoData}
-            className="bg-amber-400 text-slate-950 hover:bg-amber-300 px-2 py-1 rounded-md text-[10px] cursor-pointer transition-all border border-amber-300 font-black"
-          >
-            Reset Demo
-          </button>
-        </div>
-      </div>
-
       {/* Main Navigation Component */}
       <Navbar
         currentUser={currentUser}
