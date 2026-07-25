@@ -6,14 +6,16 @@ import Jobs from './pages/Jobs';
 import JobDetail from './pages/JobDetail';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
+import Admin from './pages/Admin';
 import PostJob from './pages/PostJob';
 import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
 import ConnectModal from './components/ConnectModal';
 import ApplyModal from './components/ApplyModal';
 import NotFound from './pages/NotFound';
-import { User, Job, JobStatus, Connection, Application, Review } from './types';
-import { Sparkles, MapPin, AlertCircle, RefreshCw, LogIn, Briefcase, CheckCircle2, X } from 'lucide-react';
+import { User, Job, JobStatus, Connection, Application, Review, ProfileFieldKey, VerificationMessage } from './types';
+import { Sparkles, MapPin, AlertCircle, RefreshCw, LogIn, Briefcase, CheckCircle2, X, ShieldAlert } from 'lucide-react';
+import ConfirmDialog from './components/ConfirmDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getPageForPath, getRouteForPage, PageId } from './routes';
 
@@ -40,11 +42,13 @@ export default function App() {
   const [viewingProfileUser, setViewingProfileUser] = useState<User | null>(null);
 
   // App data list states (initialized empty, populated dynamically from PostgreSQL)
+  const [users, setUsers] = useState<User[]>([]);
   const [workers, setWorkers] = useState<User[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [verificationMessage, setVerificationMessage] = useState<VerificationMessage | null>(null);
 
   // Active Modals states
   const [selectedWorkerForConnect, setSelectedWorkerForConnect] = useState<User | null>(null);
@@ -56,6 +60,7 @@ export default function App() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [appError, setAppError] = useState<string | null>(null);
   const [appNotice, setAppNotice] = useState<string | null>(null);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
 
   const showAppError = (message: string) => {
     setAppError(message);
@@ -97,7 +102,8 @@ export default function App() {
     try {
       setIsLoadingData(true);
       setAppError(null);
-      const [workersRes, jobsRes, connectionsRes, applicationsRes, reviewsRes] = await Promise.all([
+      const [usersRes, workersRes, jobsRes, connectionsRes, applicationsRes, reviewsRes] = await Promise.all([
+        fetchJson<User[]>('/api/users', 'Could not load users.'),
         fetchJson<User[]>('/api/workers', 'Could not load workers.'),
         fetchJson<Job[]>('/api/jobs', 'Could not load jobs.'),
         fetchJson<Connection[]>('/api/connections', 'Could not load connection requests.'),
@@ -105,12 +111,14 @@ export default function App() {
         fetchJson<Review[]>('/api/reviews', 'Could not load reviews.'),
       ]);
 
+      const userList = Array.isArray(usersRes) ? usersRes : [];
       const workerList = Array.isArray(workersRes) ? workersRes : [];
       const jobList = Array.isArray(jobsRes) ? jobsRes : [];
       const connectionList = Array.isArray(connectionsRes) ? connectionsRes : [];
       const applicationList = Array.isArray(applicationsRes) ? applicationsRes : [];
       const reviewList = Array.isArray(reviewsRes) ? reviewsRes : [];
 
+      setUsers(userList);
       setWorkers(workerList);
       setJobs(jobList);
       setConnections(connectionList);
@@ -140,8 +148,44 @@ export default function App() {
     refreshAllData();
   }, []);
 
+  const loadVerificationMessage = async (user: User | null) => {
+    if (!user || user.role === 'admin' || user.verified) {
+      setVerificationMessage(null);
+      return;
+    }
+
+    try {
+      const data = await fetchJson<{ message: VerificationMessage | null }>(
+        `/api/verification-messages/${user.id}?actorId=${encodeURIComponent(user.id)}`,
+        'Could not load your verification message.'
+      );
+      setVerificationMessage(data.message);
+    } catch (error) {
+      console.error('Failed to load verification message', error);
+      setVerificationMessage(null);
+    }
+  };
+
+  useEffect(() => {
+    loadVerificationMessage(currentUser);
+  }, [currentUser?.id, currentUser?.verified]);
+
+  const markVerificationMessageRead = async () => {
+    if (!currentUser || !verificationMessage || verificationMessage.readAt) return;
+    const res = await fetch(`/api/verification-messages/${currentUser.id}/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actorId: currentUser.id }),
+    });
+    if (!res.ok) {
+      showAppError(await getApiError(res, 'Could not mark the verification message as read.'));
+      return;
+    }
+    const data = await res.json();
+    setVerificationMessage(data.message || null);
+  };
   // Quick Switch Roles helper for demo/testing
-  const loginAsDemoUser = async (role: 'worker' | 'employer') => {
+  const loginAsDemoUser = async (role: 'worker' | 'employer' | 'admin') => {
     if (role === 'worker') {
       try {
         const res = await fetch('/api/auth/login', {
@@ -153,7 +197,7 @@ export default function App() {
           const data = await res.json();
           setCurrentUser(data.user);
           localStorage.setItem('currentUser', JSON.stringify(data.user));
-          navigateTo('dashboard');
+          navigateTo(data.user.role === 'admin' ? 'admin' : 'dashboard');
           setRoleToast(`Demo Session: Active role set to Ahmed Mohamed Ali (Worker)`);
           showAppNotice('Demo worker session loaded.');
           setTimeout(() => setRoleToast(null), 4000);
@@ -172,11 +216,11 @@ export default function App() {
           const data = await res.json();
           setCurrentUser(data.user);
           localStorage.setItem('currentUser', JSON.stringify(data.user));
-          navigateTo('dashboard');
+          navigateTo(data.user.role === 'admin' ? 'admin' : 'dashboard');
           setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
           showAppNotice('Demo employer session loaded.');
           setTimeout(() => setRoleToast(null), 4000);
-        } else {
+        } else if (role === 'employer') {
           // Register first, then login
           const regRes = await fetch('/api/auth/register', {
             method: 'POST',
@@ -200,6 +244,25 @@ export default function App() {
             setRoleToast(`Demo Session: Active role set to Qardho Agricultural Co. (Employer)`);
             showAppNotice('Demo employer session loaded.');
             setTimeout(() => setRoleToast(null), 4000);
+          }
+        } else {
+          try {
+            const adminRes = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ identifier: 'admin@qardho.com', password: DEMO_PASSWORD })
+            });
+            if (adminRes.ok) {
+              const data = await adminRes.json();
+              setCurrentUser(data.user);
+              localStorage.setItem('currentUser', JSON.stringify(data.user));
+              navigateTo('admin');
+              setRoleToast('Demo Session: Active role set to Platform Admin');
+              showAppNotice('Demo admin session loaded.');
+              setTimeout(() => setRoleToast(null), 4000);
+            }
+          } catch (err) {
+            console.error(err);
           }
         }
       } catch (err) {
@@ -285,6 +348,38 @@ export default function App() {
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
     navigateTo('home');
+  };
+
+  const requestDeleteAccount = () => {
+    if (!currentUser) return;
+    setShowDeleteAccountModal(true);
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!currentUser) return;
+
+    try {
+      const res = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentUser.id, actorId: currentUser.id })
+      });
+      if (!res.ok) {
+        showAppError(await getApiError(res, 'Could not delete account.'));
+        return;
+      }
+
+      setShowDeleteAccountModal(false);
+      setViewingProfileUser(null);
+      setCurrentUser(null);
+      localStorage.removeItem('currentUser');
+      await refreshAllData();
+      navigateTo('home');
+      showAppNotice('Your account has been removed.');
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      showAppError('Could not delete account.');
+    }
   };
 
   const getRoleSwitchTarget = () => currentUser?.role === 'worker' ? 'employer' : 'worker';
@@ -714,6 +809,7 @@ export default function App() {
               navigateTo('workers');
             } : undefined}
             onConnect={triggerConnect}
+            onRequestDeleteAccount={requestDeleteAccount}
           />
         );
       case 'dashboard':
@@ -733,6 +829,70 @@ export default function App() {
             onSwitchRole={handleSwitchRole}
             isSwitchingRole={isSwitchingRole}
             isLoading={isLoadingData}
+            verificationMessage={verificationMessage}
+            onReadVerificationMessage={markVerificationMessageRead}
+          />
+        );
+      case 'admin':
+        return (
+          <Admin
+            currentUser={currentUser}
+            users={users}
+            jobs={jobs}
+            connections={connections}
+            applications={applications}
+            reviews={reviews}
+            onNavigate={handleNavigate}
+            onRefresh={refreshAllData}
+            onLoadVerificationMessage={async (userId) => {
+              const data = await fetchJson<{ message: VerificationMessage | null }>(
+                `/api/verification-messages/${userId}?actorId=${encodeURIComponent(currentUser?.id || '')}`,
+                'Could not load the latest verification message.'
+              );
+              return data.message;
+            }}
+            onSendVerificationMessage={async (user, missingFields: ProfileFieldKey[], note: string) => {
+              const res = await fetch(`/api/admin/users/${user.id}/verification-message`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actorId: currentUser?.id, missingFields, note }),
+              });
+              if (!res.ok) throw new Error(await getApiError(res, 'Could not send the verification message.'));
+              const data = await res.json();
+              return data.message as VerificationMessage;
+            }}
+            onToggleVerifyUser={async (user) => {
+              const res = await fetch(`/api/admin/users/${user.id}/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actorId: currentUser?.id, verified: !user.verified })
+              });
+              if (!res.ok) throw new Error(await getApiError(res, 'Could not update verification.'));
+            }}
+            onToggleSuspendUser={async (user) => {
+              const res = await fetch(`/api/admin/users/${user.id}/suspend`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actorId: currentUser?.id, suspended: !user.suspended })
+              });
+              if (!res.ok) throw new Error(await getApiError(res, 'Could not update suspension.'));
+            }}
+            onDeleteUser={async (user) => {
+              const res = await fetch(`/api/admin/users/${user.id}/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actorId: currentUser?.id })
+              });
+              if (!res.ok) throw new Error(await getApiError(res, 'Could not delete user.'));
+            }}
+            onChangeUserRole={async (user, role) => {
+              const res = await fetch(`/api/admin/users/${user.id}/role`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actorId: currentUser?.id, role })
+              });
+              if (!res.ok) throw new Error(await getApiError(res, 'Could not update role.'));
+            }}
           />
         );
       case 'post-job':
@@ -793,6 +953,13 @@ export default function App() {
           >
             <Briefcase className="inline-block h-3 w-3 mr-1" />
             Log In as Farmer (Employer)
+          </button>
+          <button
+            onClick={() => loginAsDemoUser('admin')}
+            className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded-md text-[10px] cursor-pointer transition-all border border-white/10"
+          >
+            <ShieldAlert className="inline-block h-3 w-3 mr-1" />
+            Log In as Admin
           </button>
           <button
             onClick={resetDemoData}
@@ -889,6 +1056,18 @@ export default function App() {
           currentUser={currentUser}
           onClose={() => setSelectedJobForApply(null)}
           onSubmit={submitApply}
+        />
+      )}
+
+      {showDeleteAccountModal && currentUser && (
+        <ConfirmDialog
+          title="Remove your account?"
+          description="This permanently deletes your profile, jobs, applications, connections, and reviews tied to this account. This cannot be undone."
+          confirmLabel="Delete account"
+          cancelLabel="Keep account"
+          tone="danger"
+          onConfirm={confirmDeleteAccount}
+          onCancel={() => setShowDeleteAccountModal(false)}
         />
       )}
 
@@ -1014,26 +1193,3 @@ export default function App() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

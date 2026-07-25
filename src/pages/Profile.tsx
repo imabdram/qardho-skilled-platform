@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, Save, MapPin, Phone, Briefcase, DollarSign, Edit3, CheckCircle, Bell, Star, ArrowLeft, Send, ShieldCheck } from 'lucide-react';
+import { User, Save, MapPin, Phone, Briefcase, DollarSign, Edit3, CheckCircle, Bell, Star, ArrowLeft, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { User as UserType, Review, Connection, Job, Application } from '../types';
 import { QARDHO_NEIGHBORHOODS } from '../constants';
 
@@ -15,6 +15,7 @@ interface ProfileProps {
   connections: Connection[];
   onBack?: () => void;
   onConnect?: (worker: UserType) => void;
+  onRequestDeleteAccount?: () => void;
 }
 
 export default function Profile({ 
@@ -28,7 +29,8 @@ export default function Profile({
   onAddReview,
   connections = [],
   onBack,
-  onConnect
+  onConnect,
+  onRequestDeleteAccount
 }: ProfileProps) {
   if (!currentUser) return null;
 
@@ -211,15 +213,25 @@ export default function Profile({
             </div>
 
             {isOwnProfile && !isEditing && (
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="inline-flex items-center space-x-1 px-3.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer transition-all"
+                  className="inline-flex items-center justify-center space-x-1 px-3.5 py-1.5 bg-slate-950 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer transition-all"
                   id="edit-profile-trigger"
                 >
                   <Edit3 className="h-3.5 w-3.5" />
                   <span>Edit Profile</span>
                 </button>
+                {onRequestDeleteAccount && (
+                  <button
+                    onClick={onRequestDeleteAccount}
+                    className="inline-flex items-center justify-center space-x-1 px-3.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold shadow-xs cursor-pointer transition-all hover:bg-rose-100 hover:border-rose-300"
+                    id="remove-account-trigger"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Remove Account</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

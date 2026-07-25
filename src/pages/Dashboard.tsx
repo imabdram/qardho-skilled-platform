@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Connection, Application, Job, JobStatus, User, Review } from '../types';
+import { Connection, Application, Job, JobStatus, User, Review, VerificationMessage } from '../types';
 import {
   Users, Briefcase, FileText, Check, X, Phone, MapPin,
   Clock, CheckCircle2, RefreshCw, PlusCircle, Star, ArrowRight, Copy, Filter
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { getMissingProfileFields, PROFILE_FIELD_LABELS } from '../validation';
 
 interface DashboardProps {
   currentUser: User | null;
@@ -21,6 +22,8 @@ interface DashboardProps {
   onSwitchRole: () => void;
   isSwitchingRole?: boolean;
   isLoading?: boolean;
+  verificationMessage?: VerificationMessage | null;
+  onReadVerificationMessage?: () => void | Promise<void>;
 }
 
 export default function Dashboard({
@@ -37,7 +40,9 @@ export default function Dashboard({
   onViewWorkerProfile,
   onSwitchRole,
   isSwitchingRole = false,
-  isLoading = false
+  isLoading = false,
+  verificationMessage = null,
+  onReadVerificationMessage
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'progress' | 'connections' | 'applications' | 'jobs'>('progress');
   const [quickFilter, setQuickFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'needs_review'>('all');
@@ -107,15 +112,7 @@ export default function Dashboard({
     ? workerProgressItems.filter(item => item.job.status === 'in_progress').length
     : employerProgressJobs.filter(job => job.status === 'in_progress').length;
 
-  const missingProfileFields = [
-    !currentUser.name?.trim() ? 'name' : null,
-    !currentUser.phone?.trim() ? 'phone' : null,
-    !currentUser.location?.trim() ? 'location' : null,
-    !currentUser.bio?.trim() ? 'bio' : null,
-    isWorker && !currentUser.skill?.trim() ? 'skill' : null,
-    isWorker && !currentUser.rate?.trim() ? 'rate' : null,
-    isWorker && !currentUser.availability ? 'availability' : null,
-  ].filter(Boolean) as string[];
+  const missingProfileFields = getMissingProfileFields(currentUser);
 
   const copyPhone = async (phone: string) => {
     await navigator.clipboard?.writeText(phone);
@@ -416,7 +413,30 @@ export default function Dashboard({
         </div>
       </section>
 
-      {missingProfileFields.length > 0 && (
+      {verificationMessage && !currentUser.verified && (
+        <section className="mb-8 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50 shadow-sm">
+          <div className="border-b border-amber-200/70 px-5 py-4">
+            <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Message from {verificationMessage.adminName}</p>
+            <h2 className="mt-1 text-base font-black text-amber-950">Admin requested profile updates</h2>
+            <p className="mt-1 text-xs font-semibold leading-5 text-amber-800">Complete the requested information so the admin can review your account for verification.</p>
+          </div>
+          <div className="bg-white/60 px-5 py-4">
+            {verificationMessage.missingFields.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {verificationMessage.missingFields.map((field) => (
+                  <span key={field} className="rounded-full border border-amber-200 bg-white px-2.5 py-1 text-[10px] font-black text-amber-800">{PROFILE_FIELD_LABELS[field]}</span>
+                ))}
+              </div>
+            )}
+            {verificationMessage.note && <p className="mt-3 rounded-xl border border-amber-100 bg-white px-3 py-3 text-xs font-medium leading-5 text-slate-700">{verificationMessage.note}</p>}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[10px] font-bold text-slate-500">Sent {new Date(verificationMessage.sentAt).toLocaleDateString('en-GB')}</p>
+              <button onClick={async () => { await onReadVerificationMessage?.(); onNavigate('profile'); }} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-amber-600 px-4 text-xs font-black text-white transition hover:bg-amber-700">Update my profile</button>
+            </div>
+          </div>
+        </section>
+      )}
+      {!verificationMessage && missingProfileFields.length > 0 && (
         <section className="mb-8 rounded-xl border border-amber-100 bg-amber-50 p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>

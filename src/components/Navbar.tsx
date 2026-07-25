@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, Briefcase, LayoutDashboard, LogIn, LogOut, Menu, User, X } from 'lucide-react';
-import { User as UserType, Connection, Application, Job, Review } from '../types';
+import { User as UserType, Connection, Application, Job, Review, VerificationMessage } from '../types';
 import { PAGE_ROUTES } from '../routes';
+import { PROFILE_FIELD_LABELS } from '../validation';
 
 interface NavbarProps {
   currentUser: UserType | null;
@@ -17,6 +18,8 @@ interface NavbarProps {
   applications?: Application[];
   jobs?: Job[];
   reviews?: Review[];
+  verificationMessage?: VerificationMessage | null;
+  onReadVerificationMessage?: () => void | Promise<void>;
 }
 
 export default function Navbar({ 
@@ -31,7 +34,9 @@ export default function Navbar({
   connections = [],
   applications = [],
   jobs = [],
-  reviews = []
+  reviews = [],
+  verificationMessage = null,
+  onReadVerificationMessage
 }: NavbarProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
@@ -61,13 +66,26 @@ export default function Navbar({
 
     const list: Array<{
       id: string;
-      type: 'connection' | 'application' | 'job' | 'review';
+      type: 'connection' | 'application' | 'job' | 'review' | 'verification';
       title: string;
       description: string;
       date: string;
       status: 'pending' | 'accepted' | 'declined';
     }> = [];
 
+    if (verificationMessage && !verificationMessage.readAt && !currentUser.verified) {
+      const requestedFields = verificationMessage.missingFields.map((field) => PROFILE_FIELD_LABELS[field]).join(', ');
+      list.push({
+        id: `verification-${currentUser.id}`,
+        type: 'verification',
+        title: 'Profile updates requested',
+        description: requestedFields
+          ? `Admin asks you to update: ${requestedFields}.`
+          : verificationMessage.note || 'Open your profile to see the admin message.',
+        date: verificationMessage.sentAt,
+        status: 'pending',
+      });
+    }
     if (currentUser.role === 'worker') {
       // 1. Incoming connection requests (from employers trying to hire this worker)
       connections
@@ -164,10 +182,29 @@ export default function Navbar({
       if (a.status !== 'pending' && b.status === 'pending') return 1;
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
-  }, [connections, applications, jobs, reviews, currentUser]);
+  }, [connections, applications, jobs, reviews, currentUser, verificationMessage]);
 
   const activeNotifications = notifications.filter(n => !dismissedIds.includes(n.id));
   const pendingCount = activeNotifications.filter(n => n.status === 'pending').length;
+  const openNotification = async (type: string) => {
+    if (type === 'verification') {
+      await onReadVerificationMessage?.();
+      onNavigate('profile');
+    } else {
+      onNavigate('dashboard');
+    }
+    setShowNotifications(false);
+  };
+
+  const dismissNotification = async (id: string, type: string) => {
+    if (type === 'verification') await onReadVerificationMessage?.();
+    setDismissedIds((previous) => [...previous, id]);
+  };
+
+  const clearNotifications = async () => {
+    if (verificationMessage && !verificationMessage.readAt) await onReadVerificationMessage?.();
+    setDismissedIds(notifications.map((notification) => notification.id));
+  };
 
   return (
     <header className={`bg-white/95 backdrop-blur-md sticky top-0 z-50 transition-shadow duration-200 ${hasScrolled ? 'border-b border-slate-200 shadow-sm' : 'border-b border-slate-100'}`} id="main-navbar">
@@ -241,21 +278,21 @@ export default function Navbar({
             {currentUser && (
               <>
                 <button
-                  onClick={() => navigate('dashboard')}
+                  onClick={() => navigate(currentUser.role === 'admin' ? 'admin' : 'dashboard')}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center space-x-1.5 ${
-                    currentPage === 'dashboard'
+                    currentPage === (currentUser.role === 'admin' ? 'admin' : 'dashboard')
                       ? 'bg-slate-50 text-blue-600 font-semibold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                   id="nav-dashboard-btn"
                 >
                   <LayoutDashboard className="h-4 w-4" />
-                  <span>Dashboard</span>
+                  <span>{currentUser.role === 'admin' ? 'Admin Panel' : 'Dashboard'}</span>
                 </button>
 
 
-                {/* Notifications Bell next to Profile */}
-                <div className='relative hidden md:inline-block text-left' id='notifications-menu'>
+                {/* Legacy desktop notification control removed; the shared control lives beside logout. */}
+                <div className='hidden' aria-hidden={true}>
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
                     className={`p-2 rounded-lg text-sm font-medium transition-colors cursor-pointer flex items-center justify-center relative ${
@@ -282,7 +319,7 @@ export default function Navbar({
                           <span className="text-xs font-black text-slate-800 uppercase tracking-wider">New Actions ({pendingCount})</span>
                           {activeNotifications.length > 0 && (
                             <button
-                              onClick={() => setDismissedIds(notifications.map(n => n.id))}
+                              onClick={clearNotifications}
                               className="text-[10px] text-blue-600 hover:text-blue-800 font-bold uppercase tracking-wider cursor-pointer"
                             >
                               Clear All
@@ -306,7 +343,7 @@ export default function Navbar({
                                       ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                                       : 'bg-rose-50 text-rose-600 border border-rose-100'
                                 }`}>
-                                  {item.type === 'connection' ? <User className="h-3.5 w-3.5" /> : <Briefcase className="h-3.5 w-3.5" />}
+                                  {item.type === 'verification' ? <Bell className="h-3.5 w-3.5" /> : item.type === 'connection' ? <User className="h-3.5 w-3.5" /> : <Briefcase className="h-3.5 w-3.5" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between">
@@ -319,7 +356,7 @@ export default function Navbar({
                                   <div className="mt-2.5 flex items-center justify-between pt-1">
                                     <button
                                       onClick={() => {
-                                        onNavigate('dashboard');
+                                        void openNotification(item.type);
                                         setShowNotifications(false);
                                       }}
                                       className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline font-bold"
@@ -327,7 +364,7 @@ export default function Navbar({
                                       Go to Dashboard
                                     </button>
                                     <button
-                                      onClick={() => setDismissedIds(prev => [...prev, item.id])}
+                                      onClick={() => void dismissNotification(item.id, item.type)}
                                       className="text-[10px] text-slate-400 hover:text-slate-600 font-semibold"
                                     >
                                       Dismiss
@@ -397,7 +434,7 @@ export default function Navbar({
                   </span>
                 </div>
 
-                {/* Mobile Notification Button next to Profile */}
+                {/* Notification button beside logout */}
                 <div className='relative order-2 inline-block text-left mr-1' id='notifications-menu-mobile'>
                   <button
                     onClick={() => setShowNotifications(!showNotifications)}
@@ -423,7 +460,7 @@ export default function Navbar({
                           <span className="text-xs font-black text-slate-800 uppercase tracking-wider">New Actions ({pendingCount})</span>
                           {activeNotifications.length > 0 && (
                             <button
-                              onClick={() => setDismissedIds(notifications.map(n => n.id))}
+                              onClick={clearNotifications}
                               className="text-[10px] text-blue-600 hover:text-blue-800 font-bold uppercase tracking-wider cursor-pointer"
                             >
                               Clear All
@@ -445,7 +482,7 @@ export default function Navbar({
                                     ? 'bg-amber-50 text-amber-600 border border-amber-100'
                                     : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                                 }`}>
-                                  {item.type === 'connection' ? <User className="h-3 w-3" /> : <Briefcase className="h-3 w-3" />}
+                                  {item.type === 'verification' ? <Bell className="h-3 w-3" /> : item.type === 'connection' ? <User className="h-3 w-3" /> : <Briefcase className="h-3 w-3" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <span className="text-[11px] font-bold text-slate-800 block truncate">{item.title}</span>
@@ -453,7 +490,7 @@ export default function Navbar({
                                   <div className="mt-2 flex items-center justify-between">
                                     <button
                                       onClick={() => {
-                                        onNavigate('dashboard');
+                                        void openNotification(item.type);
                                         setShowNotifications(false);
                                       }}
                                       className="text-[9px] text-blue-600 hover:underline font-bold"
@@ -461,7 +498,7 @@ export default function Navbar({
                                       View
                                     </button>
                                     <button
-                                      onClick={() => setDismissedIds(prev => [...prev, item.id])}
+                                      onClick={() => void dismissNotification(item.id, item.type)}
                                       className="text-[9px] text-slate-400 hover:text-slate-600 font-semibold"
                                     >
                                       Dismiss
@@ -548,12 +585,12 @@ export default function Navbar({
           {currentUser && (
             <>
               <button
-                onClick={() => navigate('dashboard')}
+                onClick={() => navigate(currentUser.role === 'admin' ? 'admin' : 'dashboard')}
                 className={`flex-1 text-center py-1 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
-                  currentPage === 'dashboard' ? 'text-blue-600 bg-slate-50' : 'text-slate-600'
+                  currentPage === (currentUser.role === 'admin' ? 'admin' : 'dashboard') ? 'text-blue-600 bg-slate-50' : 'text-slate-600'
                 }`}
               >
-                <span>Dashboard</span>
+                <span>{currentUser.role === 'admin' ? 'Admin' : 'Dashboard'}</span>
               </button>
 
               <button

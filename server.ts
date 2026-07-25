@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { Pool } from 'pg';
+import { isProfileFieldKey } from './src/validation';
 
 // ES Module __dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
@@ -24,6 +25,20 @@ const DEMO_EMPLOYER = {
   rate: null,
   availability: 'available',
   verified: false
+};
+
+const DEMO_ADMIN = {
+  id: 'admin-1',
+  name: 'Platform Admin',
+  email: 'admin@qardho.com',
+  phone: '+252 90 700 1100',
+  role: 'admin',
+  skill: null,
+  location: 'Kaambo',
+  bio: 'Seeded platform administrator for moderation and support.',
+  rate: null,
+  availability: 'available',
+  verified: true
 };
 
 function hashPassword(password: string) {
@@ -115,9 +130,31 @@ async function ensureDemoCredentials(db: any) {
   );
 
   await db.run(
+    `INSERT INTO users (
+      id, name, email, phone, role, skill, location, bio, rate, \x22createdAt\x22, \x22smsNotificationsEnabled\x22, \x22passwordHash\x22, availability, verified
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, $11, $12, $13)
+    ON CONFLICT (id) DO NOTHING`,
+    [
+      DEMO_ADMIN.id,
+      DEMO_ADMIN.name,
+      DEMO_ADMIN.email,
+      DEMO_ADMIN.phone,
+      DEMO_ADMIN.role,
+      DEMO_ADMIN.skill,
+      DEMO_ADMIN.location,
+      DEMO_ADMIN.bio,
+      DEMO_ADMIN.rate,
+      createdAt,
+      demoPasswordHash,
+      DEMO_ADMIN.availability,
+      DEMO_ADMIN.verified
+    ]
+  );
+
+  await db.run(
     `UPDATE users
       SET "passwordHash" = $1
-      WHERE id IN ('worker-1', 'employer-1')`,
+      WHERE id IN ('worker-1', 'employer-1', 'admin-1')`,
     [demoPasswordHash]
   );
 }
@@ -144,6 +181,7 @@ async function startServer() {
       email TEXT,
       phone TEXT NOT NULL,
       role TEXT,
+      suspended BOOLEAN DEFAULT false,
       skill TEXT,
       location TEXT,
       bio TEXT,
@@ -210,12 +248,22 @@ async function startServer() {
       comment TEXT NOT NULL,
       "createdAt" TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS verification_messages (
+      "userId" TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      "adminId" TEXT NOT NULL,
+      "adminName" TEXT NOT NULL,
+      "missingFields" JSONB NOT NULL DEFAULT '[]'::jsonb,
+      note TEXT,
+      "sentAt" TEXT NOT NULL,
+      "readAt" TEXT
+    );
   `);
 
   await db.exec(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS "passwordHash" TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT 'available';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended BOOLEAN DEFAULT false;
     ALTER TABLE jobs ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open';
     ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "assignedWorkerId" TEXT;
     ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "assignedWorkerName" TEXT;
@@ -254,13 +302,53 @@ async function startServer() {
     ...sanitizeUser(user),
     smsNotificationsEnabled: !!user.smsNotificationsEnabled,
     verified: !!user.verified,
+    suspended: !!user.suspended,
   });
 
-  const validRoles = ['worker', 'employer', 'pending'];
+  const formatVerificationMessage = (message: any) => message ? ({
+    userId: message.userId,
+    adminId: message.adminId,
+    adminName: message.adminName,
+    missingFields: Array.isArray(message.missingFields) ? message.missingFields.filter(isProfileFieldKey) : [],
+    note: message.note || undefined,
+    sentAt: message.sentAt,
+    readAt: message.readAt || undefined,
+  }) : null;
+  const validRoles = ['worker', 'employer', 'admin', 'pending'];
+  const protectedRoles = ['worker', 'employer', 'admin'];
   const validJobStatuses = ['open', 'in_progress', 'completed', 'closed'];
   const validRequestStatuses = ['accepted', 'declined'];
   const validAvailability = ['available', 'busy', 'unavailable'];
   const isBlank = (value: any) => typeof value !== 'string' || value.trim().length === 0;
+  const getUserById = async (id: string) => db.get('SELECT * FROM users WHERE id = $1', [id]);
+  const requireUser = async (actorId?: string) => {
+    if (!actorId) return null;
+    return getUserById(actorId);
+  };
+  const requireAdmin = async (actorId?: string) => {
+    const actor = await requireUser(actorId);
+    return actor && actor.role === 'admin' ? actor : null;
+  };
+  const canManageTarget = (actor: any, target: any) => !!actor && (actor.role === 'admin' || actor.id === target?.id);
+  const deleteUserCascade = async (userId: string) => {
+    await db.run('DELETE FROM reviews WHERE "workerId" = $1 OR "employerId" = $1', [userId]);
+    await db.run('DELETE FROM applications WHERE "applicantId" = $1 OR "employerId" = $1', [userId]);
+    await db.run('DELETE FROM connections WHERE "fromUserId" = $1 OR "toUserId" = $1', [userId]);
+    await db.run('UPDATE jobs SET "assignedWorkerId" = NULL, "assignedWorkerName" = NULL WHERE "assignedWorkerId" = $1', [userId]);
+    await db.run('DELETE FROM jobs WHERE "employerId" = $1', [userId]);
+    await db.run('DELETE FROM verification_messages WHERE "userId" = $1', [userId]);
+    await db.run('DELETE FROM users WHERE id = $1', [userId]);
+  };
+  const isPrivilegedRole = (role: string) => protectedRoles.includes(role);
+  const adminOnly = async (req: any, res: any) => {
+    const actor = await requireAdmin(req.body?.actorId || req.query?.actorId);
+    if (!actor) {
+      res.status(403).json({ error: 'Admin access required.' });
+      return null;
+    }
+    return actor;
+  };
+
 
   // Seed data if empty
   const usersCount = await db.get('SELECT COUNT(*) as count FROM users');
@@ -347,7 +435,7 @@ async function startServer() {
 
     for (const w of SAMPLE_WORKERS) {
       await db.run(
-        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, "createdAt", "smsNotificationsEnabled", "passwordHash", availability, verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, $11, $12, $13)',
+        'INSERT INTO users (id, name, email, phone, role, skill, location, bio, rate, "createdAt", "smsNotificationsEnabled", "passwordHash", availability, verified, suspended) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, false, $11, $12, $13, false)',
         [
           w.id,
           w.name,
@@ -514,10 +602,20 @@ async function startServer() {
 
   // --- API Routes ---
 
+  // Get all users
+  app.get('/api/users', async (req, res) => {
+    try {
+      const users = await db.all('SELECT * FROM users ORDER BY "createdAt" DESC');
+      res.json(users.map(formatUser));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Get all workers (users with role = 'worker')
   app.get('/api/workers', async (req, res) => {
     try {
-      const workers = await db.all("SELECT * FROM users WHERE role = 'worker'");
+      const workers = await db.all("SELECT * FROM users WHERE role = 'worker' AND COALESCE(suspended, false) = false");
       res.json(workers.map(formatUser));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -609,6 +707,9 @@ async function startServer() {
       if (role && !validRoles.includes(role)) {
         return res.status(400).json({ error: 'Invalid user role.' });
       }
+      if (role === 'admin') {
+        return res.status(403).json({ error: 'Admin accounts cannot be created through public signup.' });
+      }
       if (availability && !validAvailability.includes(availability)) {
         return res.status(400).json({ error: 'Invalid availability value.' });
       }
@@ -674,6 +775,13 @@ async function startServer() {
       if (!validRoles.includes(role)) {
         return res.status(400).json({ error: 'Invalid user role.' });
       }
+      const existing = await db.get('SELECT * FROM users WHERE id = $1', [id]);
+      if (!existing) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+      if (existing.role === 'admin' && role !== 'admin') {
+        return res.status(403).json({ error: 'Admin role cannot be changed here.' });
+      }
       if (availability && !validAvailability.includes(availability)) {
         return res.status(400).json({ error: 'Invalid availability value.' });
       }
@@ -707,6 +815,170 @@ async function startServer() {
     }
   });
 
+  app.get('/api/admin/overview', async (req, res) => {
+    try {
+      const actor = await requireAdmin(req.query.actorId as string);
+      if (!actor) return res.status(403).json({ error: 'Admin access required.' });
+      const [users, jobs, connections, applications, reviews] = await Promise.all([
+        db.all('SELECT * FROM users ORDER BY "createdAt" DESC'),
+        db.all('SELECT * FROM jobs ORDER BY "createdAt" DESC'),
+        db.all('SELECT * FROM connections ORDER BY "createdAt" DESC'),
+        db.all('SELECT * FROM applications ORDER BY "createdAt" DESC'),
+        db.all('SELECT * FROM reviews ORDER BY "createdAt" DESC'),
+      ]);
+      res.json({ users: users.map(formatUser), jobs, connections, applications, reviews });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/users/:id/role', async (req, res) => {
+    try {
+      const actor = await requireAdmin(req.body?.actorId);
+      if (!actor) return res.status(403).json({ error: 'Admin access required.' });
+      const { id } = req.params;
+      const { role } = req.body;
+      if (!validRoles.includes(role) || role === 'pending') return res.status(400).json({ error: 'Invalid role.' });
+      const user = await getUserById(id);
+      if (!user) return res.status(404).json({ error: 'User not found.' });
+      if (user.role === 'admin' && role !== 'admin') return res.status(403).json({ error: 'Admin role cannot be removed here.' });
+      await db.run('UPDATE users SET role = $1 WHERE id = $2', [role, id]);
+      res.json({ success: true, user: formatUser(await getUserById(id)) });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.get('/api/verification-messages/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const actor = await requireUser(req.query.actorId as string);
+      if (!actor || (actor.id !== userId && actor.role !== 'admin')) {
+        return res.status(403).json({ error: 'You cannot view this verification message.' });
+      }
+      const message = await db.get('SELECT * FROM verification_messages WHERE "userId" = $1', [userId]);
+      res.json({ message: formatVerificationMessage(message) });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/admin/users/:id/verification-message', async (req, res) => {
+    try {
+      const actor = await requireAdmin(req.body?.actorId);
+      if (!actor) return res.status(403).json({ error: 'Admin access required.' });
+
+      const { id } = req.params;
+      const target = await getUserById(id);
+      if (!target) return res.status(404).json({ error: 'User not found.' });
+      if (target.verified) return res.status(400).json({ error: 'This account is already verified.' });
+
+      const incomingFields = Array.isArray(req.body?.missingFields) ? req.body.missingFields : [];
+      if (!incomingFields.every(isProfileFieldKey)) {
+        return res.status(400).json({ error: 'One or more profile fields are invalid.' });
+      }
+      const missingFields = [...new Set(incomingFields)];
+      const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+      if (note.length > 500) return res.status(400).json({ error: 'The admin note must be 500 characters or fewer.' });
+      if (missingFields.length === 0 && !note) {
+        return res.status(400).json({ error: 'Select at least one missing field or add a note.' });
+      }
+
+      const sentAt = new Date().toISOString();
+      await db.run(
+        'INSERT INTO verification_messages ("userId", "adminId", "adminName", "missingFields", note, "sentAt", "readAt") VALUES ($1, $2, $3, $4::jsonb, $5, $6, NULL) ON CONFLICT ("userId") DO UPDATE SET "adminId" = EXCLUDED."adminId", "adminName" = EXCLUDED."adminName", "missingFields" = EXCLUDED."missingFields", note = EXCLUDED.note, "sentAt" = EXCLUDED."sentAt", "readAt" = NULL',
+        [id, actor.id, actor.name, JSON.stringify(missingFields), note || null, sentAt]
+      );
+      const message = await db.get('SELECT * FROM verification_messages WHERE "userId" = $1', [id]);
+      res.json({ success: true, message: formatVerificationMessage(message) });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/verification-messages/:userId/read', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const actor = await requireUser(req.body?.actorId);
+      if (!actor || actor.id !== userId) {
+        return res.status(403).json({ error: 'Only the message recipient can mark it as read.' });
+      }
+      const readAt = new Date().toISOString();
+      await db.run(
+        'UPDATE verification_messages SET "readAt" = COALESCE("readAt", $1) WHERE "userId" = $2',
+        [readAt, userId]
+      );
+      const message = await db.get('SELECT * FROM verification_messages WHERE "userId" = $1', [userId]);
+      res.json({ success: true, message: formatVerificationMessage(message) });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+  app.post('/api/admin/users/:id/verify', async (req, res) => {
+    try {
+      const actor = await requireAdmin(req.body?.actorId);
+      if (!actor) return res.status(403).json({ error: 'Admin access required.' });
+      const { id } = req.params;
+      const { verified } = req.body;
+      await db.run('UPDATE users SET verified = $1 WHERE id = $2', [!!verified, id]);
+      if (verified) await db.run('DELETE FROM verification_messages WHERE "userId" = $1', [id]);
+      res.json({ success: true, user: formatUser(await getUserById(id)) });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/admin/users/:id/suspend', async (req, res) => {
+    try {
+      const actor = await requireAdmin(req.body?.actorId);
+      if (!actor) return res.status(403).json({ error: 'Admin access required.' });
+      const { id } = req.params;
+      const { suspended } = req.body;
+      await db.run('UPDATE users SET suspended = $1 WHERE id = $2', [!!suspended, id]);
+      res.json({ success: true, user: formatUser(await getUserById(id)) });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/admin/users/:id/delete', async (req, res) => {
+    try {
+      const actor = await requireAdmin(req.body?.actorId);
+      if (!actor) return res.status(403).json({ error: 'Admin access required.' });
+      const { id } = req.params;
+      const user = await getUserById(id);
+      if (!user) return res.status(404).json({ error: 'User not found.' });
+      if (user.role === 'admin' && actor.role !== 'admin') return res.status(403).json({ error: 'Admin cannot be removed by non-admins.' });
+      await db.exec('BEGIN');
+      try { await deleteUserCascade(id); await db.exec('COMMIT'); } catch (e) { await db.exec('ROLLBACK'); throw e; }
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/account/delete', async (req, res) => {
+    const { id, actorId } = req.body;
+    try {
+      if (isBlank(id)) {
+        return res.status(400).json({ error: 'User id is required.' });
+      }
+      const actor = await requireUser(actorId);
+      if (!actor || (actor.id !== id && actor.role !== 'admin')) {
+        return res.status(403).json({ error: 'You can only delete your own account unless you are an admin.' });
+      }
+
+      const user = await db.get('SELECT * FROM users WHERE id = $1', [id]);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      await db.exec('BEGIN');
+      try {
+        await db.run('DELETE FROM reviews WHERE "workerId" = $1 OR "employerId" = $1', [id]);
+        await db.run('DELETE FROM applications WHERE "applicantId" = $1 OR "employerId" = $1', [id]);
+        await db.run('DELETE FROM connections WHERE "fromUserId" = $1 OR "toUserId" = $1', [id]);
+        await db.run('UPDATE jobs SET "assignedWorkerId" = NULL, "assignedWorkerName" = NULL WHERE "assignedWorkerId" = $1', [id]);
+        await db.run('DELETE FROM jobs WHERE "employerId" = $1', [id]);
+        await db.run('DELETE FROM users WHERE id = $1', [id]);
+        await db.exec('COMMIT');
+      } catch (deleteErr) {
+        await db.exec('ROLLBACK');
+        throw deleteErr;
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Post Job
   app.post('/api/jobs', async (req, res) => {
     const { id, title, employerId, employerName, location, description, rate, phone, actorId } = req.body;
@@ -715,7 +987,7 @@ async function startServer() {
         return res.status(400).json({ error: 'Title, employer, location, description, rate, and phone are required.' });
       }
       const employer = await db.get('SELECT * FROM users WHERE id = $1', [actorId || employerId]);
-      if (!employer || employer.role !== 'employer' || employer.id !== employerId) {
+      if (!employer || (employer.role !== 'employer' && employer.role !== 'admin') || employer.id !== employerId) {
         return res.status(403).json({ error: 'Only the employer account can post this job.' });
       }
 
@@ -748,7 +1020,7 @@ async function startServer() {
 
       const actorIsEmployer = job.employerId === actorId;
       const actorIsAssignedWorker = job.assignedWorkerId === actorId;
-      if (!actorIsEmployer && !actorIsAssignedWorker) {
+      if (!actorIsEmployer && !actorIsAssignedWorker && (await requireAdmin(actorId)) === null) {
         return res.status(403).json({ error: 'Only the job owner or assigned worker can update this job status.' });
       }
       if (status === 'completed' && (job.status !== 'in_progress' || !job.assignedWorkerId)) {
@@ -818,7 +1090,7 @@ async function startServer() {
       if (!connection) {
         return res.status(404).json({ error: 'Connection not found.' });
       }
-      if (connection.toUserId !== actorId) {
+      if (connection.toUserId !== actorId && !(await requireAdmin(actorId))) {
         return res.status(403).json({ error: 'Only the target worker can update this request.' });
       }
       await db.run('UPDATE connections SET status = $1 WHERE id = $2', [status, id]);
@@ -879,7 +1151,7 @@ async function startServer() {
       if (!application) {
         return res.status(404).json({ error: 'Application not found.' });
       }
-      if (application.employerId !== actorId) {
+      if (application.employerId !== actorId && !(await requireAdmin(actorId))) {
         return res.status(403).json({ error: 'Only the job owner can update this application.' });
       }
       if (status === 'accepted') {
@@ -971,7 +1243,19 @@ async function startServer() {
   });
 }
 
-startServer().catch(err => {
+async function startServerWithRetry() {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await startServer();
+      return;
+    } catch (err) {
+      if (attempt === 3) throw err;
+      await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+    }
+  }
+}
+
+startServerWithRetry().catch(err => {
   console.error("Failed to start server", err);
 });
 

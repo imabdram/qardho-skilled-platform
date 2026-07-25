@@ -59,12 +59,12 @@ export default function Auth({ onLogin, onSignup }: AuthProps) {
   const formatSomaliPhone = (localPhone: string) => `+252 ${localPhone.slice(0, 2)} ${localPhone.slice(2, 5)} ${localPhone.slice(5)}`.trim();
   const passwordIsLongEnough = password.length >= 8;
 
-  const runDemoLogin = async (role: 'worker' | 'employer') => {
+  const runDemoLogin = async (role: 'worker' | 'employer' | 'admin') => {
     if (loading) return;
     setFeedback(null);
     setFieldErrors({});
     setLoading(true);
-    const identifier = role === 'worker' ? '+252 90 779 1234' : 'employer1@qardho.com';
+    const identifier = role === 'worker' ? '+252 90 779 1234' : role === 'employer' ? 'employer1@qardho.com' : 'admin@qardho.com';
     try {
       const res = await onLogin({ identifier, password: DEMO_PASSWORD });
       if (!res.success) setFeedback({ type: 'error', message: res.message });
@@ -180,6 +180,7 @@ export default function Auth({ onLogin, onSignup }: AuthProps) {
             <div className="mb-5 grid grid-cols-2 gap-2">
               <button type="button" onClick={() => runDemoLogin('worker')} disabled={loading} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">Demo Worker</button>
               <button type="button" onClick={() => runDemoLogin('employer')} disabled={loading} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">Demo Employer</button>
+              <button type="button" onClick={() => runDemoLogin('admin')} disabled={loading} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">Demo Admin</button>
             </div>
           )}
 
