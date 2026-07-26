@@ -44,8 +44,8 @@ export default function Profile({
   // Form edit states (for own profile)
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(currentUser.name);
-  const [phone, setPhone] = useState(currentUser.phone || '');
-  const [whatsappPhone, setWhatsappPhone] = useState(currentUser.whatsappPhone || '');
+  const [phone, setPhone] = useState((currentUser.phone || '').replace(/[^\d]/g, '').replace(/^252/, ''));
+  const [whatsappPhone, setWhatsappPhone] = useState((currentUser.whatsappPhone || '').replace(/[^\d]/g, '').replace(/^252/, ''));
   const [location, setLocation] = useState(currentUser.location || '');
   const [skill, setSkill] = useState(currentUser.skill || '');
   const [bio, setBio] = useState(currentUser.bio || '');
@@ -66,6 +66,7 @@ export default function Profile({
   const [avatarState, setAvatarState] = useState<'idle' | 'uploading' | 'error'>('idle');
   const [avatarError, setAvatarError] = useState('');
   const [deletePhrase, setDeletePhrase] = useState('');
+  const [moreSettingsOpen, setMoreSettingsOpen] = useState(false);
 
   // Review submission states
   const [newRating, setNewRating] = useState<number>(5);
@@ -74,7 +75,7 @@ export default function Profile({
   const [reviewSuccess, setReviewSuccess] = useState<string>('');
   const [ratingHover, setRatingHover] = useState<number | null>(null);
 
-  const isDirty = isEditing && [name !== currentUser.name, phone !== (currentUser.phone || ''), whatsappPhone !== (currentUser.whatsappPhone || ''), location !== (currentUser.location || ''), skill !== (currentUser.skill || ''), bio !== (currentUser.bio || ''), rate !== (currentUser.rate || ''), availability !== (currentUser.availability || 'available'), smsNotificationsEnabled !== (currentUser.smsNotificationsEnabled ?? true), gender !== currentUser.gender, pricingType !== (currentUser.pricingType || ''), pricingAmount !== (currentUser.pricingAmount?.toString() || ''), pricingCurrency !== (currentUser.pricingCurrency || 'USD'), pricingNote !== (currentUser.pricingNote || '')].some(Boolean);
+  const isDirty = isEditing && [name !== currentUser.name, phone !== ((currentUser.phone || '').replace(/[^\d]/g, '').replace(/^252/, '')), whatsappPhone !== ((currentUser.whatsappPhone || '').replace(/[^\d]/g, '').replace(/^252/, '')), location !== (currentUser.location || ''), skill !== (currentUser.skill || ''), bio !== (currentUser.bio || ''), rate !== (currentUser.rate || ''), availability !== (currentUser.availability || 'available'), smsNotificationsEnabled !== (currentUser.smsNotificationsEnabled ?? true), gender !== currentUser.gender, pricingType !== (currentUser.pricingType || ''), pricingAmount !== (currentUser.pricingAmount?.toString() || ''), pricingCurrency !== (currentUser.pricingCurrency || 'USD'), pricingNote !== (currentUser.pricingNote || '')].some(Boolean);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (isDirty) event.preventDefault(); };
     window.addEventListener('beforeunload', warn);
@@ -89,8 +90,8 @@ export default function Profile({
     const updated: UserType = {
       ...currentUser,
       name,
-      phone,
-      whatsappPhone: whatsappPhone || undefined,
+      phone: '+252' + phone.replace(/\D/g, ''),
+      whatsappPhone: whatsappPhone ? '+252' + whatsappPhone.replace(/\D/g, '') : undefined,
       location,
       skill: currentUser.role === 'worker' ? skill : undefined,
       bio,
@@ -364,21 +365,14 @@ export default function Profile({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Phone Number</label>
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+252 90 XXXXXXX"
-                    className="block w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    required
-                  />
-                </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-bold">Phone number</label>
+                    <div className="profile-phone-field"><span className="profile-phone-prefix">+252</span><input type="tel" inputMode="numeric" autoComplete="tel-national" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').replace(/^252/, ''))} placeholder="Enter phone number" required /></div>
+                  </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div><label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">WhatsApp Number (Optional)</label><input type="tel" value={whatsappPhone} onChange={(event) => setWhatsappPhone(event.target.value)} placeholder="+252..." className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#008060] focus:ring-2 focus:ring-emerald-500/10" /><p className="mt-1 text-[11px] text-slate-500">Shared only after an application or hiring request is accepted.</p></div>
+                <div><label className="mb-1.5 block text-sm font-bold">WhatsApp number <span className="font-medium text-slate-500">(optional)</span></label><div className="profile-phone-field"><span className="profile-phone-prefix">+252</span><input type="tel" inputMode="numeric" autoComplete="tel-national" value={whatsappPhone} onChange={(event) => setWhatsappPhone(event.target.value.replace(/\D/g, '').replace(/^252/, ''))} placeholder="Enter WhatsApp number" /></div><p className="mt-1 text-xs text-slate-500">Shared only after an application or hiring request is accepted.</p></div>
                 <div><label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">Gender (Optional)</label><select value={gender || ''} onChange={(event) => setGender((event.target.value || undefined) as UserType['gender'])} className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#008060]"><option value="">Not specified</option><option value="male">Male</option><option value="female">Female</option><option value="prefer_not_to_say">Prefer not to say</option></select></div>
               </div>
 
@@ -773,20 +767,24 @@ export default function Profile({
           )}
 
           {isOwnProfile && (
-            <section className="mt-8 rounded-2xl border border-emerald-950/10 bg-slate-50 p-5" aria-labelledby="more-settings-heading">
-              <div className="flex items-start gap-3"><Settings className="mt-0.5 h-5 w-5 text-[#008060]" /><div><h2 id="more-settings-heading" className="text-base font-black text-slate-950">More Settings</h2><p className="mt-1 text-sm font-medium leading-6 text-slate-600">Switching changes your dashboard and main navigation. Compatible profile information is preserved; worker-specific details may need to be completed.</p></div></div>
-              {['worker', 'employer'].includes(currentUser.role || '') && <button type="button" onClick={onSwitchRole} className="mt-4 min-h-11 rounded-full border border-emerald-200 bg-white px-4 text-sm font-black text-[#00715a] hover:bg-emerald-50">Switch to {currentUser.role === 'worker' ? 'Employer' : 'Worker'} role</button>}
-            </section>
-          )}
-
-          {isOwnProfile && onRequestDeleteAccount && (
-            <section className="mt-8 border-t-2 border-rose-200 pt-8" aria-labelledby="danger-zone-heading">
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
-                <div className="flex items-start gap-3"><Trash2 className="mt-0.5 h-5 w-5 text-rose-700" /><div><h2 id="danger-zone-heading" className="text-base font-black text-rose-950">Danger Zone</h2><p className="mt-1 text-sm font-medium leading-6 text-rose-800">Deleting your account permanently removes your profile and related platform records. This cannot be undone.</p></div></div>
-                <label htmlFor="delete-confirmation" className="mt-4 block text-sm font-black text-rose-950">Type <span className="font-mono">I confirm</span> exactly</label>
-                <input id="delete-confirmation" value={deletePhrase} onChange={(event) => setDeletePhrase(event.target.value)} autoComplete="off" className="mt-2 min-h-11 w-full rounded-xl border border-rose-200 bg-white px-4 text-sm font-semibold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10" />
-                <button type="button" onClick={onRequestDeleteAccount} disabled={deletePhrase !== 'I confirm'} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-rose-700 px-5 text-sm font-black text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-rose-300"><Trash2 className="h-4 w-4" />Delete account permanently</button>
-              </div>
+            <section className="mt-8 border-t border-emerald-950/10 pt-6" aria-labelledby="more-settings-heading">
+              <button type="button" aria-expanded={moreSettingsOpen} aria-controls="more-settings-panel" onClick={() => setMoreSettingsOpen((open) => !open)} className="flex min-h-12 w-full items-center justify-between rounded-xl border border-emerald-950/10 bg-slate-50 px-4 text-left text-sm font-black text-slate-900 hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060]">
+                <span className="inline-flex items-center gap-2"><Settings className="h-4 w-4 text-[#008060]" />More Settings</span><span aria-hidden="true">{moreSettingsOpen ? '�w^~)�t' : '�w^~)�v'}</span>
+              </button>
+              {moreSettingsOpen && <div id="more-settings-panel" className="mt-4 space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
+                <div>
+                  <h2 id="more-settings-heading" className="text-base font-black text-slate-950">Account role</h2>
+                  <p className="mt-1 text-sm font-medium text-slate-600">Current role: <strong>{currentUser.role === 'worker' ? 'Worker' : 'Employer'}</strong>. Role switching preserves compatible profile information and may require additional setup.</p>
+                  {['worker', 'employer'].includes(currentUser.role || '') && <button type="button" onClick={onSwitchRole} className="mt-4 min-h-11 rounded-xl border border-emerald-700 bg-white px-4 text-sm font-black text-[#00715a] hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060]">Change role</button>}
+                </div>
+                {isOwnProfile && onRequestDeleteAccount && <div className="border-t border-rose-200 pt-5" aria-labelledby="danger-zone-heading">
+                  <h2 id="danger-zone-heading" className="text-base font-black text-rose-950">Danger Zone</h2>
+                  <p className="mt-1 text-sm font-medium text-rose-800">Deleting your account permanently removes your profile and related platform records. This cannot be undone.</p>
+                  <label htmlFor="delete-confirmation" className="mt-4 block text-sm font-black text-rose-950">Type <span className="font-mono">I confirm</span> exactly</label>
+                  <input id="delete-confirmation" value={deletePhrase} onChange={(event) => setDeletePhrase(event.target.value)} autoComplete="off" className="mt-2 min-h-12 w-full rounded-xl border border-rose-200 bg-white px-4 text-sm font-semibold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10" />
+                  <button type="button" onClick={onRequestDeleteAccount} disabled={deletePhrase !== 'I confirm'} className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-rose-700 px-5 text-sm font-black text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-rose-300"><Trash2 className="h-4 w-4" />Permanently delete account</button>
+                </div>}
+              </div>}
             </section>
           )}
         </div>

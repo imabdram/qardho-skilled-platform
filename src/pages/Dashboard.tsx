@@ -44,7 +44,7 @@ export default function Dashboard({
   verificationMessage = null,
   onReadVerificationMessage
 }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'progress' | 'connections' | 'applications' | 'jobs'>('progress');
+  const [activeTab, setActiveTab] = useState<'progress' | 'connections' | 'applications' | 'jobs'>('applications');
   const [actionKey, setActionKey] = useState<string | null>(null);
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
@@ -181,8 +181,8 @@ export default function Dashboard({
 
   const getTimelineSteps = (job: Job, hasApplication: boolean, hasAccepted: boolean, reviewed = false) => [
     { label: 'Posted', done: true },
-    { label: 'Applied', done: hasApplication },
-    { label: 'Accepted', done: hasAccepted },
+    { label: 'Applications received', done: hasApplication },
+    { label: 'Worker accepted', done: hasAccepted },
     { label: 'In progress', done: ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer', 'completed'].includes(job.status) },
     { label: 'Completed', done: job.status === 'completed' },
     { label: 'Reviewed', done: reviewed },
@@ -224,16 +224,14 @@ export default function Dashboard({
       <article key={job.id} className="rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h3 className="text-sm font-black text-slate-900">{job.title}</h3>
+            <h3 className="line-clamp-2 text-base font-black text-slate-900">{job.title}</h3><p className="mt-1 text-xs font-semibold text-slate-500">{job.category || "Local work"}"��y��y� {job.location} �w^~)�v Posted {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(job.createdAt))}</p>
             <p className="mt-1 text-xs font-medium text-slate-500">{workerName ? `Worker: ${workerName}` : 'No worker accepted yet'}</p>
           </div>
           {getJobStatusBadge(job.status)}
         </div>
         <Timeline steps={getTimelineSteps(job, hasApplications, !!accepted || !!job.assignedWorkerId, reviewed)} />
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {job.status === 'open' && (
-            <span className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">Next step: Accept an applicant</span>
-          )}
+          <div className="job-next-step"><span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Next step</span><span className="mt-1 block text-sm font-black text-slate-800">{job.status === 'open' ? (hasApplications ? `Review ${applications.filter(app => app.jobId === job.id).length} applicants` : 'Wait for applications') : job.status === 'completed' && !reviewed ? 'Leave a review' : job.status === 'completion_requested_by_worker' ? 'Confirm job completion' : ['active', 'in_progress'].includes(job.status) ? 'Wait for the worker to finish' : 'Review job details'}</span></div>
           {['active', 'in_progress'].includes(job.status) && (
             <button
               onClick={() => openConfirmation({
@@ -279,6 +277,8 @@ export default function Dashboard({
               {actionKey === `close-${job.id}` ? 'Closing...' : 'Close job'}
             </button>
           )}
+          <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-emerald-700 px-3 text-xs font-black text-emerald-800 hover:bg-emerald-50">View details</button>
+          {hasApplications && job.status === 'open' && <button onClick={() => setActiveTab('applications')} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-600 px-3 text-xs font-black text-white hover:bg-emerald-700">View candidates</button>}
         </div>
       </article>
     );
@@ -382,7 +382,7 @@ export default function Dashboard({
             <NeedsAttentionCard title={`${pendingConnections} hire request${pendingConnections === 1 ? '' : 's'}`} detail={isWorker ? 'Accept to reveal contact details.' : 'Waiting for worker response.'} action="Open requests" onClick={() => setActiveTab('connections')} />
           )}
           {completionRequests > 0 && (
-            <NeedsAttentionCard title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`} detail={isWorker ? 'The other participant requested completion.' : 'Waiting for the other participant.'} action="Open progress" onClick={() => setActiveTab('progress')} tone="emerald" />
+            <NeedsAttentionCard title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`} detail={isWorker ? 'The other participant requested completion.' : 'Waiting for the other participant.'} action="Open progress" onClick={() => setActiveTab(isWorker ? 'progress' : 'jobs')} tone="emerald" />
           )}
           {activeJobsCount > 0 && (
             <NeedsAttentionCard title={`${activeJobsCount} active job${activeJobsCount === 1 ? '' : 's'}`} detail={isWorker ? 'Keep contact details handy.' : 'Request completion when finished.'} action="Open progress" onClick={() => setActiveTab('progress')} />
@@ -450,18 +450,18 @@ export default function Dashboard({
 
       <div className="sticky top-[104px] z-30 -mx-4 mb-6 flex gap-2 overflow-x-auto border-y border-emerald-950/10 bg-[#f6fbf8]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex-wrap sm:border-b sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-3 sm:pt-0">
         {[
-          { key: 'progress' as const, label: 'Job Progress' },
-          { key: 'connections' as const, label: isWorker ? 'Hire Requests' : 'Connections' },
+          ...(isWorker ? [{ key: 'progress' as const, label: 'Job Progress' }] : []),
           { key: 'applications' as const, label: isWorker ? 'Applications' : 'Candidates' },
+          { key: 'connections' as const, label: isWorker ? 'Hire Requests' : 'Connections' },
           ...(!isWorker ? [{ key: 'jobs' as const, label: 'Posted Jobs' }] : []),
         ].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`shrink-0 rounded-full border px-3 py-2 text-xs font-bold ${activeTab === tab.key ? 'border-[#008060] bg-[#008060] text-white' : 'border-emerald-950/10 bg-white text-slate-600 hover:bg-emerald-50 hover:text-[#005f49]'}`}>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} aria-selected={activeTab === tab.key} className={`min-w-[110px] shrink-0 rounded-full border px-3 py-2 text-xs font-bold sm:flex-1 ${activeTab === tab.key ? 'border-[#008060] bg-[#008060] text-white' : 'border-emerald-950/10 bg-white text-slate-600 hover:bg-emerald-50 hover:text-[#005f49]'}`}>
             {tab.label} ({tabCounts[tab.key]})
           </button>
         ))}
       </div>
 
-      {activeTab === 'progress' && (
+      {isWorker && activeTab === 'progress' && (
         <section className="space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">

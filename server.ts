@@ -465,6 +465,7 @@ async function startServer() {
     if (normalized.startsWith('252')) return /^252\d{8,9}$/.test(normalized) ? `+${normalized}` : null;
     return /^\d{8,15}$/.test(normalized) ? `+${normalized}` : null;
   };
+  const normalizeSomaliPhone = (value: any) => { const digits = String(value || "").replace(/\D/g, ""); const national = digits.startsWith("252") && digits.length > 12 ? digits.slice(3) : digits; return /^\d{8,12}$/.test(national) ? "+252" + national : null; };
   const getUserById = async (id: string) => db.get('SELECT * FROM users WHERE id = $1', [id]);
   const createSession = async (res: any, userId: string) => {
     const token = randomBytes(32).toString('base64url');
@@ -495,6 +496,11 @@ async function startServer() {
       return null;
     }
     return req.authUser;
+  };
+  const requireRole = (...roles: string[]) => (req: any, res: any, next: any) => {
+    if (!req.authUser || req.authUser.suspended) return res.status(401).json({ error: 'Please sign in to continue.', code: 'AUTH_REQUIRED' });
+    if (!roles.includes(req.authUser.role)) return res.status(403).json({ error: 'You do not have permission to perform this action.', code: 'FORBIDDEN_ROLE' });
+    next();
   };
   const addNotification = async (userId: string, type: string, title: string, message: string, href?: string) => {
     await db.run('INSERT INTO notifications (id, "userId", type, title, message, href, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)', [`notice-${Date.now()}-${randomBytes(4).toString('hex')}`, userId, type, title, message, href || null, new Date().toISOString()]);
@@ -906,8 +912,8 @@ async function startServer() {
       if (availability && !validAvailability.includes(availability)) {
         return res.status(400).json({ error: 'Invalid availability value.' });
       }
-      const normalizedPhone = normalizePhone(phone);
-      const normalizedWhatsapp = whatsappPhone ? normalizePhone(whatsappPhone) : null;
+      const normalizedPhone = normalizeSomaliPhone(phone);
+      const normalizedWhatsapp = whatsappPhone ? normalizeSomaliPhone(whatsappPhone) : null;
       if (!normalizedPhone || (whatsappPhone && !normalizedWhatsapp)) {
         return res.status(400).json({ error: 'Enter valid international phone numbers.' });
       }
@@ -1299,7 +1305,7 @@ async function startServer() {
   });
 
   // Post Job
-  app.post('/api/jobs', async (req, res) => {
+  app.post('/api/jobs', requireRole('employer'), async (req, res) => {
     const { id, title, location, description, requirements, category, workType, expectedDuration, rate, pricingType, pricingAmount, pricingCurrency, pricingNote } = req.body;
     try {
       const employer = authenticated(req, res);
@@ -1324,7 +1330,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/jobs/:id/status', async (req, res) => {
+  app.post('/api/jobs/:id/status', requireRole('employer', 'worker'), async (req, res) => {
     const { id } = req.params;
     const { status, note } = req.body;
 
@@ -1385,7 +1391,7 @@ async function startServer() {
     }
   });
   // Connection Requests
-  app.post('/api/connections', async (req, res) => {
+  app.post('/api/connections', requireRole('employer'), async (req, res) => {
     const { id, toUserId, message, jobId, expectedTimeline } = req.body;
     try {
       const fromUser = authenticated(req, res);
@@ -1414,7 +1420,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/connections/:id/status', async (req, res) => {
+  app.post('/api/connections/:id/status', requireRole('worker'), async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     if (!validRequestStatuses.includes(status)) {
@@ -1441,7 +1447,7 @@ async function startServer() {
   });
 
   // Application Actions
-  app.post('/api/applications', async (req, res) => {
+  app.post('/api/applications', requireRole('worker'), async (req, res) => {
     const { id, jobId, message, proposedPricingType, proposedAmount, proposedCurrency, proposedNote, expectedTimeline } = req.body;
     try {
       const applicant = authenticated(req, res);
@@ -1478,7 +1484,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/applications/:id/status', async (req, res) => {
+  app.post('/api/applications/:id/status', requireRole('employer'), async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     if (!validRequestStatuses.includes(status)) {
@@ -1520,7 +1526,7 @@ async function startServer() {
     }
   });
   // Reviews
-  app.post('/api/reviews', async (req, res) => {
+  app.post('/api/reviews', requireRole('employer'), async (req, res) => {
     const { id, workerId, jobId, rating, comment } = req.body;
     try {
       const employer = authenticated(req, res);

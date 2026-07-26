@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   ArrowRight, BriefcaseBusiness, CheckCircle2, Eye, EyeOff, Loader2, Lock,
-  Mail, MapPin, Phone, ShieldCheck, User, UserPlus,
+  Mail, MapPin, Phone, User, UserPlus,
 } from 'lucide-react';
 import { PAGE_ROUTES } from '../routes';
 
@@ -30,15 +30,18 @@ export default function Auth({ onLogin, onSignup }: AuthProps) {
   const [identifier, setIdentifier] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [countryCode, setCountryCode] = useState('+252');
   const [phone, setPhone] = useState('');
-  const [whatsappCountryCode, setWhatsappCountryCode] = useState('+252');
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const resetToken = useMemo(() => new URLSearchParams(location.search).get('token') || '', [location.search]);
+
+  const sanitizeNationalPhone = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    return digits.startsWith('252') && digits.length > 12 ? digits.slice(3) : digits;
+  };
 
   useEffect(() => {
     setFeedback(null);
@@ -68,10 +71,10 @@ export default function Auth({ onLogin, onSignup }: AuthProps) {
       if (!password) next.password = 'Password is required.';
     } else if (mode === 'register') {
       if (!name.trim()) next.name = 'Full name is required.';
-      if (!/^\+\d{1,4}$/.test(countryCode)) next.countryCode = 'Use a valid country code.';
+
       if (!/^\d{8,12}$/.test(phone.replace(/\D/g, ''))) next.phone = 'Enter 8 to 12 phone digits.';
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) next.email = 'Enter a valid email address.';
-      if (whatsappPhone && (!/^\+\d{1,4}$/.test(whatsappCountryCode) || !/^\d{8,12}$/.test(whatsappPhone.replace(/\D/g, '')))) next.whatsappPhone = 'Enter a valid international WhatsApp number.';
+      if (whatsappPhone && /^\d{8,12}$/.test(sanitizeNationalPhone(whatsappPhone))) next.whatsappPhone = 'Enter 8 to 12 WhatsApp digits, or leave it blank.';
       if (password.length < 8) next.password = 'Use at least 8 characters.';
     } else if (mode === 'forgot') {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) next.email = 'Enter a valid email address.';
@@ -94,8 +97,8 @@ export default function Auth({ onLogin, onSignup }: AuthProps) {
         const result = await onLogin({ identifier: identifier.trim(), password });
         if (!result.success) setFeedback({ type: 'error', message: result.message });
       } else if (mode === 'register') {
-        const normalizedPhone = `${countryCode}${phone.replace(/\D/g, '')}`;
-        const normalizedWhatsapp = whatsappPhone ? `${whatsappCountryCode}${whatsappPhone.replace(/\D/g, '')}` : undefined;
+        const normalizedPhone = '+252' + sanitizeNationalPhone(phone);
+        const normalizedWhatsapp = whatsappPhone ? '+252' + sanitizeNationalPhone(whatsappPhone) : undefined;
         const signup = await onSignup({ name: name.trim(), email: email.trim() || undefined, phone: normalizedPhone, whatsappPhone: normalizedWhatsapp, password, role: 'pending' });
         if (!signup.success) setFeedback({ type: 'error', message: signup.message });
         else {
@@ -139,18 +142,13 @@ export default function Auth({ onLogin, onSignup }: AuthProps) {
   const description = mode === 'login' ? 'Sign in to manage jobs, applications, hiring requests, and work progress.' : mode === 'register' ? 'Start with your contact details, then complete a short role-based setup.' : mode === 'forgot' ? 'Enter your email. The response stays the same whether or not an account exists.' : 'Reset links expire after 30 minutes and can be used only once.';
 
   return (
-    <main className="relative min-h-[calc(100dvh-70px)] overflow-hidden bg-slate-950 lg:grid lg:grid-cols-[minmax(28rem,46%)_1fr]">
+    <main className="auth-page relative min-h-[calc(100dvh-70px)] overflow-hidden bg-slate-950 lg:grid lg:grid-cols-[minmax(28rem,46%)_1fr]">
       <img key={images[imageIndex].src} src={images[imageIndex].src} alt="" className="absolute inset-0 h-full w-full object-cover opacity-70 transition-opacity duration-700 motion-reduce:transition-none lg:hidden" width="1200" height="900" loading={imageIndex === 0 ? 'eager' : 'lazy'} decoding="async" />
       <div className="absolute inset-0 bg-gradient-to-b from-slate-950/55 via-slate-950/75 to-slate-950/90 lg:hidden" />
 
       <section className="relative z-10 flex min-h-[calc(100dvh-70px)] items-center justify-center px-4 py-8 sm:px-8 lg:bg-[#f6fbf8] lg:px-12">
-        <div className="w-full max-w-md rounded-3xl border border-white/15 bg-white/95 p-5 shadow-2xl backdrop-blur-xl sm:p-8 lg:border-emerald-950/10 lg:bg-white">
-          <div className="flex items-center justify-between gap-3">
-            <Link to={PAGE_ROUTES.home} className="inline-flex items-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060] focus-visible:ring-offset-2"><img src="/assets/suuqa-Xirfadaha-logo.png" alt="Qardho Skilled Platform" className="h-12 w-36 object-contain object-left" width="1536" height="1024" decoding="async" /></Link>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-black text-emerald-800"><ShieldCheck className="h-3.5 w-3.5" />Private session</span>
-          </div>
-
-          <div className="mt-8">
+        <div className="w-full max-w-md rounded-3xl border border-white/15 auth-card p-5 shadow-2xl backdrop-blur-xl sm:p-8 lg:border-emerald-950/10 ">
+          <div className="mt-1">
             <p className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-[#008060]"><MapPin className="h-3.5 w-3.5" />Qardho local work network</p>
             <h1 className="mt-3 text-3xl font-black text-slate-950">{title}</h1>
             <p className="mt-2 text-sm font-medium leading-6 text-slate-600">{description}</p>
@@ -167,8 +165,8 @@ export default function Auth({ onLogin, onSignup }: AuthProps) {
             {(mode === 'register' || mode === 'forgot') && <div><label htmlFor="auth-email" className="mb-1.5 block text-sm font-bold">Email {mode === 'register' && <span className="font-medium text-slate-400">(optional)</span>}</label><div className="relative"><Mail className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" /><input id="auth-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={`${fieldClass('email')} pl-11`} autoComplete="email" placeholder="name@example.com" /></div>{errors.email && <p className="mt-1 text-xs font-bold text-rose-600">{errors.email}</p>}</div>}
 
             {mode === 'register' && <>
-              <div><label htmlFor="auth-phone" className="mb-1.5 block text-sm font-bold">Phone number</label><div className="flex gap-2"><input aria-label="Phone country code" value={countryCode} onChange={(e) => setCountryCode(e.target.value.replace(/[^\d+]/g, '').slice(0, 5))} className={`${fieldClass('countryCode')} w-24 shrink-0`} /><div className="relative min-w-0 flex-1"><Phone className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" /><input id="auth-phone" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={`${fieldClass('phone')} pl-11`} placeholder="90 123 4567" /></div></div>{(errors.countryCode || errors.phone) && <p className="mt-1 text-xs font-bold text-rose-600">{errors.countryCode || errors.phone}</p>}</div>
-              <div><label htmlFor="auth-whatsapp" className="mb-1.5 block text-sm font-bold">WhatsApp number <span className="font-medium text-slate-400">(optional)</span></label><div className="flex gap-2"><input aria-label="WhatsApp country code" value={whatsappCountryCode} onChange={(e) => setWhatsappCountryCode(e.target.value.replace(/[^\d+]/g, '').slice(0, 5))} className={`${fieldClass('whatsappPhone')} w-24 shrink-0`} /><input id="auth-whatsapp" inputMode="tel" value={whatsappPhone} onChange={(e) => setWhatsappPhone(e.target.value)} className={fieldClass('whatsappPhone')} placeholder="90 123 4567" /></div>{errors.whatsappPhone ? <p className="mt-1 text-xs font-bold text-rose-600">{errors.whatsappPhone}</p> : <p className="mt-1 text-xs font-medium text-slate-500">Used only for approved job contacts. It is not shown publicly.</p>}</div>
+              <div><label htmlFor="auth-phone">Phone number</label><div className="phone-input"><span className="phone-prefix">+252</span><input id="auth-phone" type="tel" inputMode="numeric" maxLength={12} value={phone} onChange={(e)=>setPhone(sanitizeNationalPhone(e.target.value))} /></div></div>
+              <div><label htmlFor="auth-whatsapp">WhatsApp number (optional)</label><div className="phone-input"><span className="phone-prefix">+252</span><input id="auth-whatsapp" type="tel" inputMode="numeric" maxLength={12} value={whatsappPhone} onChange={(e)=>setWhatsappPhone(sanitizeNationalPhone(e.target.value))} /></div></div>
             </>}
 
             {(mode === 'login' || mode === 'register' || mode === 'reset') && <div><div className="mb-1.5 flex items-center justify-between"><label htmlFor="auth-password" className="text-sm font-bold">{mode === 'reset' ? 'New password' : 'Password'}</label>{mode === 'login' && <Link to={PAGE_ROUTES['forgot-password']} className="text-xs font-black text-[#00715a] hover:underline">Forgot password?</Link>}</div><div className="relative"><Lock className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" /><input id="auth-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className={`${fieldClass('password')} px-11`} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /><button type="button" onClick={() => setShowPassword((show) => !show)} className="absolute right-1 top-1 inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>{errors.password && <p className="mt-1 text-xs font-bold text-rose-600">{errors.password}</p>}</div>}
@@ -208,3 +206,9 @@ export default function Auth({ onLogin, onSignup }: AuthProps) {
     </main>
   );
 }
+
+
+
+
+
+

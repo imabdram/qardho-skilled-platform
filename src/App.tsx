@@ -13,12 +13,15 @@ import Onboarding from './pages/Onboarding';
 import ConnectModal from './components/ConnectModal';
 import ApplyModal from './components/ApplyModal';
 import NotFound from './pages/NotFound';
+import Unauthorized from './pages/Unauthorized';
 import AboutContact from './pages/AboutContact';
 import { User, Job, JobStatus, Connection, Application, Review, ProfileFieldKey, VerificationMessage, PricingType } from './types';
 import { MapPin, AlertCircle, RefreshCw, CheckCircle2, X } from 'lucide-react';
 import ConfirmDialog from './components/ConfirmDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getPageForPath, getRouteForPage, PageId } from './routes';
+
+const getDefaultRouteForUser = (user: User) => user.role === 'admin' ? '/admin' : user.role === 'employer' ? '/dashboard' : user.role === 'worker' ? '/dashboard' : '/onboarding';
 
 export default function App() {
   const location = useLocation();
@@ -39,6 +42,7 @@ export default function App() {
   // Navigation & User session states
   const [currentPage, setCurrentPage] = useState<PageId>(() => getPageForPath(location.pathname));
   const [currentUser, setCurrentUser] = useState<User | null>(() => loadSavedUser());
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [viewingProfileUser, setViewingProfileUser] = useState<User | null>(null);
 
   // App data list states (initialized empty, populated dynamically from PostgreSQL)
@@ -149,9 +153,26 @@ export default function App() {
       else localStorage.removeItem('currentUser');
       await refreshAllData(sessionUser);
     };
-    bootstrap();
+    bootstrap().finally(() => { if (active) setSessionLoading(false); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    const path = location.pathname;
+    const guestOnly = ['/login', '/auth', '/register', '/forgot-password', '/reset-password'].includes(path);
+    const protectedPath = ['/profile', '/dashboard', '/worker/dashboard', '/employer/dashboard', '/post-job', '/admin', '/onboarding'].includes(path);
+    let target: string | null = null;
+    if (guestOnly && currentUser) target = getDefaultRouteForUser(currentUser);
+    else if (!currentUser && protectedPath) target = '/login';
+    else if (currentUser?.role === 'pending' && path !== '/onboarding' && (protectedPath || ['/', '/workers', '/jobs', '/about-contact'].includes(path) || /^\/jobs\//.test(path))) target = '/onboarding';
+    else if (currentUser && path === '/onboarding' && currentUser.role !== 'pending') target = getDefaultRouteForUser(currentUser);
+    else if (currentUser && path === '/admin' && currentUser.role !== 'admin') target = '/unauthorized';
+    else if (currentUser && (path === '/post-job' || path === '/employer/dashboard') && currentUser.role !== 'employer') target = currentUser.role === 'pending' ? '/onboarding' : '/unauthorized';
+    else if (currentUser && path === '/worker/dashboard' && currentUser.role !== 'worker') target = currentUser.role === 'pending' ? '/onboarding' : '/unauthorized';
+    else if (currentUser && path === '/profile' && currentUser.role === 'pending') target = '/onboarding';
+    if (target && target !== path) navigate(target, { replace: true });
+  }, [sessionLoading, currentUser?.id, currentUser?.role, location.pathname, navigate]);
 
   const loadVerificationMessage = async (user: User | null) => {
     if (!user || user.role === 'admin' || user.verified) {
@@ -626,6 +647,8 @@ export default function App() {
     }
 
     switch (currentPage) {
+      case 'unauthorized':
+        return <Unauthorized />;
       case 'home':
         return (
           <Landing
@@ -822,6 +845,8 @@ export default function App() {
         );
     }
   };
+
+  if (sessionLoading) return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm font-bold text-slate-600">Checking your session...</div>;
 
   const roleSwitchTarget = getRoleSwitchTarget();
   const roleSwitchTargetName = roleSwitchTarget === 'worker' ? 'Worker' : 'Employer';

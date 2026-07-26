@@ -1,4 +1,4 @@
-export type PageId = 'home' | 'workers' | 'jobs' | 'job-detail' | 'profile' | 'dashboard' | 'admin' | 'post-job' | 'auth' | 'register' | 'forgot-password' | 'reset-password' | 'about' | 'not-found';
+export type PageId = 'home' | 'workers' | 'jobs' | 'job-detail' | 'profile' | 'dashboard' | 'admin' | 'post-job' | 'auth' | 'register' | 'forgot-password' | 'reset-password' | 'about' | 'unauthorized' | 'not-found';
 
 export const PAGE_ROUTES: Record<PageId, string> = {
   home: '/',
@@ -14,6 +14,7 @@ export const PAGE_ROUTES: Record<PageId, string> = {
   'forgot-password': '/forgot-password',
   'reset-password': '/reset-password',
   about: '/about-contact',
+  unauthorized: '/unauthorized',
   'not-found': '/404',
 };
 
@@ -23,6 +24,8 @@ export const ROUTE_PAGES: Record<string, PageId> = {
   '/jobs': 'jobs',
   '/profile': 'profile',
   '/dashboard': 'dashboard',
+  '/worker/dashboard': 'dashboard',
+  '/employer/dashboard': 'dashboard',
   '/admin': 'admin',
   '/post-job': 'post-job',
   '/login': 'auth',
@@ -31,6 +34,7 @@ export const ROUTE_PAGES: Record<string, PageId> = {
   '/forgot-password': 'forgot-password',
   '/reset-password': 'reset-password',
   '/about-contact': 'about',
+  '/unauthorized': 'unauthorized',
   '/404': 'not-found',
 };
 
