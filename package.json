@@ -22,6 +22,7 @@
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "react-router-dom": "^7.18.1",
+    "sharp": "^0.34.5",
     "vite": "^6.2.3"
   },
   "devDependencies": {
@@ -36,6 +37,8 @@
   },
   "optionalDependencies": {
     "@esbuild/win32-x64": "^0.25.0",
+    "@img/sharp-libvips-win32-x64": "^1.2.4",
+    "@img/sharp-win32-x64": "^0.34.5",
     "@rollup/rollup-win32-x64-msvc": "^4.62.2",
     "@tailwindcss/oxide-win32-x64-msvc": "^4.3.2",
     "lightningcss-win32-x64-msvc": "^1.32.0"

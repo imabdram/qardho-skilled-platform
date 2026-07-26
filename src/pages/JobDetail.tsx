@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Briefcase, Calendar, CheckCircle2, DollarSign, Lock, MapPin, Phone, UserRound } from 'lucide-react';
+import { ArrowLeft, Briefcase, Calendar, CheckCircle2, Clock3, DollarSign, Lock, MapPin, MessageCircle, UserRound } from 'lucide-react';
 import { Application, Job, User } from '../types';
 import { PAGE_ROUTES } from '../routes';
 
@@ -53,7 +53,7 @@ export default function JobDetail({ job, currentUser, applications, onApply, onN
     { label: 'Posted', done: true },
     { label: 'Applied', done: !!myApplication || reviewed },
     { label: 'Accepted', done: !!job.assignedWorkerId || myApplication?.status === 'accepted' },
-    { label: 'In progress', done: job.status === 'in_progress' || job.status === 'completed' },
+    { label: 'In progress', done: ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer', 'completed'].includes(job.status) },
     { label: 'Completed', done: job.status === 'completed' },
   ];
 
@@ -103,6 +103,14 @@ export default function JobDetail({ job, currentUser, applications, onApply, onN
               <p className="mt-3 whitespace-pre-line rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-7 text-slate-700">{job.description}</p>
             </div>
 
+            {job.requirements && <div><h2 className="text-base font-black text-slate-950">Requirements</h2><p className="mt-3 whitespace-pre-line rounded-xl border border-slate-100 bg-white p-4 text-sm leading-7 text-slate-700">{job.requirements}</p></div>}
+
+            {(job.category || job.workType || job.expectedDuration) && <div className="grid gap-3 sm:grid-cols-3">
+              {job.category && <div className="rounded-xl border border-slate-100 p-4"><Briefcase className="h-4 w-4 text-[#008060]" /><span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Category</span><span className="text-sm font-bold text-slate-900">{job.category}</span></div>}
+              {job.workType && <div className="rounded-xl border border-slate-100 p-4"><UserRound className="h-4 w-4 text-[#008060]" /><span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Work type</span><span className="text-sm font-bold text-slate-900">{job.workType}</span></div>}
+              {job.expectedDuration && <div className="rounded-xl border border-slate-100 p-4"><Clock3 className="h-4 w-4 text-[#008060]" /><span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Expected duration</span><span className="text-sm font-bold text-slate-900">{job.expectedDuration}</span></div>}
+            </div>}
+
             <div>
               <h2 className="text-base font-black text-slate-950">Status timeline</h2>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -122,10 +130,7 @@ export default function JobDetail({ job, currentUser, applications, onApply, onN
                 <h2 className="text-sm font-black text-slate-950">Employer</h2>
               </div>
               <p className="mt-2 text-sm font-bold text-slate-900">{job.employerName}</p>
-              <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs font-semibold text-blue-800">
-                <Lock className="mr-1.5 inline h-3.5 w-3.5" />
-                Contact unlocks after accepted application or hire request.
-              </div>
+              {job.phone && myApplication?.status === 'accepted' ? <a href={`https://wa.me/${job.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hello, my name is ${currentUser?.name}. I am contacting you through Qardho Skilled Platform regarding the job "${job.title}". My application has been accepted, and I would like to discuss the next steps.`)}`} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-4 text-xs font-black text-slate-950"><MessageCircle className="h-4 w-4" />Contact on WhatsApp</a> : <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs font-semibold text-blue-800"><Lock className="mr-1.5 inline h-3.5 w-3.5" />Contact unlocks after an accepted application.</div>}
             </div>
 
             {myApplication && (

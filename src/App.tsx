@@ -7,13 +7,14 @@ import JobDetail from './pages/JobDetail';
 import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
-import PostJob from './pages/PostJob';
+import PostJob, { JobFormData } from './pages/PostJob';
 import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
 import ConnectModal from './components/ConnectModal';
 import ApplyModal from './components/ApplyModal';
 import NotFound from './pages/NotFound';
-import { User, Job, JobStatus, Connection, Application, Review, ProfileFieldKey, VerificationMessage } from './types';
+import AboutContact from './pages/AboutContact';
+import { User, Job, JobStatus, Connection, Application, Review, ProfileFieldKey, VerificationMessage, PricingType } from './types';
 import { MapPin, AlertCircle, RefreshCw, CheckCircle2, X } from 'lucide-react';
 import ConfirmDialog from './components/ConfirmDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -97,16 +98,16 @@ export default function App() {
   }, [location.pathname]);
 
   // Load and refresh all data from the PostgreSQL database
-  const refreshAllData = async () => {
+  const refreshAllData = async (authenticatedUser: User | null = currentUser) => {
     try {
       setIsLoadingData(true);
       setAppError(null);
       const [usersRes, workersRes, jobsRes, connectionsRes, applicationsRes, reviewsRes] = await Promise.all([
-        fetchJson<User[]>('/api/users', 'Could not load users.'),
+        authenticatedUser?.role === 'admin' ? fetchJson<User[]>('/api/users', 'Could not load users.') : Promise.resolve([]),
         fetchJson<User[]>('/api/workers', 'Could not load workers.'),
         fetchJson<Job[]>('/api/jobs', 'Could not load jobs.'),
-        fetchJson<Connection[]>('/api/connections', 'Could not load connection requests.'),
-        fetchJson<Application[]>('/api/applications', 'Could not load applications.'),
+        authenticatedUser ? fetchJson<Connection[]>('/api/connections', 'Could not load connection requests.') : Promise.resolve([]),
+        authenticatedUser ? fetchJson<Application[]>('/api/applications', 'Could not load applications.') : Promise.resolve([]),
         fetchJson<Review[]>('/api/reviews', 'Could not load reviews.'),
       ]);
 
@@ -124,17 +125,6 @@ export default function App() {
       setApplications(applicationList);
       setReviews(reviewList);
 
-      // Keep current user state updated with latest loaded values without crashing on stale storage.
-      const savedUser = loadSavedUser();
-      if (savedUser) {
-        const latestWorker = workerList.find((w) => w.id === savedUser.id);
-        const ownsJob = jobList.some((job) => job.employerId === savedUser.id);
-        if (latestWorker || ownsJob) {
-          const latestUser = latestWorker || savedUser;
-          setCurrentUser(latestUser);
-          localStorage.setItem('currentUser', JSON.stringify(latestUser));
-        }
-      }
     } catch (e) {
       console.error("Failed to fetch fresh database states", e);
       showAppError(e instanceof Error ? e.message : 'Could not load platform data. Check that the local server is running.');
@@ -144,7 +134,23 @@ export default function App() {
   };
 
   useEffect(() => {
-    refreshAllData();
+    let active = true;
+    const bootstrap = async () => {
+      let sessionUser: User | null = null;
+      try {
+        const response = await fetch('/api/auth/me');
+        if (response.ok) sessionUser = (await response.json()).user || null;
+      } catch {
+        sessionUser = null;
+      }
+      if (!active) return;
+      setCurrentUser(sessionUser);
+      if (sessionUser) localStorage.setItem('currentUser', JSON.stringify(sessionUser));
+      else localStorage.removeItem('currentUser');
+      await refreshAllData(sessionUser);
+    };
+    bootstrap();
+    return () => { active = false; };
   }, []);
 
   const loadVerificationMessage = async (user: User | null) => {
@@ -155,7 +161,7 @@ export default function App() {
 
     try {
       const data = await fetchJson<{ message: VerificationMessage | null }>(
-        `/api/verification-messages/${user.id}?actorId=${encodeURIComponent(user.id)}`,
+        `/api/verification-messages/${user.id}`,
         'Could not load your verification message.'
       );
       setVerificationMessage(data.message);
@@ -174,7 +180,6 @@ export default function App() {
     const res = await fetch(`/api/verification-messages/${currentUser.id}/read`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ actorId: currentUser.id }),
     });
     if (!res.ok) {
       showAppError(await getApiError(res, 'Could not mark the verification message as read.'));
@@ -236,7 +241,7 @@ export default function App() {
       const res = await fetch('/api/profile/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...updatedUser, actorId: updatedUser.id })
+        body: JSON.stringify(updatedUser)
       });
       if (res.ok) {
         const data = await res.json();
@@ -256,7 +261,8 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
     navigateTo('home');
@@ -274,7 +280,7 @@ export default function App() {
       const res = await fetch('/api/account/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: currentUser.id, actorId: currentUser.id })
+        body: JSON.stringify({ confirmation: 'I confirm' })
       });
       if (!res.ok) {
         showAppError(await getApiError(res, 'Could not delete account.'));
@@ -310,7 +316,6 @@ export default function App() {
     const warnings = targetRole === 'worker'
       ? [
           !currentUser.skill?.trim() ? 'Worker skill will need to be updated after switching.' : null,
-          !currentUser.rate?.trim() ? 'Worker rate will need to be updated after switching.' : null,
           !currentUser.availability ? 'Worker availability will default to available.' : null,
         ].filter(Boolean) as string[]
       : [];
@@ -334,23 +339,15 @@ export default function App() {
 
     const newRole = getRoleSwitchTarget();
     const targetRoleName = newRole === 'worker' ? 'Worker' : 'Employer';
-    const updatedUser: User = {
-      ...currentUser,
-      role: newRole,
-      skill: newRole === 'worker' ? (currentUser.skill || 'General Laborer') : undefined,
-      rate: newRole === 'worker' ? (currentUser.rate || '$15/day') : undefined,
-      availability: newRole === 'worker' ? (currentUser.availability || 'available') : currentUser.availability,
-    };
-
     setIsSwitchingRole(true);
     setShowRoleSwitchModal(false);
     setRoleToast(`Switching to ${targetRoleName} Mode...`);
 
     try {
-      const res = await fetch('/api/profile/update', {
+      const res = await fetch('/api/profile/switch-role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...updatedUser, actorId: updatedUser.id })
+        body: JSON.stringify({ role: newRole, confirmation: roleSwitchConfirmation.trim().toUpperCase() })
       });
       if (res.ok) {
         const data = await res.json();
@@ -358,7 +355,7 @@ export default function App() {
         localStorage.setItem('currentUser', JSON.stringify(data.user));
         setRoleToast(`Success! Switched to ${targetRoleName} Mode`);
         showAppNotice(`Switched to ${newRole === 'worker' ? 'worker' : 'employer'} mode.`);
-        await refreshAllData();
+        await refreshAllData(data.user);
 
         if (newRole === 'worker' && currentPage === 'workers') {
           navigateTo('jobs');
@@ -389,7 +386,7 @@ export default function App() {
     setSelectedWorkerForConnect(worker);
   };
 
-  const submitConnect = async ({ message, phone }: { message: string; phone: string }) => {
+  const submitConnect = async ({ message, jobId, expectedTimeline }: { message: string; jobId?: string; expectedTimeline?: string }) => {
     if (!currentUser || !selectedWorkerForConnect) return;
 
     try {
@@ -397,13 +394,10 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fromUserId: currentUser.id,
-          fromUserName: currentUser.name,
           toUserId: selectedWorkerForConnect.id,
-          toUserName: selectedWorkerForConnect.name,
-          actorId: currentUser.id,
           message,
-          phone
+          jobId,
+          expectedTimeline,
         })
       });
       if (res.ok) {
@@ -443,7 +437,7 @@ export default function App() {
     setSelectedJobForApply(job);
   };
 
-  const submitApply = async ({ message, phone, location }: { message: string; phone: string; location: string }) => {
+  const submitApply = async ({ message, proposedPricingType, proposedAmount, proposedCurrency, proposedNote, expectedTimeline }: { message: string; proposedPricingType?: PricingType; proposedAmount?: number; proposedCurrency?: string; proposedNote?: string; expectedTimeline?: string }) => {
     if (!currentUser || !selectedJobForApply) return;
 
     try {
@@ -452,15 +446,12 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jobId: selectedJobForApply.id,
-          jobTitle: selectedJobForApply.title,
-          employerId: selectedJobForApply.employerId,
-          applicantId: currentUser.id,
-          applicantName: currentUser.name,
-          applicantSkill: currentUser.skill || 'General Laborer',
-          actorId: currentUser.id,
           message,
-          phone,
-          location
+          proposedPricingType,
+          proposedAmount,
+          proposedCurrency,
+          proposedNote,
+          expectedTimeline,
         })
       });
       if (res.ok) {
@@ -483,7 +474,7 @@ export default function App() {
       const res = await fetch(`/api/connections/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, actorId: currentUser?.id })
+        body: JSON.stringify({ status })
       });
       if (res.ok) {
         await refreshAllData();
@@ -502,7 +493,7 @@ export default function App() {
       const res = await fetch(`/api/applications/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, actorId: currentUser?.id })
+        body: JSON.stringify({ status })
       });
       if (res.ok) {
         await refreshAllData();
@@ -521,7 +512,7 @@ export default function App() {
       const res = await fetch(`/api/jobs/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, actorId: currentUser?.id })
+        body: JSON.stringify({ status })
       });
       if (res.ok) {
         await refreshAllData();
@@ -541,25 +532,28 @@ export default function App() {
       const res = await fetch('/api/profile/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...updatedProfile, actorId: currentUser?.id })
+        body: JSON.stringify(updatedProfile)
       });
       if (res.ok) {
         const data = await res.json();
         setCurrentUser(data.user);
         localStorage.setItem('currentUser', JSON.stringify(data.user));
-        await refreshAllData();
+        await refreshAllData(data.user);
         showAppNotice('Profile updated.');
       } else {
-        showAppError(await getApiError(res, 'Could not update profile.'));
+        const message = await getApiError(res, 'Could not update profile.');
+        showAppError(message);
+        throw new Error(message);
       }
     } catch (e) {
       console.error(e);
       showAppError('Could not update profile.');
+      throw e;
     }
   };
 
   // Post Job Handler
-  const postNewJob = async (jobData: { title: string; location: string; description: string; rate: string; phone: string }) => {
+  const postNewJob = async (jobData: JobFormData) => {
     if (!currentUser) return;
 
     try {
@@ -567,15 +561,13 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employerId: currentUser.id,
-          employerName: currentUser.name,
-          actorId: currentUser.id,
           ...jobData
         })
       });
       if (res.ok) {
         await refreshAllData();
         showAppNotice('Job posted.');
+        navigateTo('dashboard');
       } else {
         showAppError(await getApiError(res, 'Could not post job.'));
       }
@@ -591,7 +583,7 @@ export default function App() {
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newReviewData, actorId: currentUser?.id })
+        body: JSON.stringify(newReviewData)
       });
       if (res.ok) {
         await refreshAllData();
@@ -627,6 +619,7 @@ export default function App() {
       return (
         <Onboarding
           currentUser={currentUser}
+          jobs={jobs}
           onCompleteOnboarding={handleCompleteOnboarding}
         />
       );
@@ -707,6 +700,10 @@ export default function App() {
             } : undefined}
             onConnect={triggerConnect}
             onRequestDeleteAccount={requestDeleteAccount}
+            onAvatarUpdated={(user) => {
+              setCurrentUser(user);
+              localStorage.setItem('currentUser', JSON.stringify(user));
+            }}
           />
         );
       case 'dashboard':
@@ -743,7 +740,7 @@ export default function App() {
             onRefresh={refreshAllData}
             onLoadVerificationMessage={async (userId) => {
               const data = await fetchJson<{ message: VerificationMessage | null }>(
-                `/api/verification-messages/${userId}?actorId=${encodeURIComponent(currentUser?.id || '')}`,
+                `/api/verification-messages/${userId}`,
                 'Could not load the latest verification message.'
               );
               return data.message;
@@ -752,7 +749,7 @@ export default function App() {
               const res = await fetch(`/api/admin/users/${user.id}/verification-message`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ actorId: currentUser?.id, missingFields, note }),
+                body: JSON.stringify({ missingFields, note }),
               });
               if (!res.ok) throw new Error(await getApiError(res, 'Could not send the verification message.'));
               const data = await res.json();
@@ -762,7 +759,7 @@ export default function App() {
               const res = await fetch(`/api/admin/users/${user.id}/verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ actorId: currentUser?.id, verified: !user.verified })
+                body: JSON.stringify({ verified: !user.verified })
               });
               if (!res.ok) throw new Error(await getApiError(res, 'Could not update verification.'));
             }}
@@ -770,7 +767,7 @@ export default function App() {
               const res = await fetch(`/api/admin/users/${user.id}/suspend`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ actorId: currentUser?.id, suspended: !user.suspended })
+                body: JSON.stringify({ suspended: !user.suspended })
               });
               if (!res.ok) throw new Error(await getApiError(res, 'Could not update suspension.'));
             }}
@@ -778,7 +775,7 @@ export default function App() {
               const res = await fetch(`/api/admin/users/${user.id}/delete`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ actorId: currentUser?.id })
+                body: JSON.stringify({})
               });
               if (!res.ok) throw new Error(await getApiError(res, 'Could not delete user.'));
             }}
@@ -786,7 +783,7 @@ export default function App() {
               const res = await fetch(`/api/admin/users/${user.id}/role`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ actorId: currentUser?.id, role })
+                body: JSON.stringify({ role })
               });
               if (!res.ok) throw new Error(await getApiError(res, 'Could not update role.'));
             }}
@@ -794,8 +791,12 @@ export default function App() {
         );
       case 'post-job':
         return <PostJob currentUser={currentUser} onPostJob={postNewJob} onNavigate={handleNavigate} />;
+      case 'about':
+        return <AboutContact />;
       case 'auth':
       case 'register':
+      case 'forgot-password':
+      case 'reset-password':
         return <Auth onLogin={handleLogin} onSignup={handleSignup} />;
       case 'not-found':
         return <NotFound />;
@@ -904,6 +905,7 @@ export default function App() {
         <ConnectModal
           worker={selectedWorkerForConnect}
           currentUser={currentUser}
+          jobs={jobs}
           onClose={() => setSelectedWorkerForConnect(null)}
           onSubmit={submitConnect}
         />

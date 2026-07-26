@@ -1,27 +1,18 @@
 import React from 'react';
-import { DollarSign, Send, Star, ShieldCheck } from 'lucide-react';
+import { DollarSign, Star, ShieldCheck } from 'lucide-react';
 import { User as UserType, Review } from '../types';
+import Avatar from './Avatar';
 
 interface WorkerCardProps {
   key?: string;
   worker: UserType;
-  onConnect: (worker: UserType) => void;
+  onConnect?: (worker: UserType) => void;
   onViewProfile?: (worker: UserType) => void;
   isCurrentUser: boolean;
   reviews?: Review[];
 }
 
-export default function WorkerCard({ worker, onConnect, onViewProfile, isCurrentUser, reviews = [] }: WorkerCardProps) {
-  // Generate random avatar initials style or color
-  const colors = ['bg-blue-100 text-blue-800', 'bg-emerald-100 text-emerald-800', 'bg-purple-100 text-purple-800', 'bg-amber-100 text-amber-800', 'bg-rose-100 text-rose-800'];
-  const colorIndex = worker.name.charCodeAt(0) % colors.length;
-  const colorClass = colors[colorIndex];
-  
-  const initials = worker.name
-    .split(' ')
-    .map(n => n[0])
-    .slice(0, 2)
-    .join('');
+export default function WorkerCard({ worker, onViewProfile, isCurrentUser, reviews = [] }: WorkerCardProps) {
 
   // Calculate rating stats
   const workerReviews = reviews.filter(r => r.workerId === worker.id);
@@ -32,21 +23,19 @@ export default function WorkerCard({ worker, onConnect, onViewProfile, isCurrent
 
   return (
     <div 
-      className="bg-white rounded-xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200 transition-all duration-200 flex flex-col justify-between p-5"
+      className="flex flex-col justify-between rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#008060]/30 hover:shadow-md"
       id={`worker-card-${worker.id}`}
     >
       <div>
         {/* Card Header Info */}
         <div className="flex items-start space-x-4">
-          <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-bold text-sm tracking-wide ${colorClass} shrink-0`}>
-            {initials}
-          </div>
+          <Avatar name={worker.name} src={worker.avatarUrl} />
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-semibold text-slate-900 truncate">
               {worker.name}
             </h3>
             <div className="flex flex-wrap items-center gap-1.5 mt-1">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+              <span className="inline-flex items-center rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-[#005f49]">
                 {worker.skill}
               </span>
               {worker.verified && (
@@ -86,7 +75,7 @@ export default function WorkerCard({ worker, onConnect, onViewProfile, isCurrent
         </div>
 
         {/* Bio/Summary */}
-        <p className="mt-4 text-xs text-slate-500 leading-relaxed line-clamp-3">
+        <p className="mt-4 text-sm text-slate-600 leading-relaxed line-clamp-3">
           {worker.bio || 'Professional skilled technician ready to assist you. Contact to discuss job details and requirements.'}
         </p>
       </div>
@@ -96,26 +85,17 @@ export default function WorkerCard({ worker, onConnect, onViewProfile, isCurrent
         {onViewProfile && (
           <button
             onClick={() => onViewProfile(worker)}
-            className="w-full inline-flex items-center justify-center space-x-1.5 px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+            className="w-full inline-flex items-center justify-center space-x-1.5 rounded-full border border-emerald-950/10 px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-emerald-50 hover:text-[#005f49] cursor-pointer"
           >
             <Star className="h-3.5 w-3.5 text-amber-500" />
-            <span>View Profile & Feedback</span>
+            <span>View Profile</span>
           </button>
         )}
 
-        {isCurrentUser ? (
+        {isCurrentUser && (
           <div className="text-center text-xs font-semibold text-slate-400 bg-slate-50 py-2.5 rounded-lg border border-slate-100">
             This is you
           </div>
-        ) : (
-          <button
-            onClick={() => onConnect(worker)}
-            className="w-full inline-flex items-center justify-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-xs hover:shadow-md transition-all cursor-pointer"
-            id={`btn-connect-${worker.id}`}
-          >
-            <Send className="h-3.5 w-3.5" />
-            <span>Connect & Hire</span>
-          </button>
         )}
       </div>
     </div>

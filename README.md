@@ -11,8 +11,8 @@ The project is currently an MVP/demo app with a real React frontend, Express API
 - **Fully Migrated to Native PostgreSQL:** The database layer communicates directly using native parameterized queries (`$1`, `$2`, etc.) and quoted camelCase identifiers. The old SQLite dynamic translation layer and leftover `.sqlite` files have been completely removed.
 - Demo quick-login flows for both worker and employer roles.
 - Production build and TypeScript check currently pass.
-- Authentication is demo/local only: users sign in by registered phone or email plus password, but the app does not create production-grade sessions or protect all API routes.
-- API routes are intended for local prototype use and are not production-hardened.
+- Authentication uses hashed passwords and secure, HTTP-only database sessions. Protected API routes derive identity and permissions from the session instead of client-supplied user IDs.
+- Password reset links use hashed, expiring, one-use tokens. Configure the reset webhook below to deliver links outside development.
 - SMS preferences are stored in profiles, but real SMS delivery is not integrated yet.
 - The app does not include direct chat, payments, escrow, scheduling, or admin moderation tools yet.
 
@@ -20,9 +20,9 @@ The project is currently an MVP/demo app with a real React frontend, Express API
 
 - Worker directory with search, skill filters, neighborhood filters, and availability filters.
 - Worker cards with skill, location, rate, availability, verified badge, and review summary.
-- Public worker profile view with bio, direct contact details, ratings, reviews, and trust signals.
-- Job board with search, neighborhood filtering, and lifecycle status filtering.
-- Job lifecycle statuses: `open`, `in_progress`, `completed`, and `closed`.
+- Public worker profile view with bio, ratings, reviews, trust signals, optimized avatars, and approval-gated contact details.
+- Job board with search and neighborhood filtering. All records display by default without status-filter tabs.
+- Two-party job completion requests, confirmation, disputes, audit events, and notifications.
 - Employer job posting flow.
 - Worker job application flow.
 - Employer-to-worker connection request flow.
@@ -40,16 +40,12 @@ The project is currently an MVP/demo app with a real React frontend, Express API
 
 The app is usable as an MVP, but these production features are still missing:
 
-- Real authentication with secure sessions or token-based auth.
-- Server-side authorization that does not rely on client-supplied IDs.
-- Input validation and rate limiting on public endpoints.
 - Direct messaging between employers and workers.
-- SMS, email, or WhatsApp delivery for notifications.
+- SMS and direct in-app messaging. Password-reset delivery requires a configured webhook.
 - Payments, invoices, escrow, and transaction tracking.
-- Scheduling, milestones, and job completion workflows.
-- Admin moderation, dispute handling, and trust-and-safety tooling.
+- Scheduling, milestones, and full dispute-resolution tooling beyond the completion audit trail.
 - Saved searches, bookmarks, recommendations, and richer discovery tools.
-- Full localization support, including Somali language UI.
+- Full localization. SO, EN, and AR selectors currently prepare language and RTL state but copy is still primarily English.
 - A complete automated end-to-end test suite for the main marketplace flows.
 
 ## Tech Stack
@@ -76,6 +72,10 @@ The backend creates these PostgreSQL tables when the app starts:
 - `connections`: employer-to-worker hire/contact requests.
 - `applications`: worker applications to posted jobs.
 - `reviews`: employer reviews for workers.
+- `sessions`: hashed, expiring authenticated browser sessions.
+- `password_reset_tokens`: hashed, expiring, one-use reset tokens.
+- `notifications`: role and workflow notifications with direct links.
+- `completion_events`: completion request, confirmation, and dispute audit records.
 
 If the database has no users, the server seeds sample workers, jobs, connections, applications, and reviews.
 
@@ -109,6 +109,9 @@ If the database has no users, the server seeds sample workers, jobs, connections
 | `GET` | `/api/reviews` | List worker reviews. |
 | `POST` | `/api/auth/register` | Create a new local user account. |
 | `POST` | `/api/auth/login` | Log in by email or phone number plus password. |
+| `POST` | `/api/auth/forgot-password` | Create a neutral-response password reset request. |
+| `POST` | `/api/auth/reset-password` | Consume a one-use reset token. |
+| `GET` | `/api/auth/me` | Restore the current secure session. |
 | `POST` | `/api/profile/update` | Update user profile and role details. |
 | `POST` | `/api/jobs` | Create a new job post. |
 | `POST` | `/api/jobs/:id/status` | Update a job lifecycle status. |
@@ -140,6 +143,13 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST/neondb?sslmode=verify-full"
 ```
 
 Keep the real Neon URL in local/deployment secrets. Do not commit it to Git.
+
+Optional configuration:
+
+- `PUBLIC_APP_URL`: public origin used in reset links.
+- `RESET_WEBHOOK_URL` and `RESET_WEBHOOK_SECRET`: password-reset delivery webhook.
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`: persistent free-tier profile image storage.
+- `UPLOAD_DIR`: local image fallback directory. Render's default filesystem is ephemeral, so Cloudinary is recommended there.
 
 ### Run in Development
 
@@ -199,6 +209,8 @@ The application is built to run as a single monolithic service that serves the R
 4. Under **Environment Variables**, add:
    - `DATABASE_URL`: `your_neon_postgresql_connection_string`
    - `NODE_ENV`: `production`
+   - `PUBLIC_APP_URL`: your Render service URL
+   - Cloudinary variables listed above for persistent profile images
 5. In **Advanced settings**, set the **Health Check Path** to `/`.
 
 ### Deploying to Railway.app
@@ -235,6 +247,23 @@ Suggested demo loop:
 7. Browse jobs and submit an application.
 8. Open the dashboard to accept, decline, or track requests.
 9. Edit a profile and update availability or notification preferences.
+
+## Database Migrations
+
+Schema migrations are additive and run automatically when the server starts. They create the session, password-reset, notification, and completion-audit tables and add optional profile, pricing, proposal, and completion columns with `IF NOT EXISTS`. Back up a production database before the first deployment, deploy one server instance, review its startup log, and then verify:
+
+```bash
+npm run build
+npm start
+```
+
+No destructive migration or manual data rewrite is required.
+
+## Image Storage and Processing
+
+Profile uploads are validated on both client and server, limited to JPEG, PNG, or WebP and 5 MB, rotated from metadata, resized to at most 800 by 800, and stored as compressed WebP. With Cloudinary configured, the processed image is uploaded there. Without it, files are written to `UPLOAD_DIR` and served from `/uploads`; use that fallback only on persistent storage.
+
+Bundled platform imagery has optimized WebP variants. Non-critical avatar and gallery images use fixed dimensions, lazy loading, and asynchronous decoding to reduce layout shift and bandwidth.
 
 ## Verification
 

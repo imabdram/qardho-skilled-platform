@@ -3,8 +3,6 @@ import { Application, Connection, Job, ProfileFieldKey, Review, User, Verificati
 import { ShieldAlert, Search, Trash2, UserCheck, UserX, BadgeCheck, Briefcase, MessageSquare, Link as LinkIcon, Clock3, UsersRound, X } from 'lucide-react';
 import { buildVerificationMessageText, getMissingProfileFields, PROFILE_FIELD_LABELS } from '../validation';
 
-type UserFilter = 'all' | 'waiting' | 'verified' | 'suspended';
-
 interface AdminProps {
   currentUser: User | null;
   users: User[];
@@ -25,7 +23,6 @@ interface AdminProps {
 export default function Admin({ currentUser, users, jobs, connections, applications, reviews, onNavigate, onRefresh, onToggleVerifyUser, onToggleSuspendUser, onDeleteUser, onChangeUserRole, onLoadVerificationMessage, onSendVerificationMessage }: AdminProps) {
   const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [userFilter, setUserFilter] = useState<UserFilter>('all');
   const [reviewingUser, setReviewingUser] = useState<User | null>(null);
   const [selectedMissingFields, setSelectedMissingFields] = useState<ProfileFieldKey[]>([]);
   const [verificationNote, setVerificationNote] = useState('');
@@ -54,15 +51,9 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
 
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const matchingStatus = users.filter((user) => {
-      if (userFilter === 'waiting') return !user.verified && user.role !== 'admin';
-      if (userFilter === 'verified') return !!user.verified;
-      if (userFilter === 'suspended') return !!user.suspended;
-      return true;
-    });
-    if (!q) return matchingStatus;
-    return matchingStatus.filter((user) => [user.name, user.email, user.phone, user.role, user.location, user.skill].filter(Boolean).join(' ').toLowerCase().includes(q));
-  }, [users, query, userFilter]);
+    if (!q) return users;
+    return users.filter((user) => [user.name, user.email, user.phone, user.role, user.location, user.skill].filter(Boolean).join(' ').toLowerCase().includes(q));
+  }, [users, query]);
 
   const formatJoinedDate = (createdAt?: string) => {
     if (!createdAt) return 'Signup date unavailable';
@@ -170,7 +161,7 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
             <div className="rounded-2xl bg-white/5 px-4 py-3"><div className="text-slate-400">Users</div><div className="mt-1 text-2xl text-white">{counts.users}</div></div>
             <div className="rounded-2xl bg-white/5 px-4 py-3"><div className="text-slate-400">Verified</div><div className="mt-1 text-2xl text-white">{counts.verified}</div></div>
             <div className="rounded-2xl bg-white/5 px-4 py-3"><div className="text-slate-400">Suspended</div><div className="mt-1 text-2xl text-white">{counts.suspended}</div></div>
-            <button onClick={() => { setUserFilter('waiting'); document.getElementById('user-accounts')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-left transition hover:bg-amber-300/15"><div className="text-amber-200">Waiting</div><div className="mt-1 flex items-center gap-2 text-2xl text-white">{counts.waiting}{counts.waiting > 0 && <span className="h-2 w-2 animate-pulse rounded-full bg-amber-300" />}</div></button>
+            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-left"><div className="text-amber-200">Waiting</div><div className="mt-1 flex items-center gap-2 text-2xl text-white">{counts.waiting}{counts.waiting > 0 && <span className="h-2 w-2 animate-pulse rounded-full bg-amber-300" />}</div></div>
           </div>
         </div>
       </section>
@@ -209,16 +200,6 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
       </section>
 
       <section id="user-accounts" className="mt-6 scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="mb-4 flex flex-wrap gap-2 border-b border-slate-100 pb-4">
-          {([
-            ['all', 'All accounts', counts.users],
-            ['waiting', 'Waiting', counts.waiting],
-            ['verified', 'Verified', counts.verified],
-            ['suspended', 'Suspended', counts.suspended],
-          ] as Array<[UserFilter, string, number]>).map(([value, label, count]) => (
-            <button key={value} onClick={() => setUserFilter(value)} className={`rounded-xl px-3 py-2 text-xs font-black transition ${userFilter === value ? value === 'waiting' ? 'bg-amber-100 text-amber-800' : 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>{label} <span className="ml-1 opacity-70">{count}</span></button>
-          ))}
-        </div>
         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-50">
           <Search className="h-4 w-4 text-slate-400" />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search users by name, phone, email, skill, or role" className="w-full bg-transparent text-sm font-semibold outline-none" />

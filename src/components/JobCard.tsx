@@ -6,14 +6,11 @@ interface JobCardProps {
   key?: string;
   job: Job;
   application?: Application;
-  onApply: (job: Job) => void;
   onViewDetails?: (job: Job) => void;
   isOwner: boolean;
 }
 
-export default function JobCard({ job, application, onApply, onViewDetails, isOwner }: JobCardProps) {
-  const isOpen = job.status === 'open';
-  const canApply = isOpen && !application;
+export default function JobCard({ job, application, onViewDetails, isOwner }: JobCardProps) {
 
   const formatDate = (dateStr: string) => {
     try {
@@ -28,8 +25,13 @@ export default function JobCard({ job, application, onApply, onViewDetails, isOw
     const label = status.replace('_', ' ');
     const styles = {
       open: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      in_progress: 'bg-blue-50 text-blue-700 border-blue-100',
+      in_progress: 'bg-[#b7f25c]/35 text-[#005f49] border-[#b7f25c]/70',
+      active: 'bg-[#b7f25c]/35 text-[#005f49] border-[#b7f25c]/70',
+      completion_requested_by_worker: 'bg-amber-50 text-amber-700 border-amber-100',
+      completion_requested_by_employer: 'bg-amber-50 text-amber-700 border-amber-100',
       completed: 'bg-slate-100 text-slate-700 border-slate-200',
+      completion_disputed: 'bg-rose-50 text-rose-700 border-rose-100',
+      cancelled: 'bg-slate-100 text-slate-600 border-slate-200',
       closed: 'bg-rose-50 text-rose-700 border-rose-100',
     }[status];
 
@@ -59,12 +61,12 @@ export default function JobCard({ job, application, onApply, onViewDetails, isOw
 
   return (
     <div
-      className="bg-white rounded-xl border border-slate-100 shadow-xs hover:shadow-md hover:border-slate-200 transition-all duration-200 p-5 flex flex-col justify-between"
+      className="flex flex-col justify-between rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#008060]/30 hover:shadow-md"
       id={`job-card-${job.id}`}
     >
       <div>
         <div>
-          <h3 className="text-lg font-bold text-slate-900 leading-snug hover:text-blue-600 transition-colors">
+          <h3 className="font-display text-lg font-bold text-[#111615] leading-snug transition-colors hover:text-[#008060]">
             {job.title}
           </h3>
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block font-mono mt-1">
@@ -94,7 +96,7 @@ export default function JobCard({ job, application, onApply, onViewDetails, isOw
           </div>
         </div>
 
-        <p className="mt-4 text-xs text-slate-600 leading-relaxed font-normal line-clamp-3">
+        <p className="mt-4 text-sm text-slate-600 leading-relaxed font-normal line-clamp-3">
           {job.description}
         </p>
       </div>
@@ -103,30 +105,16 @@ export default function JobCard({ job, application, onApply, onViewDetails, isOw
         {onViewDetails && (
           <button
             onClick={() => onViewDetails(job)}
-            className="w-full inline-flex items-center justify-center space-x-1.5 px-4 py-2.5 font-semibold text-xs rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all"
+            className="w-full inline-flex items-center justify-center space-x-1.5 rounded-full border border-emerald-950/10 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-all hover:bg-emerald-50 hover:text-[#005f49]"
           >
             <span>View Details</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         )}
-        {isOwner ? (
+        {isOwner && (
           <div className="text-center text-xs font-semibold text-blue-600 bg-blue-50/50 py-2.5 rounded-lg border border-blue-100">
             Your Job Listing
           </div>
-        ) : (
-          <button
-            onClick={() => onApply(job)}
-            disabled={!canApply}
-            className={`w-full inline-flex items-center justify-center space-x-1.5 px-4 py-2.5 font-semibold text-xs rounded-lg shadow-xs transition-all ${
-              canApply
-                ? 'bg-slate-900 hover:bg-slate-800 text-white hover:shadow-md cursor-pointer'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-            }`}
-            id={`btn-apply-${job.id}`}
-          >
-            <span>{application ? `Already applied: ${application.status}` : isOpen ? 'Apply Now' : 'Not Accepting Applications'}</span>
-            {canApply && <ArrowRight className="h-3.5 w-3.5" />}
-          </button>
         )}
       </div>
     </div>

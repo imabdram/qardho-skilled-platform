@@ -37,6 +37,15 @@ export const isOneOf = <T extends readonly string[]>(value: unknown, allowed: T)
 );
 
 export const isValidRating = (value: unknown) => Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 5;
+export const isNonNegativePrice = (value: unknown) => value === undefined || value === null || value === '' || (Number.isFinite(Number(value)) && Number(value) >= 0);
+export const hasMinimumJobDescription = (value: unknown) => typeof value === 'string' && value.trim().length >= 100;
+export const hasMinimumJobRequirements = (value: unknown) => typeof value === 'string' && value.trim().length >= 50;
+export const normalizeInternationalPhone = (value: unknown) => {
+  const normalized = typeof value === 'string' ? value.replace(/[^\d+]/g, '') : '';
+  if (!normalized) return null;
+  const withPrefix = normalized.startsWith('+') ? normalized : normalized.startsWith('252') ? `+${normalized}` : `+${normalized}`;
+  return /^\+\d{8,15}$/.test(withPrefix) ? withPrefix : null;
+};
 export const PROFILE_FIELD_LABELS: Record<ProfileFieldKey, string> = {
   name: 'Full name',
   phone: 'Phone number',
@@ -63,7 +72,6 @@ export const getMissingProfileFields = (user: Pick<User, 'name' | 'phone' | 'rol
 
   if (user.role === 'worker') {
     if (!user.skill?.trim()) missing.push('skill');
-    if (!user.rate?.trim()) missing.push('rate');
     if (!user.availability) missing.push('availability');
   }
 

@@ -18,6 +18,13 @@ export interface User {
   availability?: 'available' | 'busy' | 'unavailable';
   verified?: boolean;
   suspended?: boolean;
+  whatsappPhone?: string;
+  avatarUrl?: string;
+  gender?: 'male' | 'female' | 'prefer_not_to_say';
+  pricingType?: PricingType;
+  pricingAmount?: number;
+  pricingCurrency?: string;
+  pricingNote?: string;
 }
 
 export const PROFILE_FIELD_KEYS = [
@@ -43,7 +50,8 @@ export interface VerificationMessage {
   sentAt: string;
   readAt?: string;
 }
-export type JobStatus = 'open' | 'in_progress' | 'completed' | 'closed';
+export type PricingType = 'project' | 'hour' | 'day';
+export type JobStatus = 'open' | 'active' | 'completion_requested_by_worker' | 'completion_requested_by_employer' | 'completed' | 'completion_disputed' | 'cancelled' | 'closed' | 'in_progress';
 
 export interface Job {
   id: string;
@@ -52,12 +60,26 @@ export interface Job {
   employerName: string;
   location: string;    // Neighborhood in Qardho
   description: string;
+  requirements?: string;
+  category?: string;
+  workType?: string;
+  expectedDuration?: string;
   rate: string;        // Payment offer (e.g. "$20/day")
-  phone: string;       // Direct contact phone
+  phone?: string;
+  pricingType?: PricingType;
+  pricingAmount?: number;
+  pricingCurrency?: string;
+  pricingNote?: string;
   assignedWorkerId?: string;
   assignedWorkerName?: string;
   completionRequestedAt?: string;
   workerCompletedAt?: string;
+  completionRequestedBy?: string;
+  completionRequestedRole?: 'worker' | 'employer';
+  completionConfirmedBy?: string;
+  completionConfirmedAt?: string;
+  completionDisputedBy?: string;
+  completionDisputedAt?: string;
   status: JobStatus;   // Lifecycle status for the job post
   createdAt: string;
 }
@@ -71,6 +93,20 @@ export interface Connection {
   status: 'pending' | 'accepted' | 'declined';
   message?: string;
   phone?: string;      // Contact info shared
+  jobId?: string;
+  jobTitle?: string;
+  expectedTimeline?: string;
+  createdAt: string;
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  href?: string;
+  readAt?: string;
   createdAt: string;
 }
 
@@ -87,6 +123,11 @@ export interface Application {
   location: string;    // Worker's location
   status: 'pending' | 'accepted' | 'declined';
   createdAt: string;
+  proposedPricingType?: PricingType;
+  proposedAmount?: number;
+  proposedCurrency?: string;
+  proposedNote?: string;
+  expectedTimeline?: string;
 }
 
 export interface Review {

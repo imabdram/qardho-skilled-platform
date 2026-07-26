@@ -1,291 +1,208 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import {
+  ArrowRight, BriefcaseBusiness, CheckCircle2, Eye, EyeOff, Loader2, Lock,
+  Mail, MapPin, Phone, ShieldCheck, User, UserPlus,
+} from 'lucide-react';
 import { PAGE_ROUTES } from '../routes';
-import { ArrowRight, CheckCircle2, Eye, EyeOff, Lock, LogIn, Mail, MapPin, Phone, ShieldCheck, User, UserPlus, Wrench } from 'lucide-react';
 
 interface AuthProps {
   onLogin: (data: { identifier: string; password: string }) => Promise<{ success: boolean; message: string }>;
-  onSignup: (data: any) => Promise<{ success: boolean; message: string }>;
+  onSignup: (data: Record<string, unknown>) => Promise<{ success: boolean; message: string }>;
 }
 
-type FieldErrors = Partial<Record<'loginIdentifier' | 'name' | 'phone' | 'password', string>>;
+type Feedback = { type: 'success' | 'error'; message: string };
+
+const images = [
+  { src: '/assets/auth-gallery-solar.webp', alt: 'Solar technician working in Qardho' },
+  { src: '/assets/auth-gallery-tailoring.webp', alt: 'Tailor working in a local workshop' },
+  { src: '/assets/auth-gallery-construction.webp', alt: 'Mason building a wall' },
+  { src: '/assets/auth-gallery-teaching-farming.webp', alt: 'A practical farming lesson' },
+];
 
 export default function Auth({ onLogin, onSignup }: AuthProps) {
   const location = useLocation();
-  const [isLoginTab, setIsLoginTab] = useState(() => location.pathname !== PAGE_ROUTES.register);
-  const [loginIdentifier, setLoginIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const mode = location.pathname === PAGE_ROUTES.register ? 'register' : location.pathname === PAGE_ROUTES['forgot-password'] ? 'forgot' : location.pathname === PAGE_ROUTES['reset-password'] ? 'reset' : 'login';
+  const [imageIndex, setImageIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [identifier, setIdentifier] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [countryCode, setCountryCode] = useState('+252');
   const [phone, setPhone] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [whatsappCountryCode, setWhatsappCountryCode] = useState('+252');
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const DEMO_PASSWORD = 'demo1234';
-
-  const galleryImages = [
-    { src: '/assets/auth-gallery-solar.png', alt: 'Solar technician inspecting rooftop panels in Qardho', className: 'object-left' },
-    { src: '/assets/auth-gallery-tailoring.png', alt: 'Tailor sewing fabric in a local workshop', className: 'object-center' },
-    { src: '/assets/auth-gallery-construction.png', alt: 'Mason building a concrete block wall', className: 'object-center' },
-    { src: '/assets/auth-gallery-teaching-farming.png', alt: 'Teacher leading a practical farming lesson', className: 'object-center' },
-  ];
-
-  const galleryBackdrop = galleryImages[0].src;
-  const inputClass = 'block h-12 w-full rounded-lg border bg-white pl-11 pr-3 text-sm font-semibold text-slate-900 transition placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10';
-  const passwordInputClass = 'block h-12 w-full rounded-lg border bg-white pl-11 pr-11 text-sm font-semibold text-slate-900 transition placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-600/10';
-  const labelClass = 'mb-2 block text-[11px] font-black uppercase tracking-wider text-slate-600';
+  const resetToken = useMemo(() => new URLSearchParams(location.search).get('token') || '', [location.search]);
 
   useEffect(() => {
-    setIsLoginTab(location.pathname !== PAGE_ROUTES.register);
     setFeedback(null);
-    setFieldErrors({});
-  }, [location.pathname]);
+    setErrors({});
+    setPassword('');
+    setConfirmPassword('');
+  }, [mode]);
 
-  const clearFieldError = (field: keyof FieldErrors) => {
-    if (fieldErrors[field]) {
-      setFieldErrors((current) => ({ ...current, [field]: undefined }));
-    }
-  };
+  useEffect(() => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced) return;
+    const timer = window.setInterval(() => {
+      setImageIndex((current) => {
+        const next = (current + 1) % images.length;
+        const preload = new Image();
+        preload.src = images[(next + 1) % images.length].src;
+        return next;
+      });
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, []);
 
-  const handlePhoneChange = (value: string) => {
-    const digitsOnly = value.replace(/\D/g, '');
-    const withoutCountryCode = digitsOnly.startsWith('252') ? digitsOnly.slice(3) : digitsOnly;
-    setPhone(withoutCountryCode.slice(0, 9));
-    clearFieldError('phone');
-  };
-
-  const formatSomaliPhone = (localPhone: string) => `+252 ${localPhone.slice(0, 2)} ${localPhone.slice(2, 5)} ${localPhone.slice(5)}`.trim();
-  const passwordIsLongEnough = password.length >= 8;
-
-  const runDemoLogin = async (role: 'worker' | 'employer' | 'admin') => {
-    if (loading) return;
-    setFeedback(null);
-    setFieldErrors({});
-    setLoading(true);
-    const identifier = role === 'worker' ? '+252 90 779 1234' : role === 'employer' ? 'employer1@qardho.com' : 'admin@qardho.com';
-    try {
-      const res = await onLogin({ identifier, password: DEMO_PASSWORD });
-      if (!res.success) setFeedback({ type: 'error', message: res.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (loading) return;
-
-    setFeedback(null);
-    const nextErrors: FieldErrors = {};
-
-    if (isLoginTab) {
-      if (!loginIdentifier.trim()) nextErrors.loginIdentifier = 'Email or phone is required.';
-      if (!password.trim()) nextErrors.password = 'Password is required.';
+  const validate = () => {
+    const next: Record<string, string> = {};
+    if (mode === 'login') {
+      if (!identifier.trim()) next.identifier = 'Email or phone is required.';
+      if (!password) next.password = 'Password is required.';
+    } else if (mode === 'register') {
+      if (!name.trim()) next.name = 'Full name is required.';
+      if (!/^\+\d{1,4}$/.test(countryCode)) next.countryCode = 'Use a valid country code.';
+      if (!/^\d{8,12}$/.test(phone.replace(/\D/g, ''))) next.phone = 'Enter 8 to 12 phone digits.';
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) next.email = 'Enter a valid email address.';
+      if (whatsappPhone && (!/^\+\d{1,4}$/.test(whatsappCountryCode) || !/^\d{8,12}$/.test(whatsappPhone.replace(/\D/g, '')))) next.whatsappPhone = 'Enter a valid international WhatsApp number.';
+      if (password.length < 8) next.password = 'Use at least 8 characters.';
+    } else if (mode === 'forgot') {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) next.email = 'Enter a valid email address.';
     } else {
-      if (!name.trim()) nextErrors.name = 'Full name is required.';
-      if (!phone.trim()) nextErrors.phone = 'Phone number is required.';
-      else if (!/^\d{9}$/.test(phone)) nextErrors.phone = 'Enter a valid 9-digit Somali number after +252.';
-      if (!password.trim()) nextErrors.password = 'Password is required.';
-      else if (!passwordIsLongEnough) nextErrors.password = 'Password must be at least 8 characters.';
+      if (!resetToken) next.token = 'This reset link is missing its token.';
+      if (password.length < 8) next.password = 'Use at least 8 characters.';
+      if (password !== confirmPassword) next.confirmPassword = 'Passwords do not match.';
     }
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
 
-    setFieldErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
-
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (loading || !validate()) return;
     setLoading(true);
+    setFeedback(null);
     try {
-      if (isLoginTab) {
-        const res = await onLogin({ identifier: loginIdentifier.trim(), password });
-        if (!res.success) setFeedback({ type: 'error', message: res.message });
+      if (mode === 'login') {
+        const result = await onLogin({ identifier: identifier.trim(), password });
+        if (!result.success) setFeedback({ type: 'error', message: result.message });
+      } else if (mode === 'register') {
+        const normalizedPhone = `${countryCode}${phone.replace(/\D/g, '')}`;
+        const normalizedWhatsapp = whatsappPhone ? `${whatsappCountryCode}${whatsappPhone.replace(/\D/g, '')}` : undefined;
+        const signup = await onSignup({ name: name.trim(), email: email.trim() || undefined, phone: normalizedPhone, whatsappPhone: normalizedWhatsapp, password, role: 'pending' });
+        if (!signup.success) setFeedback({ type: 'error', message: signup.message });
+        else {
+          const login = await onLogin({ identifier: normalizedPhone, password });
+          if (!login.success) setFeedback({ type: 'success', message: 'Account created. Sign in with your new details.' });
+        }
+      } else if (mode === 'forgot') {
+        const response = await fetch('/api/auth/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim() }) });
+        const data = await response.json();
+        setFeedback({ type: 'success', message: data.message });
+        if (data.developmentResetUrl) window.setTimeout(() => window.location.assign(data.developmentResetUrl), 1200);
       } else {
-        const formattedPhone = formatSomaliPhone(phone);
-        const signupRes = await onSignup({
-          name: name.trim(),
-          email: email.trim() || undefined,
-          phone: formattedPhone,
-          password,
-          role: 'pending',
-        });
-        if (!signupRes.success) {
-          setFeedback({ type: 'error', message: signupRes.message });
-          return;
-        }
-
-        setFeedback({ type: 'success', message: 'Account created. Opening onboarding...' });
-        const loginRes = await onLogin({ identifier: formattedPhone, password });
-        if (!loginRes.success) {
-          setFeedback({ type: 'error', message: loginRes.message || 'Account created, but automatic sign-in failed. Please sign in.' });
-        }
+        const response = await fetch('/api/auth/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: resetToken, password }) });
+        const data = await response.json();
+        if (!response.ok) setFeedback({ type: 'error', message: data.error || 'Could not reset password.' });
+        else setFeedback({ type: 'success', message: data.message });
       }
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: err.message || 'An unexpected error occurred.' });
+    } catch {
+      setFeedback({ type: 'error', message: 'The server could not be reached. Please try again.' });
     } finally {
       setLoading(false);
     }
   };
 
-  const forgotPassword = () => {
-    setFeedback({ type: 'error', message: 'Password reset is not enabled in demo mode. Use demo1234 for demo accounts.' });
+  const quickLogin = async (identifierValue: string) => {
+    if (loading) return;
+    setIdentifier(identifierValue);
+    setPassword('demo1234');
+    setLoading(true);
+    setFeedback(null);
+    try {
+      const result = await onLogin({ identifier: identifierValue, password: 'demo1234' });
+      if (!result.success) setFeedback({ type: 'error', message: result.message });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const inputStateClass = (field: keyof FieldErrors) => fieldErrors[field] ? 'border-red-300 bg-red-50/40' : 'border-slate-200';
+  const fieldClass = (key: string) => `min-h-12 w-full rounded-xl border bg-white/95 px-4 text-sm font-semibold text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#008060] focus:ring-4 focus:ring-emerald-500/10 ${errors[key] ? 'border-rose-300' : 'border-slate-200'}`;
+  const title = mode === 'login' ? 'Welcome back' : mode === 'register' ? 'Create your account' : mode === 'forgot' ? 'Reset your password' : 'Choose a new password';
+  const description = mode === 'login' ? 'Sign in to manage jobs, applications, hiring requests, and work progress.' : mode === 'register' ? 'Start with your contact details, then complete a short role-based setup.' : mode === 'forgot' ? 'Enter your email. The response stays the same whether or not an account exists.' : 'Reset links expire after 30 minutes and can be used only once.';
 
   return (
-    <main className="min-h-screen bg-white text-slate-900 lg:grid lg:h-screen lg:grid-cols-[minmax(500px,49%)_1fr] lg:overflow-hidden" id="auth-page">
-      <section className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-8 sm:px-8 lg:h-screen lg:min-h-0 lg:overflow-y-auto lg:bg-white lg:px-12 lg:py-10 xl:px-16">
-        <div className="w-full max-w-[430px]">
-          <div className="mb-9 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3" aria-label="Xirfad Qardho">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
-                <Wrench className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <div className="leading-none">
-                <span className="block text-xl font-black tracking-tight text-slate-950">Xirfad</span>
-                <span className="mt-1 block text-xs font-black uppercase tracking-wider text-blue-600">Qardho</span>
-              </div>
-            </div>
-            <div className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-black text-slate-600 shadow-sm sm:flex">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Local network</span>
-            </div>
+    <main className="relative min-h-[calc(100dvh-70px)] overflow-hidden bg-slate-950 lg:grid lg:grid-cols-[minmax(28rem,46%)_1fr]">
+      <img key={images[imageIndex].src} src={images[imageIndex].src} alt="" className="absolute inset-0 h-full w-full object-cover opacity-70 transition-opacity duration-700 motion-reduce:transition-none lg:hidden" width="1200" height="900" loading={imageIndex === 0 ? 'eager' : 'lazy'} decoding="async" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/55 via-slate-950/75 to-slate-950/90 lg:hidden" />
+
+      <section className="relative z-10 flex min-h-[calc(100dvh-70px)] items-center justify-center px-4 py-8 sm:px-8 lg:bg-[#f6fbf8] lg:px-12">
+        <div className="w-full max-w-md rounded-3xl border border-white/15 bg-white/95 p-5 shadow-2xl backdrop-blur-xl sm:p-8 lg:border-emerald-950/10 lg:bg-white">
+          <div className="flex items-center justify-between gap-3">
+            <Link to={PAGE_ROUTES.home} className="inline-flex items-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060] focus-visible:ring-offset-2"><img src="/assets/suuqa-Xirfadaha-logo.png" alt="Qardho Skilled Platform" className="h-12 w-36 object-contain object-left" width="1536" height="1024" decoding="async" /></Link>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-black text-emerald-800"><ShieldCheck className="h-3.5 w-3.5" />Private session</span>
           </div>
 
-          <div className="mb-8">
-            <p className="mb-4 inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-blue-700">
-              <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-              Qardho skilled-trade platform
-            </p>
-            <h1 className="text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl">
-              {isLoginTab ? 'Sign in to your account' : 'Create your Xirfad account'}
-            </h1>
-            <p className="mt-3 max-w-sm text-sm font-medium leading-6 text-slate-500">
-              {isLoginTab ? 'Access your dashboard, job activity, applications, and hiring connections.' : 'Create an account and go straight to onboarding.'}
-            </p>
+          <div className="mt-8">
+            <p className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-[#008060]"><MapPin className="h-3.5 w-3.5" />Qardho local work network</p>
+            <h1 className="mt-3 text-3xl font-black text-slate-950">{title}</h1>
+            <p className="mt-2 text-sm font-medium leading-6 text-slate-600">{description}</p>
           </div>
 
-          <div className="mb-6 grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-100 p-1">
-            <Link to={PAGE_ROUTES.auth} onClick={() => setFeedback(null)} className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${isLoginTab ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/80' : 'text-slate-500 hover:text-slate-900'}`}>
-              <LogIn className="h-4 w-4" aria-hidden="true" />
-              <span>Sign In</span>
-            </Link>
-            <Link to={PAGE_ROUTES.register} onClick={() => setFeedback(null)} className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${!isLoginTab ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/80' : 'text-slate-500 hover:text-slate-900'}`}>
-              <UserPlus className="h-4 w-4" aria-hidden="true" />
-              <span>Create Account</span>
-            </Link>
-          </div>
+          {feedback && <div className={`mt-5 rounded-xl border p-3 text-sm font-bold ${feedback.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`} role="status">{feedback.message}</div>}
+          {errors.token && <p className="mt-4 text-sm font-bold text-rose-700">{errors.token}</p>}
 
-          {isLoginTab && (
-            <div className="mb-5 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => runDemoLogin('worker')} disabled={loading} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">Demo Worker</button>
-              <button type="button" onClick={() => runDemoLogin('employer')} disabled={loading} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">Demo Employer</button>
-              <button type="button" onClick={() => runDemoLogin('admin')} disabled={loading} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:opacity-60">Demo Admin</button>
-            </div>
-          )}
+          <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
+            {mode === 'register' && <div><label htmlFor="auth-name" className="mb-1.5 block text-sm font-bold">Full name</label><div className="relative"><User className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" /><input id="auth-name" value={name} onChange={(e) => setName(e.target.value)} className={`${fieldClass('name')} pl-11`} autoComplete="name" placeholder="Amina Yusuf" /></div>{errors.name && <p className="mt-1 text-xs font-bold text-rose-600">{errors.name}</p>}</div>}
 
-          <form onSubmit={handleSubmit} className="space-y-4" id="auth-submit-form" noValidate>
-            {feedback && (
-              <div className={`rounded-xl border p-3.5 text-xs font-bold ${feedback.type === 'success' ? 'border-emerald-100 bg-emerald-50 text-emerald-800' : 'border-red-100 bg-red-50 text-red-800'}`}>
-                {feedback.message}
-              </div>
-            )}
+            {mode === 'login' && <div><label htmlFor="auth-identifier" className="mb-1.5 block text-sm font-bold">Email or phone</label><div className="relative"><Mail className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" /><input id="auth-identifier" value={identifier} onChange={(e) => setIdentifier(e.target.value)} className={`${fieldClass('identifier')} pl-11`} autoComplete="username" placeholder="name@example.com or +252..." /></div>{errors.identifier && <p className="mt-1 text-xs font-bold text-rose-600">{errors.identifier}</p>}</div>}
 
-            <div className="space-y-3">
-              {!isLoginTab && (
-                <div>
-                  <label className={labelClass}>Full Name *</label>
-                  <div className="relative">
-                    <User className="pointer-events-none absolute left-3.5 top-4 h-4 w-4 text-slate-400" />
-                    <input type="text" value={name} onChange={(e) => { setName(e.target.value); clearFieldError('name'); }} placeholder="Ahmed Mohamed" className={`${inputClass} ${inputStateClass('name')}`} aria-invalid={!!fieldErrors.name} />
-                  </div>
-                  {fieldErrors.name && <p className="mt-1 text-[11px] font-semibold text-red-600">{fieldErrors.name}</p>}
-                </div>
-              )}
+            {(mode === 'register' || mode === 'forgot') && <div><label htmlFor="auth-email" className="mb-1.5 block text-sm font-bold">Email {mode === 'register' && <span className="font-medium text-slate-400">(optional)</span>}</label><div className="relative"><Mail className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" /><input id="auth-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={`${fieldClass('email')} pl-11`} autoComplete="email" placeholder="name@example.com" /></div>{errors.email && <p className="mt-1 text-xs font-bold text-rose-600">{errors.email}</p>}</div>}
 
-              {isLoginTab ? (
-                <div>
-                  <label className={labelClass}>Email Address or Phone Number *</label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3.5 top-4 h-4 w-4 text-slate-400" />
-                    <input type="text" value={loginIdentifier} onChange={(e) => { setLoginIdentifier(e.target.value); clearFieldError('loginIdentifier'); }} placeholder="name@example.com or +252..." className={`${inputClass} ${inputStateClass('loginIdentifier')}`} aria-invalid={!!fieldErrors.loginIdentifier} />
-                  </div>
-                  {fieldErrors.loginIdentifier && <p className="mt-1 text-[11px] font-semibold text-red-600">{fieldErrors.loginIdentifier}</p>}
-                </div>
-              ) : (
-                <div>
-                  <label className={labelClass}>Email Address (Optional)</label>
-                  <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3.5 top-4 h-4 w-4 text-slate-400" />
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" className={`${inputClass} border-slate-200`} />
-                  </div>
-                </div>
-              )}
+            {mode === 'register' && <>
+              <div><label htmlFor="auth-phone" className="mb-1.5 block text-sm font-bold">Phone number</label><div className="flex gap-2"><input aria-label="Phone country code" value={countryCode} onChange={(e) => setCountryCode(e.target.value.replace(/[^\d+]/g, '').slice(0, 5))} className={`${fieldClass('countryCode')} w-24 shrink-0`} /><div className="relative min-w-0 flex-1"><Phone className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" /><input id="auth-phone" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className={`${fieldClass('phone')} pl-11`} placeholder="90 123 4567" /></div></div>{(errors.countryCode || errors.phone) && <p className="mt-1 text-xs font-bold text-rose-600">{errors.countryCode || errors.phone}</p>}</div>
+              <div><label htmlFor="auth-whatsapp" className="mb-1.5 block text-sm font-bold">WhatsApp number <span className="font-medium text-slate-400">(optional)</span></label><div className="flex gap-2"><input aria-label="WhatsApp country code" value={whatsappCountryCode} onChange={(e) => setWhatsappCountryCode(e.target.value.replace(/[^\d+]/g, '').slice(0, 5))} className={`${fieldClass('whatsappPhone')} w-24 shrink-0`} /><input id="auth-whatsapp" inputMode="tel" value={whatsappPhone} onChange={(e) => setWhatsappPhone(e.target.value)} className={fieldClass('whatsappPhone')} placeholder="90 123 4567" /></div>{errors.whatsappPhone ? <p className="mt-1 text-xs font-bold text-rose-600">{errors.whatsappPhone}</p> : <p className="mt-1 text-xs font-medium text-slate-500">Used only for approved job contacts. It is not shown publicly.</p>}</div>
+            </>}
 
-              {!isLoginTab && (
-                <div>
-                  <label className={labelClass} htmlFor="signup-phone-local">Somali Phone Number *</label>
-                  <div className={`flex h-12 w-full items-center rounded-lg border bg-white text-sm font-semibold text-slate-900 transition focus-within:border-blue-600 focus-within:ring-4 focus-within:ring-blue-600/10 ${inputStateClass('phone')}`}>
-                    <div className="flex h-full shrink-0 items-center gap-2 pl-3.5 pr-3 text-slate-500">
-                      <Phone className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                      <span className="font-black text-slate-700">+252</span>
-                    </div>
-                    <div className="h-6 w-px bg-slate-200" aria-hidden="true" />
-                    <input id="signup-phone-local" type="tel" inputMode="numeric" autoComplete="tel-national" value={phone} onChange={(e) => handlePhoneChange(e.target.value)} placeholder="90 123 4567" className="h-full min-w-0 flex-1 rounded-r-lg border-0 bg-transparent px-3 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400" maxLength={9} aria-invalid={!!fieldErrors.phone} />
-                  </div>
-                  {fieldErrors.phone ? <p className="mt-1 text-[11px] font-semibold text-red-600">{fieldErrors.phone}</p> : <p className="mt-1.5 text-[11px] font-semibold text-slate-400">Saved as {phone.length === 9 ? formatSomaliPhone(phone) : '+252 90 123 4567'}.</p>}
-                </div>
-              )}
+            {(mode === 'login' || mode === 'register' || mode === 'reset') && <div><div className="mb-1.5 flex items-center justify-between"><label htmlFor="auth-password" className="text-sm font-bold">{mode === 'reset' ? 'New password' : 'Password'}</label>{mode === 'login' && <Link to={PAGE_ROUTES['forgot-password']} className="text-xs font-black text-[#00715a] hover:underline">Forgot password?</Link>}</div><div className="relative"><Lock className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" /><input id="auth-password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className={`${fieldClass('password')} px-11`} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /><button type="button" onClick={() => setShowPassword((show) => !show)} className="absolute right-1 top-1 inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>{errors.password && <p className="mt-1 text-xs font-bold text-rose-600">{errors.password}</p>}</div>}
 
-              <div>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-600">Password *</label>
-                  {isLoginTab && <button type="button" onClick={forgotPassword} className="text-[11px] font-black text-blue-600 hover:text-blue-800">Forgot password?</button>}
-                </div>
-                <div className="relative">
-                  <Lock className="pointer-events-none absolute left-3.5 top-4 h-4 w-4 text-slate-400" />
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => { setPassword(e.target.value); clearFieldError('password'); }} placeholder="Enter your password" className={`${passwordInputClass} ${inputStateClass('password')}`} aria-invalid={!!fieldErrors.password} />
-                  <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-lg text-slate-400 transition hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}>
-                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-                  </button>
-                </div>
-                {fieldErrors.password ? <p className="mt-1 text-[11px] font-semibold text-red-600">{fieldErrors.password}</p> : !isLoginTab && <p className={`mt-1 text-[11px] font-semibold ${passwordIsLongEnough ? 'text-emerald-600' : 'text-slate-400'}`}>{passwordIsLongEnough ? 'Password length is good.' : 'Use at least 8 characters.'}</p>}
-              </div>
-            </div>
+            {mode === 'reset' && <div><label htmlFor="auth-confirm" className="mb-1.5 block text-sm font-bold">Confirm new password</label><input id="auth-confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={fieldClass('confirmPassword')} autoComplete="new-password" />{errors.confirmPassword && <p className="mt-1 text-xs font-bold text-rose-600">{errors.confirmPassword}</p>}</div>}
 
-            <button type="submit" disabled={loading} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-600/25 disabled:cursor-not-allowed disabled:opacity-50" id="btn-auth-submit">
-              {loading ? <span>Processing...</span> : isLoginTab ? <><LogIn className="h-4 w-4" /><span>Sign In</span><ArrowRight className="h-4 w-4" /></> : <><UserPlus className="h-4 w-4" /><span>Create Account and Continue</span><ArrowRight className="h-4 w-4" /></>}
-            </button>
+            <button type="submit" disabled={loading} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-[#008060] px-5 text-sm font-black text-white shadow-lg shadow-emerald-900/15 hover:bg-[#006b50] disabled:cursor-not-allowed disabled:opacity-60">{loading ? <><Loader2 className="h-4 w-4 animate-spin" />Please wait...</> : mode === 'login' ? <>Sign In<ArrowRight className="h-4 w-4" /></> : mode === 'register' ? <><UserPlus className="h-4 w-4" />Create account</> : mode === 'forgot' ? <>Send reset link<Mail className="h-4 w-4" /></> : <><CheckCircle2 className="h-4 w-4" />Update password</>}</button>
           </form>
 
-          <p className="mt-6 text-center text-xs font-semibold leading-5 text-slate-400">Built for workers, employers, and local job coordination in Qardho.</p>
+          <div className="mt-6 text-center text-sm font-semibold text-slate-600">
+            {mode === 'login' && <>Don't have an account? <Link to={PAGE_ROUTES.register} className="font-black text-[#00715a] hover:underline">Create an account</Link></>}
+            {mode === 'register' && <>Already have an account? <Link to={PAGE_ROUTES.auth} className="font-black text-[#00715a] hover:underline">Sign in</Link></>}
+            {(mode === 'forgot' || mode === 'reset') && <Link to={PAGE_ROUTES.auth} className="font-black text-[#00715a] hover:underline">Back to sign in</Link>}
+          </div>
+          {mode === 'login' && (
+            <div className="mt-5 border-t border-slate-200 pt-5">
+              <p className="text-center text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Demo quick sign in</p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <button type="button" disabled={loading} onClick={() => quickLogin('+252 90 779 1234')} className="min-h-10 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">Worker</button>
+                <button type="button" disabled={loading} onClick={() => quickLogin('employer1@qardho.com')} className="min-h-10 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">Employer</button>
+                <button type="button" disabled={loading} onClick={() => quickLogin('admin@qardho.com')} className="min-h-10 rounded-xl border border-slate-200 bg-white px-2 text-xs font-black text-slate-700 hover:border-emerald-300 hover:bg-emerald-50">Admin</button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
-      <aside className="relative hidden h-screen overflow-hidden bg-slate-950 lg:block" aria-label="Qardho skilled trade gallery">
-        <img src={galleryBackdrop} alt="" className="absolute inset-0 h-full w-full object-cover opacity-20" loading="eager" decoding="async" />
-        <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(15,23,42,0.94),rgba(15,23,42,0.62)_42%,rgba(37,99,235,0.24))]" />
-        <div className="relative z-10 flex h-full flex-col p-7 xl:p-9">
-          <div className="flex items-center justify-between gap-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-black uppercase tracking-wider text-white backdrop-blur-md">
-              <CheckCircle2 className="h-4 w-4 text-emerald-300" aria-hidden="true" />
-              <span>Workers, jobs, and local hiring</span>
-            </div>
-          </div>
-          <div className="my-auto grid h-[68vh] max-h-[700px] min-h-[470px] grid-cols-12 grid-rows-12 gap-4 xl:gap-5">
-            {galleryImages.map((image, index) => (
-              <div key={image.src} className={`${index === 0 ? 'col-span-7 row-span-8' : index === 3 ? 'col-span-7 row-span-4' : 'col-span-5 row-span-4'} overflow-hidden rounded-2xl border border-white/15 bg-white/10 shadow-2xl shadow-slate-950/35`}>
-                <img src={image.src} alt={image.alt} className={`h-full w-full object-cover ${image.className}`} loading={index === 0 ? 'eager' : 'lazy'} decoding="async" />
-              </div>
-            ))}
-          </div>
-          <div className="max-w-xl pb-2">
-            <div className="mb-4 flex flex-wrap gap-2">
-              {['Solar', 'Construction', 'Tailoring', 'Teaching', 'Farming'].map((trade) => <span key={trade} className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-black text-white backdrop-blur-md">{trade}</span>)}
-            </div>
-            <h2 className="text-3xl font-black leading-tight tracking-tight text-white xl:text-4xl">A practical way to coordinate local skilled work.</h2>
-            <p className="mt-4 max-w-lg text-sm font-semibold leading-6 text-slate-300">Sign in, choose your role, complete your profile, and continue into the right workflow.</p>
-          </div>
+      <aside className="relative hidden min-h-[calc(100dvh-70px)] overflow-hidden lg:block">
+        <img key={images[imageIndex].src} src={images[imageIndex].src} alt={images[imageIndex].alt} className="absolute inset-0 h-full w-full object-cover transition-opacity duration-700 motion-reduce:transition-none" width="1400" height="1050" loading={imageIndex === 0 ? 'eager' : 'lazy'} decoding="async" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/30 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-10 text-white">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black backdrop-blur-md"><BriefcaseBusiness className="h-4 w-4 text-[#b7f25c]" />Workers, jobs, and safer local contact</span>
+          <h2 className="mt-5 max-w-xl text-4xl font-black leading-tight">Review the details before you make the connection.</h2>
+          <p className="mt-3 max-w-lg text-sm font-semibold leading-6 text-white/75">Private contact details unlock only after an application or hiring request is accepted.</p>
         </div>
       </aside>
     </main>

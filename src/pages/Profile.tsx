@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { User, Save, MapPin, Phone, Briefcase, DollarSign, Edit3, CheckCircle, Bell, Star, ArrowLeft, Send, ShieldCheck, Trash2 } from 'lucide-react';
-import { User as UserType, Review, Connection, Job, Application } from '../types';
+import React, { useEffect, useState } from 'react';
+import { User, Save, MapPin, Phone, Briefcase, DollarSign, Edit3, CheckCircle, Bell, Star, ArrowLeft, Send, ShieldCheck, Trash2, Upload, ImageOff, Settings } from 'lucide-react';
+import { User as UserType, Review, Connection, Job, Application, PricingType } from '../types';
 import { QARDHO_NEIGHBORHOODS } from '../constants';
+import Avatar from '../components/Avatar';
 
 interface ProfileProps {
   currentUser: UserType | null;
   userToShow?: UserType | null;
-  onUpdateProfile: (updatedProfile: UserType) => void;
+  onUpdateProfile: (updatedProfile: UserType) => void | Promise<void>;
+  onAvatarUpdated?: (user: UserType) => void;
   onSwitchRole: () => void;
   reviews: Review[];
   jobs: Job[];
@@ -21,7 +23,8 @@ interface ProfileProps {
 export default function Profile({ 
   currentUser, 
   userToShow, 
-  onUpdateProfile, 
+  onUpdateProfile,
+  onAvatarUpdated,
   onSwitchRole,
   reviews = [],
   jobs = [],
@@ -42,13 +45,27 @@ export default function Profile({
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(currentUser.name);
   const [phone, setPhone] = useState(currentUser.phone || '');
+  const [whatsappPhone, setWhatsappPhone] = useState(currentUser.whatsappPhone || '');
   const [location, setLocation] = useState(currentUser.location || '');
   const [skill, setSkill] = useState(currentUser.skill || '');
   const [bio, setBio] = useState(currentUser.bio || '');
   const [rate, setRate] = useState(currentUser.rate || '');
+  const [gender, setGender] = useState<UserType['gender']>(currentUser.gender);
+  const [pricingType, setPricingType] = useState<PricingType | ''>(currentUser.pricingType || '');
+  const [pricingAmount, setPricingAmount] = useState(currentUser.pricingAmount?.toString() || '');
+  const [pricingCurrency, setPricingCurrency] = useState(currentUser.pricingCurrency || 'USD');
+  const [pricingNote, setPricingNote] = useState(currentUser.pricingNote || '');
   const [availability, setAvailability] = useState(currentUser.availability || 'available');
   const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(currentUser.smsNotificationsEnabled ?? true);
   const [successMsg, setSuccessMsg] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(targetUser.avatarUrl || '');
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarState, setAvatarState] = useState<'idle' | 'uploading' | 'error'>('idle');
+  const [avatarError, setAvatarError] = useState('');
+  const [deletePhrase, setDeletePhrase] = useState('');
 
   // Review submission states
   const [newRating, setNewRating] = useState<number>(5);
@@ -57,23 +74,85 @@ export default function Profile({
   const [reviewSuccess, setReviewSuccess] = useState<string>('');
   const [ratingHover, setRatingHover] = useState<number | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const isDirty = isEditing && [name !== currentUser.name, phone !== (currentUser.phone || ''), whatsappPhone !== (currentUser.whatsappPhone || ''), location !== (currentUser.location || ''), skill !== (currentUser.skill || ''), bio !== (currentUser.bio || ''), rate !== (currentUser.rate || ''), availability !== (currentUser.availability || 'available'), smsNotificationsEnabled !== (currentUser.smsNotificationsEnabled ?? true), gender !== currentUser.gender, pricingType !== (currentUser.pricingType || ''), pricingAmount !== (currentUser.pricingAmount?.toString() || ''), pricingCurrency !== (currentUser.pricingCurrency || 'USD'), pricingNote !== (currentUser.pricingNote || '')].some(Boolean);
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => { if (isDirty) event.preventDefault(); };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [isDirty]);
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
+    if (!name.trim() || !phone.trim()) { setSaveError('Name and phone are required.'); return; }
+    if (pricingAmount && Number(pricingAmount) < 0) { setSaveError('Pricing amount cannot be negative.'); return; }
     const updated: UserType = {
       ...currentUser,
       name,
       phone,
+      whatsappPhone: whatsappPhone || undefined,
       location,
       skill: currentUser.role === 'worker' ? skill : undefined,
       bio,
       rate: currentUser.role === 'worker' ? rate : undefined,
       availability: currentUser.role === 'worker' ? availability : currentUser.availability,
       smsNotificationsEnabled,
+      gender,
+      pricingType: pricingType || undefined,
+      pricingAmount: pricingAmount ? Number(pricingAmount) : undefined,
+      pricingCurrency,
+      pricingNote: pricingNote || undefined,
     };
-    onUpdateProfile(updated);
-    setIsEditing(false);
-    setSuccessMsg('Your profile has been successfully updated.');
-    setTimeout(() => setSuccessMsg(''), 4000);
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      await Promise.resolve(onUpdateProfile(updated));
+      setIsEditing(false);
+      setSuccessMsg('Your profile has been successfully updated.');
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch { setSaveError('Could not save your profile. Please try again.'); }
+    finally { setIsSaving(false); }
+  };
+
+  const chooseAvatar = (file?: File) => {
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setAvatarError('Choose a JPEG, PNG, or WebP image.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setAvatarError('Profile images must be 5 MB or smaller.'); return; }
+    setAvatarError('');
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setAvatarPreview(String(reader.result || ''));
+    reader.readAsDataURL(file);
+  };
+
+  const uploadAvatar = async () => {
+    if (!avatarPreview || !avatarFile || avatarState === 'uploading') return;
+    setAvatarState('uploading');
+    try {
+      const response = await fetch('/api/profile/avatar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageDataUrl: avatarPreview }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Upload failed.');
+      setAvatarUrl(data.avatarUrl);
+      setAvatarPreview('');
+      setAvatarFile(null);
+      onAvatarUpdated?.(data.user);
+      setSuccessMsg('Profile image updated.');
+      setAvatarState('idle');
+    } catch (error) { setAvatarError(error instanceof Error ? error.message : 'Upload failed.'); setAvatarState('error'); }
+  };
+
+  const removeAvatar = async () => {
+    setAvatarState('uploading');
+    try {
+      const response = await fetch('/api/profile/avatar', { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not remove image.');
+      setAvatarUrl('');
+      setAvatarPreview('');
+      setAvatarFile(null);
+      onAvatarUpdated?.(data.user);
+      setAvatarState('idle');
+    } catch (error) { setAvatarError(error instanceof Error ? error.message : 'Could not remove image.'); setAvatarState('error'); }
   };
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
@@ -99,16 +178,6 @@ export default function Profile({
       setTimeout(() => setReviewSuccess(''), 4000);
     }
   };
-  // Profile data for avatar initials
-  const colors = ['bg-blue-100 text-blue-800', 'bg-emerald-100 text-emerald-800', 'bg-purple-100 text-purple-800', 'bg-amber-100 text-amber-800', 'bg-rose-100 text-rose-800'];
-  const colorIndex = targetUser.name.charCodeAt(0) % colors.length;
-  const colorClass = colors[colorIndex];
-  
-  const initials = targetUser.name
-    .split(' ')
-    .map(n => n[0])
-    .slice(0, 2)
-    .join('');
 
   // Calculate rating stats for target user
   const targetReviews = reviews.filter(r => r.workerId === targetUser.id);
@@ -125,7 +194,7 @@ export default function Profile({
 
   const profileChecks = [
     { label: 'Basic info', complete: !!targetUser.name?.trim() && !!targetUser.bio?.trim(), weight: 40 },
-    { label: 'Skill and rate', complete: targetUser.role !== 'worker' || (!!targetUser.skill?.trim() && !!targetUser.rate?.trim()), weight: 30 },
+    { label: 'Professional info', complete: targetUser.role !== 'worker' || !!targetUser.skill?.trim(), weight: 30 },
     { label: 'Contact and availability', complete: !!targetUser.phone?.trim() && !!targetUser.location?.trim() && (targetUser.role !== 'worker' || !!targetUser.availability), weight: 30 },
   ];
   const profileStrength = profileChecks.reduce((total, item) => total + (item.complete ? item.weight : 0), 0);
@@ -135,6 +204,19 @@ export default function Profile({
     app.status === 'accepted'
   );
   const canSeeTargetPhone = isOwnProfile || hasHired || hasAcceptedApplicationForTarget;
+  const acceptedHireConnection = connections.find((connection) =>
+    connection.fromUserId === currentUser.id &&
+    connection.toUserId === targetUser.id &&
+    connection.status === 'accepted'
+  );
+  const acceptedApplicationForTarget = applications.find((application) =>
+    application.employerId === currentUser.id &&
+    application.applicantId === targetUser.id &&
+    application.status === 'accepted'
+  );
+  const approvedContactPhone = isOwnProfile
+    ? (targetUser.whatsappPhone || targetUser.phone)
+    : (acceptedHireConnection?.phone || acceptedApplicationForTarget?.phone);
   const completedReviewJobs = jobs.filter((job) => {
     if (job.employerId !== currentUser.id || job.status !== 'completed') return false;
     const acceptedApplication = applications.some((app) =>
@@ -171,9 +253,7 @@ export default function Profile({
         {/* Profile Header backdrop */}
         <div className="h-32 bg-gradient-to-r from-blue-500 to-sky-600 relative">
           <div className="absolute -bottom-10 left-8">
-            <div className={`h-20 w-20 rounded-2xl bg-white border-4 border-white shadow-md flex items-center justify-center font-extrabold text-xl tracking-wider ${colorClass}`}>
-              {initials}
-            </div>
+            <Avatar name={targetUser.name} src={isOwnProfile ? (avatarPreview || avatarUrl) : targetUser.avatarUrl} size="xl" eager className="border-4 border-white shadow-md" />
           </div>
         </div>
 
@@ -222,16 +302,6 @@ export default function Profile({
                   <Edit3 className="h-3.5 w-3.5" />
                   <span>Edit Profile</span>
                 </button>
-                {onRequestDeleteAccount && (
-                  <button
-                    onClick={onRequestDeleteAccount}
-                    className="inline-flex items-center justify-center space-x-1 px-3.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold shadow-xs cursor-pointer transition-all hover:bg-rose-100 hover:border-rose-300"
-                    id="remove-account-trigger"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    <span>Remove Account</span>
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -263,9 +333,25 @@ export default function Profile({
               <span>{successMsg}</span>
             </div>
           )}
+          {saveError && <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700" role="alert">{saveError}</div>}
+
+          {isOwnProfile && (
+            <section className="mb-6 rounded-2xl border border-emerald-950/10 bg-white p-4" aria-labelledby="profile-image-heading">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div><h2 id="profile-image-heading" className="text-sm font-black text-slate-950">Profile Image</h2><p className="mt-1 text-xs font-medium text-slate-500">JPEG, PNG, or WebP. Maximum 5 MB. The server crops and compresses it to WebP.</p></div>
+                <div className="flex flex-wrap gap-2">
+                  <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-slate-200 px-4 text-xs font-black hover:bg-slate-50"><Upload className="h-4 w-4" />Choose image<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => chooseAvatar(event.target.files?.[0])} /></label>
+                  {avatarPreview && <button type="button" onClick={uploadAvatar} disabled={avatarState === 'uploading'} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#008060] px-4 text-xs font-black text-white disabled:opacity-60"><Save className="h-4 w-4" />{avatarState === 'uploading' ? 'Uploading...' : 'Save image'}</button>}
+                  {(avatarUrl || avatarPreview) && <button type="button" onClick={avatarPreview ? () => { setAvatarPreview(''); setAvatarFile(null); } : removeAvatar} disabled={avatarState === 'uploading'} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-rose-200 px-4 text-xs font-black text-rose-700"><ImageOff className="h-4 w-4" />{avatarPreview ? 'Cancel preview' : 'Remove'}</button>}
+                </div>
+              </div>
+              {avatarError && <p className="mt-3 text-xs font-bold text-rose-600" role="alert">{avatarError}</p>}
+            </section>
+          )}
 
           {isEditing && isOwnProfile ? (
             <form onSubmit={handleSave} className="space-y-4" id="profile-edit-form">
+              <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#008060]">Personal Information</p><p className="mt-1 text-xs font-medium text-slate-500">Keep your public name and basic details accurate.</p></div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Full Name</label>
@@ -289,6 +375,11 @@ export default function Profile({
                     required
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div><label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">WhatsApp Number (Optional)</label><input type="tel" value={whatsappPhone} onChange={(event) => setWhatsappPhone(event.target.value)} placeholder="+252..." className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#008060] focus:ring-2 focus:ring-emerald-500/10" /><p className="mt-1 text-[11px] text-slate-500">Shared only after an application or hiring request is accepted.</p></div>
+                <div><label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">Gender (Optional)</label><select value={gender || ''} onChange={(event) => setGender((event.target.value || undefined) as UserType['gender'])} className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#008060]"><option value="">Not specified</option><option value="male">Male</option><option value="female">Female</option><option value="prefer_not_to_say">Prefer not to say</option></select></div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -348,6 +439,8 @@ export default function Profile({
                 </div>
               )}
 
+              {currentUser.role === 'worker' && <fieldset className="rounded-2xl border border-slate-100 p-4"><legend className="px-2 text-xs font-black uppercase tracking-[0.18em] text-[#008060]">Professional Pricing (Optional)</legend><div className="grid gap-3 sm:grid-cols-3"><select value={pricingType} onChange={(event) => setPricingType(event.target.value as PricingType | '')} className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold"><option value="">No pricing type</option><option value="project">Per project</option><option value="hour">Per hour</option><option value="day">Per day</option></select><input type="number" min="0" step="0.01" value={pricingAmount} onChange={(event) => setPricingAmount(event.target.value)} placeholder="Amount" className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold" /><input value={pricingCurrency} onChange={(event) => setPricingCurrency(event.target.value.toUpperCase().slice(0, 8))} aria-label="Pricing currency" className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-black" /></div><input value={pricingNote} onChange={(event) => setPricingNote(event.target.value)} placeholder="Optional pricing note" className="mt-3 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold" /></fieldset>}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Bio / Profile Description</label>
                 <textarea
@@ -398,10 +491,11 @@ export default function Profile({
                 </button>
                 <button
                   type="submit"
+                  disabled={isSaving}
                   className="flex-1 inline-flex items-center justify-center space-x-1.5 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-sm cursor-pointer"
                 >
                   <Save className="h-3.5 w-3.5" />
-                  <span>Save Profile</span>
+                  <span>{isSaving ? 'Saving...' : 'Save Profile'}</span>
                 </button>
               </div>
             </form>
@@ -421,7 +515,7 @@ export default function Profile({
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Direct Phone Contact</span>
                   <div className="flex items-center text-sm font-semibold text-slate-800">
                     <Phone className="h-4 w-4 text-slate-400 mr-1.5 shrink-0" />
-                    <span>{canSeeTargetPhone ? (targetUser.phone || 'No phone set yet') : 'Contact unlocks after accepted application or hire request.'}</span>
+                    <span>{canSeeTargetPhone ? (approvedContactPhone || 'No phone set yet') : 'Contact unlocks after accepted application or hire request.'}</span>
                   </div>
                 </div>
 
@@ -624,7 +718,7 @@ export default function Profile({
                                 className="inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-lg cursor-pointer"
                               >
                                 <Send className="h-3 w-3" />
-                                <span>Connect & Hire Now</span>
+                                <span>Send Job Offer</span>
                               </button>
                             )}
                           </div>
@@ -676,6 +770,24 @@ export default function Profile({
               )}
 
             </div>
+          )}
+
+          {isOwnProfile && (
+            <section className="mt-8 rounded-2xl border border-emerald-950/10 bg-slate-50 p-5" aria-labelledby="more-settings-heading">
+              <div className="flex items-start gap-3"><Settings className="mt-0.5 h-5 w-5 text-[#008060]" /><div><h2 id="more-settings-heading" className="text-base font-black text-slate-950">More Settings</h2><p className="mt-1 text-sm font-medium leading-6 text-slate-600">Switching changes your dashboard and main navigation. Compatible profile information is preserved; worker-specific details may need to be completed.</p></div></div>
+              {['worker', 'employer'].includes(currentUser.role || '') && <button type="button" onClick={onSwitchRole} className="mt-4 min-h-11 rounded-full border border-emerald-200 bg-white px-4 text-sm font-black text-[#00715a] hover:bg-emerald-50">Switch to {currentUser.role === 'worker' ? 'Employer' : 'Worker'} role</button>}
+            </section>
+          )}
+
+          {isOwnProfile && onRequestDeleteAccount && (
+            <section className="mt-8 border-t-2 border-rose-200 pt-8" aria-labelledby="danger-zone-heading">
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
+                <div className="flex items-start gap-3"><Trash2 className="mt-0.5 h-5 w-5 text-rose-700" /><div><h2 id="danger-zone-heading" className="text-base font-black text-rose-950">Danger Zone</h2><p className="mt-1 text-sm font-medium leading-6 text-rose-800">Deleting your account permanently removes your profile and related platform records. This cannot be undone.</p></div></div>
+                <label htmlFor="delete-confirmation" className="mt-4 block text-sm font-black text-rose-950">Type <span className="font-mono">I confirm</span> exactly</label>
+                <input id="delete-confirmation" value={deletePhrase} onChange={(event) => setDeletePhrase(event.target.value)} autoComplete="off" className="mt-2 min-h-11 w-full rounded-xl border border-rose-200 bg-white px-4 text-sm font-semibold outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10" />
+                <button type="button" onClick={onRequestDeleteAccount} disabled={deletePhrase !== 'I confirm'} className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-rose-700 px-5 text-sm font-black text-white hover:bg-rose-800 disabled:cursor-not-allowed disabled:bg-rose-300"><Trash2 className="h-4 w-4" />Delete account permanently</button>
+              </div>
+            </section>
           )}
         </div>
       </div>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildVerificationMessageText, getMissingProfileFields, isEmailLike, isSomaliPhone, isValidRating, normalizeOptionalEmail, normalizePhone } from '../src/validation';
+import { buildVerificationMessageText, getMissingProfileFields, hasMinimumJobDescription, hasMinimumJobRequirements, isEmailLike, isNonNegativePrice, isSomaliPhone, isValidRating, normalizeInternationalPhone, normalizeOptionalEmail, normalizePhone } from '../src/validation';
 
 test('normalizes phone numbers by removing spaces and dashes', () => {
   assert.equal(normalizePhone('+252 90-700 1122'), '+252907001122');
@@ -43,7 +43,27 @@ test('detects common and worker-specific missing profile fields', () => {
     skill: '',
     rate: '',
     availability: undefined,
-  }), ['location', 'bio', 'skill', 'rate', 'availability']);
+  }), ['location', 'bio', 'skill', 'availability']);
+});
+
+test('validates optional non-negative prices', () => {
+  assert.equal(isNonNegativePrice(''), true);
+  assert.equal(isNonNegativePrice(0), true);
+  assert.equal(isNonNegativePrice(25.5), true);
+  assert.equal(isNonNegativePrice(-1), false);
+});
+
+test('enforces job description and requirements minimums', () => {
+  assert.equal(hasMinimumJobDescription('a'.repeat(99)), false);
+  assert.equal(hasMinimumJobDescription('a'.repeat(100)), true);
+  assert.equal(hasMinimumJobRequirements('a'.repeat(49)), false);
+  assert.equal(hasMinimumJobRequirements('a'.repeat(50)), true);
+});
+
+test('normalizes international WhatsApp numbers', () => {
+  assert.equal(normalizeInternationalPhone('+252 90 700 1122'), '+252907001122');
+  assert.equal(normalizeInternationalPhone('252907001122'), '+252907001122');
+  assert.equal(normalizeInternationalPhone('123'), null);
 });
 
 test('does not require worker-only fields from employers', () => {

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Connection, Application, Job, JobStatus, User, Review, VerificationMessage } from '../types';
 import {
   Users, Briefcase, FileText, Check, X, Phone, MapPin,
-  Clock, CheckCircle2, RefreshCw, PlusCircle, Star, ArrowRight, Copy, Filter
+  Clock, CheckCircle2, RefreshCw, PlusCircle, Star, ArrowRight, Copy
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { getMissingProfileFields, PROFILE_FIELD_LABELS } from '../validation';
@@ -45,7 +45,6 @@ export default function Dashboard({
   onReadVerificationMessage
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<'progress' | 'connections' | 'applications' | 'jobs'>('progress');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'pending' | 'active' | 'completed' | 'needs_review'>('all');
   const [actionKey, setActionKey] = useState<string | null>(null);
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
@@ -106,11 +105,11 @@ export default function Dashboard({
   const getWorker = (id?: string) => workers.find(worker => worker.id === id);
   const reviewReadyJobs = myPostedJobs.filter(job => job.status === 'completed' && !isJobReviewed(job));
   const completionRequests = isWorker
-    ? workerProgressItems.filter(item => item.job.status === 'in_progress' && item.job.completionRequestedAt).length
-    : employerProgressJobs.filter(job => job.status === 'in_progress' && job.completionRequestedAt).length;
+    ? workerProgressItems.filter(item => item.job.status === 'completion_requested_by_employer').length
+    : employerProgressJobs.filter(job => job.status === 'completion_requested_by_worker').length;
   const activeJobsCount = isWorker
-    ? workerProgressItems.filter(item => item.job.status === 'in_progress').length
-    : employerProgressJobs.filter(job => job.status === 'in_progress').length;
+    ? workerProgressItems.filter(item => ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer'].includes(item.job.status)).length
+    : employerProgressJobs.filter(job => ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer'].includes(job.status)).length;
 
   const missingProfileFields = getMissingProfileFields(currentUser);
 
@@ -122,16 +121,17 @@ export default function Dashboard({
 
   const cleanPhoneHref = (phone: string) => `tel:${phone.replace(/[^+\d]/g, '')}`;
 
-  const ContactActions = ({ phone, label = 'Phone' }: { phone?: string; label?: string }) => {
+  const ContactActions = ({ phone, label = 'Phone', whatsappMessage }: { phone?: string; label?: string; whatsappMessage?: string }) => {
     if (!phone) return <span className="text-[11px] italic text-slate-400">Phone not shared</span>;
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800">
-          <Phone className="h-3.5 w-3.5 text-blue-600" />
+          <Phone className="h-3.5 w-3.5 text-[#008060]" />
           <span className="text-slate-500">{label}:</span>
           <span className="font-mono text-slate-950 select-all">{phone}</span>
         </span>
         <a href={cleanPhoneHref(phone)} className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-900 px-2.5 text-[11px] font-black text-white hover:bg-slate-800">Call</a>
+        {whatsappMessage && <a href={`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center justify-center rounded-md bg-[#25D366] px-2.5 text-[11px] font-black text-slate-950 hover:bg-[#20bd5a]">WhatsApp</a>}
         <button onClick={() => copyPhone(phone)} className="inline-flex min-h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-black text-slate-700 hover:bg-slate-50">
           <Copy className="h-3 w-3" />
           {copiedPhone === phone ? 'Copied' : 'Copy'}
@@ -163,8 +163,13 @@ export default function Dashboard({
   const getJobStatusBadge = (status: JobStatus) => {
     const styles = {
       open: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      in_progress: 'bg-blue-50 text-blue-700 border-blue-100',
+      in_progress: 'bg-[#b7f25c]/35 text-[#005f49] border-[#b7f25c]/70',
+      active: 'bg-[#b7f25c]/35 text-[#005f49] border-[#b7f25c]/70',
+      completion_requested_by_worker: 'bg-amber-50 text-amber-700 border-amber-100',
+      completion_requested_by_employer: 'bg-amber-50 text-amber-700 border-amber-100',
       completed: 'bg-slate-100 text-slate-700 border-slate-200',
+      completion_disputed: 'bg-rose-50 text-rose-700 border-rose-100',
+      cancelled: 'bg-slate-100 text-slate-600 border-slate-200',
       closed: 'bg-rose-50 text-rose-700 border-rose-100',
     }[status];
     return (
@@ -178,7 +183,7 @@ export default function Dashboard({
     { label: 'Posted', done: true },
     { label: 'Applied', done: hasApplication },
     { label: 'Accepted', done: hasAccepted },
-    { label: 'In progress', done: job.status === 'in_progress' || job.status === 'completed' },
+    { label: 'In progress', done: ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer', 'completed'].includes(job.status) },
     { label: 'Completed', done: job.status === 'completed' },
     { label: 'Reviewed', done: reviewed },
   ];
@@ -191,7 +196,7 @@ export default function Dashboard({
       { label: 'Applied', done: true },
       { label: 'Reviewed', done: decided },
       { label: app.status === 'declined' ? 'Declined' : 'Accepted', done: decided },
-      { label: 'Active job', done: app.status === 'accepted' && (job?.status === 'in_progress' || job?.status === 'completed') },
+      { label: 'Active job', done: app.status === 'accepted' && !!job && ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer', 'completed'].includes(job.status) },
       { label: 'Completed', done: job?.status === 'completed' },
       { label: 'Reviewed', done: reviewed },
     ];
@@ -216,7 +221,7 @@ export default function Dashboard({
     const hasApplications = applications.some(app => app.jobId === job.id);
 
     return (
-      <article key={job.id} className="rounded-xl border border-slate-100 bg-white p-5 shadow-xs">
+      <article key={job.id} className="rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h3 className="text-sm font-black text-slate-900">{job.title}</h3>
@@ -229,22 +234,24 @@ export default function Dashboard({
           {job.status === 'open' && (
             <span className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">Next step: Accept an applicant</span>
           )}
-          {job.status === 'in_progress' && (
+          {['active', 'in_progress'].includes(job.status) && (
             <button
               onClick={() => openConfirmation({
                 title: 'Request worker completion?',
                 description: `This asks the assigned worker to confirm the work for "${job.title}" is finished. Reviews unlock after the worker confirms.`,
-                confirmLabel: job.completionRequestedAt ? 'Waiting...' : actionKey === `complete-${job.id}` ? 'Requesting...' : 'Request completion',
+                confirmLabel: actionKey === `complete-${job.id}` ? 'Requesting...' : 'Request completion',
                 tone: 'neutral',
                 actionKey: `complete-${job.id}`,
-                onConfirm: () => onUpdateJobStatus(job.id, 'completed'),
+                onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_employer'),
               })}
-              disabled={!!job.completionRequestedAt || actionKey === `complete-${job.id}`} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-blue-600 px-3 text-xs font-black text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+              disabled={actionKey === `complete-${job.id}`} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#008060] px-3 text-xs font-black text-white hover:bg-[#005f49] disabled:cursor-not-allowed disabled:bg-emerald-300"
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
-              {job.completionRequestedAt ? 'Waiting worker confirmation' : actionKey === `complete-${job.id}` ? 'Requesting...' : 'Request completion'}
+              {actionKey === `complete-${job.id}` ? 'Requesting...' : 'Request completion'}
             </button>
           )}
+          {job.status === 'completion_requested_by_employer' && <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">Waiting for the worker</span>}
+          {job.status === 'completion_requested_by_worker' && <><button onClick={() => openConfirmation({ title: 'Confirm job completion?', description: `Confirm that "${job.title}" is finished.`, confirmLabel: 'Confirm completion', tone: 'neutral', actionKey: `confirm-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completed') })} className="min-h-10 rounded-full bg-emerald-600 px-3 text-xs font-black text-white">Confirm completion</button><button onClick={() => openConfirmation({ title: 'Report a completion issue?', description: 'The job will remain unresolved and the dispute will be recorded.', confirmLabel: 'Report issue', tone: 'danger', actionKey: `dispute-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_disputed') })} className="min-h-10 rounded-full border border-rose-200 px-3 text-xs font-black text-rose-700">Report issue</button></>}
           {job.status === 'completed' && !reviewed && (
             <button onClick={() => { const reviewWorker = getWorker(job.assignedWorkerId || accepted?.applicantId); if (reviewWorker) onViewWorkerProfile(reviewWorker); else onNavigate('workers'); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-xs font-black text-white hover:bg-emerald-700">
               <Star className="h-3.5 w-3.5" />
@@ -278,7 +285,7 @@ export default function Dashboard({
   };
 
   const renderWorkerProgressCard = ({ application, job }: { application: Application; job: Job }) => (
-    <article key={application.id} className="rounded-xl border border-slate-100 bg-white p-5 shadow-xs">
+    <article key={application.id} className="rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-black text-slate-900">{job.title}</h3>
@@ -288,10 +295,10 @@ export default function Dashboard({
       </div>
       <Timeline steps={getTimelineSteps(job, true, true, reviews.some(review => review.jobId === job.id))} />
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {job.status === 'in_progress' && <span className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">{job.completionRequestedAt ? 'Employer requested completion' : 'Active job'}</span>}
+        {['active', 'in_progress'].includes(job.status) && <><span className="rounded-lg bg-[#b7f25c]/35 px-3 py-2 text-xs font-bold text-[#005f49]">Active job</span><button onClick={() => openConfirmation({ title: 'Request job completion?', description: `Ask the employer to confirm that "${job.title}" is finished.`, confirmLabel: 'Request completion', tone: 'neutral', actionKey: `worker-request-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_worker') })} className="min-h-10 rounded-full bg-[#008060] px-3 text-xs font-black text-white">Request completion</button></>}
         {job.status === 'completed' && <span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Completed</span>}
-        <ContactActions phone={job.phone} label="Employer" />
-        {job.status === 'in_progress' && job.completionRequestedAt && (
+        <ContactActions phone={job.phone} label="Employer" whatsappMessage={`Hello, my name is ${currentUser.name}. I am contacting you through Qardho Skilled Platform regarding the job "${job.title}". My application has been accepted, and I would like to discuss the next steps.`} />
+        {job.status === 'completion_requested_by_employer' && (
           <button
             onClick={() => openConfirmation({ title: 'Confirm work completed?', description: `This confirms you finished "${job.title}". The employer can review the job after this.`, confirmLabel: actionKey === `worker-complete-${job.id}` ? 'Confirming...' : 'Confirm completed', tone: 'neutral', actionKey: `worker-complete-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completed') })}
             disabled={actionKey === `worker-complete-${job.id}`}
@@ -301,30 +308,13 @@ export default function Dashboard({
             {actionKey === `worker-complete-${job.id}` ? 'Confirming...' : 'Confirm completed'}
           </button>
         )}
+        {job.status === 'completion_requested_by_employer' && <button onClick={() => openConfirmation({ title: 'Report a completion issue?', description: 'The job will remain unresolved and the issue will be recorded.', confirmLabel: 'Report issue', tone: 'danger', actionKey: `worker-dispute-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_disputed') })} className="min-h-10 rounded-full border border-rose-200 px-3 text-xs font-black text-rose-700">Report issue</button>}
+        {job.status === 'completion_requested_by_worker' && <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">Waiting for the employer</span>}
         <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 hover:bg-slate-50">View related job</button>
       </div>
     </article>
   );
 
-
-  const progressMatchesFilter = (job: Job) => {
-    if (quickFilter === 'all') return true;
-    if (quickFilter === 'active') return job.status === 'in_progress';
-    if (quickFilter === 'completed') return job.status === 'completed';
-    if (quickFilter === 'needs_review') return !isWorker && job.status === 'completed' && !isJobReviewed(job);
-    if (quickFilter === 'pending') return job.status === 'open';
-    return true;
-  };
-
-  const filteredEmployerProgressJobs = employerProgressJobs.filter(progressMatchesFilter);
-  const filteredWorkerProgressItems = workerProgressItems.filter(item => progressMatchesFilter(item.job));
-  const filteredApplications = myApplications.filter(app => {
-    if (quickFilter === 'all') return true;
-    if (quickFilter === 'pending') return app.status === 'pending';
-    if (quickFilter === 'active') return app.status === 'accepted';
-    if (quickFilter === 'completed') return getJobForApplication(app)?.status === 'completed';
-    return true;
-  });
 
   const tabCounts = {
     progress: isWorker ? workerProgressItems.length : employerProgressJobs.length,
@@ -334,7 +324,7 @@ export default function Dashboard({
   };
 
   const NeedsAttentionCard = ({ title, detail, action, onClick, tone = 'blue' }: { title: string; detail: string; action: string; onClick: () => void; tone?: 'blue' | 'amber' | 'emerald' }) => {
-    const toneClass = tone === 'amber' ? 'bg-amber-50 text-amber-800 border-amber-100' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-blue-50 text-blue-800 border-blue-100';
+    const toneClass = tone === 'amber' ? 'bg-amber-50 text-amber-800 border-amber-100' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-[#b7f25c]/30 text-[#005f49] border-[#b7f25c]/60';
     return (
       <button onClick={onClick} className={`min-h-28 rounded-xl border p-4 text-left transition hover:shadow-sm ${toneClass}`}>
         <span className="block text-sm font-black">{title}</span>
@@ -345,10 +335,10 @@ export default function Dashboard({
   };
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" id="dashboard-container">
-      <div className="mb-8 flex flex-col gap-5 rounded-2xl bg-slate-900 p-6 text-white sm:p-8 md:flex-row md:items-center md:justify-between">
+      <div className="mb-8 flex flex-col gap-5 rounded-2xl bg-[#111615] p-6 text-white shadow-xl shadow-emerald-950/15 sm:p-8 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-black sm:text-2xl">My Dashboard Panel</h1>
+            <h1 className="font-display text-xl font-black sm:text-2xl">My Dashboard Panel</h1>
             <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${isWorker ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-300'}`}>
               {isWorker ? 'Skilled Worker' : 'Employer'}
             </span>
@@ -359,15 +349,11 @@ export default function Dashboard({
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           {!isWorker && (
-            <button onClick={() => onNavigate('post-job')} className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-xs font-black text-slate-900 hover:bg-slate-100">
-              <PlusCircle className="h-4 w-4 text-blue-600" />
+            <button onClick={() => onNavigate('post-job')} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#b7f25c] px-4 py-2.5 text-xs font-black text-[#111615] hover:bg-[#c8ff74]">
+              <PlusCircle className="h-4 w-4 text-[#005f49]" />
               Post a Job
             </button>
           )}
-          <button onClick={onSwitchRole} disabled={isSwitchingRole} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-black text-white hover:bg-white/15 disabled:cursor-not-allowed disabled:text-slate-400">
-            <RefreshCw className={`h-4 w-4 ${isSwitchingRole ? 'animate-spin' : ''}`} />
-            {isSwitchingRole ? 'Switching...' : `Switch to ${isWorker ? 'Employer' : 'Worker'}`}
-          </button>
         </div>
       </div>
 
@@ -390,19 +376,19 @@ export default function Dashboard({
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {pendingApplications > 0 && (
-            <NeedsAttentionCard title={`${pendingApplications} ${isWorker ? 'application' : 'candidate'}${pendingApplications === 1 ? '' : 's'} waiting`} detail={isWorker ? 'Waiting for employer response.' : 'Review applicants and hire one worker.'} action={isWorker ? 'View status' : 'Review candidates'} onClick={() => { setActiveTab('applications'); setQuickFilter('pending'); }} tone="amber" />
+            <NeedsAttentionCard title={`${pendingApplications} ${isWorker ? 'application' : 'candidate'}${pendingApplications === 1 ? '' : 's'} waiting`} detail={isWorker ? 'Waiting for employer response.' : 'Review applicants and hire one worker.'} action={isWorker ? 'View status' : 'Review candidates'} onClick={() => setActiveTab('applications')} tone="amber" />
           )}
           {pendingConnections > 0 && (
-            <NeedsAttentionCard title={`${pendingConnections} hire request${pendingConnections === 1 ? '' : 's'}`} detail={isWorker ? 'Accept to reveal contact details.' : 'Waiting for worker response.'} action="Open requests" onClick={() => { setActiveTab('connections'); setQuickFilter('pending'); }} />
+            <NeedsAttentionCard title={`${pendingConnections} hire request${pendingConnections === 1 ? '' : 's'}`} detail={isWorker ? 'Accept to reveal contact details.' : 'Waiting for worker response.'} action="Open requests" onClick={() => setActiveTab('connections')} />
           )}
           {completionRequests > 0 && (
-            <NeedsAttentionCard title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`} detail={isWorker ? 'Employer says the work is complete.' : 'Waiting for worker confirmation.'} action="Open progress" onClick={() => { setActiveTab('progress'); setQuickFilter('active'); }} tone="emerald" />
+            <NeedsAttentionCard title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`} detail={isWorker ? 'The other participant requested completion.' : 'Waiting for the other participant.'} action="Open progress" onClick={() => setActiveTab('progress')} tone="emerald" />
           )}
           {activeJobsCount > 0 && (
-            <NeedsAttentionCard title={`${activeJobsCount} active job${activeJobsCount === 1 ? '' : 's'}`} detail={isWorker ? 'Keep contact details handy.' : 'Request completion when finished.'} action="Open progress" onClick={() => { setActiveTab('progress'); setQuickFilter('active'); }} />
+            <NeedsAttentionCard title={`${activeJobsCount} active job${activeJobsCount === 1 ? '' : 's'}`} detail={isWorker ? 'Keep contact details handy.' : 'Request completion when finished.'} action="Open progress" onClick={() => setActiveTab('progress')} />
           )}
           {!isWorker && reviewReadyJobs.length > 0 && (
-            <NeedsAttentionCard title={`${reviewReadyJobs.length} review${reviewReadyJobs.length === 1 ? '' : 's'} needed`} detail="Completed jobs are waiting for feedback." action="Leave review" onClick={() => { setActiveTab('progress'); setQuickFilter('needs_review'); }} tone="emerald" />
+            <NeedsAttentionCard title={`${reviewReadyJobs.length} review${reviewReadyJobs.length === 1 ? '' : 's'} needed`} detail="Completed jobs are waiting for feedback." action="Leave review" onClick={() => setActiveTab('progress')} tone="emerald" />
           )}
           {missingProfileFields.length > 0 && (
             <NeedsAttentionCard title="Profile incomplete" detail={`Missing: ${missingProfileFields.slice(0, 3).join(', ')}${missingProfileFields.length > 3 ? '...' : ''}`} action="Complete profile" onClick={() => onNavigate('profile')} tone="amber" />
@@ -455,37 +441,22 @@ export default function Dashboard({
           { label: isWorker ? 'Active Jobs' : 'Open Jobs', value: isWorker ? activeJobsCount : openJobs },
           { label: 'Completed Jobs', value: isWorker ? workerProgressItems.filter(item => item.job.status === 'completed').length : completedJobs },
         ].map(metric => (
-          <div key={metric.label} className="rounded-xl border border-slate-100 bg-white p-4 shadow-xs">
+          <div key={metric.label} className="rounded-xl border border-emerald-950/10 bg-white p-4 shadow-sm">
             <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">{metric.label}</span>
             <span className="mt-1 block text-2xl font-black text-slate-900">{metric.value}</span>
           </div>
         ))}
       </div>
 
-      <div className="sticky top-[104px] z-30 -mx-4 mb-6 flex gap-2 overflow-x-auto border-y border-slate-100 bg-slate-50/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex-wrap sm:border-b sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-3 sm:pt-0">
+      <div className="sticky top-[104px] z-30 -mx-4 mb-6 flex gap-2 overflow-x-auto border-y border-emerald-950/10 bg-[#f6fbf8]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex-wrap sm:border-b sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-3 sm:pt-0">
         {[
           { key: 'progress' as const, label: 'Job Progress' },
           { key: 'connections' as const, label: isWorker ? 'Hire Requests' : 'Connections' },
           { key: 'applications' as const, label: isWorker ? 'Applications' : 'Candidates' },
           ...(!isWorker ? [{ key: 'jobs' as const, label: 'Posted Jobs' }] : []),
         ].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`shrink-0 rounded-lg border px-3 py-2 text-xs font-bold ${activeTab === tab.key ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`shrink-0 rounded-full border px-3 py-2 text-xs font-bold ${activeTab === tab.key ? 'border-[#008060] bg-[#008060] text-white' : 'border-emerald-950/10 bg-white text-slate-600 hover:bg-emerald-50 hover:text-[#005f49]'}`}>
             {tab.label} ({tabCounts[tab.key]})
-          </button>
-        ))}
-      </div>
-
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider text-slate-400"><Filter className="h-3.5 w-3.5" />Filter</span>
-        {[
-          { key: 'all' as const, label: 'All' },
-          { key: 'pending' as const, label: 'Pending' },
-          { key: 'active' as const, label: 'Active' },
-          { key: 'completed' as const, label: 'Completed' },
-          ...(!isWorker ? [{ key: 'needs_review' as const, label: 'Needs review' }] : []),
-        ].map(filter => (
-          <button key={filter.key} onClick={() => setQuickFilter(filter.key)} className={`rounded-full border px-3 py-1 text-xs font-bold ${quickFilter === filter.key ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}>
-            {filter.label}
           </button>
         ))}
       </div>
@@ -499,7 +470,7 @@ export default function Dashboard({
             </div>
           </div>
           {isWorker ? (
-            filteredWorkerProgressItems.length > 0 ? filteredWorkerProgressItems.map(renderWorkerProgressCard) : (
+            workerProgressItems.length > 0 ? workerProgressItems.map(renderWorkerProgressCard) : (
               <div className="rounded-xl border border-slate-100 bg-white py-12 text-center">
                 <Briefcase className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                 <p className="text-xs font-medium text-slate-500">No matching jobs yet. Accepted jobs will appear here after an employer hires you.</p>
@@ -507,7 +478,7 @@ export default function Dashboard({
               </div>
             )
           ) : (
-            filteredEmployerProgressJobs.length > 0 ? filteredEmployerProgressJobs.map(renderEmployerProgressCard) : (
+            employerProgressJobs.length > 0 ? employerProgressJobs.map(renderEmployerProgressCard) : (
               <div className="rounded-xl border border-slate-100 bg-white py-12 text-center">
                 <Briefcase className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                 <p className="text-xs font-medium text-slate-500">No matching posted jobs. Post a job or adjust the filter.</p>
@@ -538,7 +509,7 @@ export default function Dashboard({
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-50 pt-3">
                 {conn.phone && conn.status === 'accepted' ? (
-                  <ContactActions phone={conn.phone} />
+                  <ContactActions phone={conn.phone} whatsappMessage={isWorker ? `Hello, my name is ${currentUser.name}. I am contacting you through Qardho Skilled Platform${conn.jobTitle ? ` regarding the job "${conn.jobTitle}"` : ''}. I accepted your hiring request and would like to discuss the next steps.` : `Hello ${conn.toUserName}, I am ${currentUser.name}. I am contacting you through Qardho Skilled Platform${conn.jobTitle ? ` regarding the job "${conn.jobTitle}"` : ''}. I would like to discuss the work details and next steps.`} />
                 ) : (
                   <span className="text-[11px] italic text-slate-400">{conn.status === 'pending' ? 'Accept request to reveal phone' : 'Contact hidden'}</span>
                 )}
@@ -562,7 +533,7 @@ export default function Dashboard({
             <div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><h2 className="text-base font-bold text-slate-900">{isWorker ? 'Job Applications Submitted' : 'Applications Received'}</h2></div>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">{myApplications.length}</span>
           </div>
-          {filteredApplications.length > 0 ? filteredApplications.map(app => (
+          {myApplications.length > 0 ? myApplications.map(app => (
             <article key={app.id} className="rounded-xl border border-slate-100 bg-white p-5 shadow-xs">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -575,7 +546,7 @@ export default function Dashboard({
               <Timeline steps={getApplicationTimelineSteps(app)} />
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-50 pt-3">
                 <div className="space-y-1">
-                  {(isWorker || app.status === 'accepted') ? <ContactActions phone={app.phone} label={isWorker ? 'Your phone' : 'Applicant'} /> : <span className="text-[11px] italic text-slate-400">Contact unlocks after accepted application or hire request.</span>}
+                  {(isWorker || app.status === 'accepted') ? <ContactActions phone={app.phone} label={isWorker ? 'Your phone' : 'Applicant'} whatsappMessage={!isWorker && app.status === 'accepted' ? `Hello ${app.applicantName}, I am ${currentUser.name}. I am contacting you through Qardho Skilled Platform regarding the job "${app.jobTitle}". I would like to discuss the work details and next steps.` : undefined} /> : <span className="text-[11px] italic text-slate-400">Contact unlocks after accepted application or hire request.</span>}
                   <span className="flex items-center text-[11px] text-slate-500"><MapPin className="mr-1.5 h-3 w-3 text-slate-400" />Qardho ({app.location})</span>
                 </div>
                 {!isWorker && app.status === 'pending' && (
@@ -624,7 +595,7 @@ export default function Dashboard({
               <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs italic text-slate-700">"{selectedApplication.message}"</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-slate-100 p-3"><span className="block text-[10px] font-black uppercase text-slate-400">Location</span><span className="text-sm font-bold text-slate-900">{selectedApplication.location}</span></div>
-                <div className="rounded-xl border border-slate-100 p-3"><span className="block text-[10px] font-black uppercase text-slate-400">Phone</span>{selectedApplication.status === 'accepted' ? <ContactActions phone={selectedApplication.phone} label="Applicant" /> : <span className="text-xs font-semibold text-slate-500">Contact unlocks after accepted application or hire request.</span>}</div>
+                <div className="rounded-xl border border-slate-100 p-3"><span className="block text-[10px] font-black uppercase text-slate-400">Phone</span>{selectedApplication.status === 'accepted' ? <ContactActions phone={selectedApplication.phone} label="Applicant" whatsappMessage={`Hello ${selectedApplication.applicantName}, I am ${currentUser.name}. I am contacting you through Qardho Skilled Platform regarding the job "${selectedApplication.jobTitle}". I would like to discuss the work details and next steps.`} /> : <span className="text-xs font-semibold text-slate-500">Contact unlocks after accepted application or hire request.</span>}</div>
               </div>
             </div>
             <div className="flex flex-col gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row">
