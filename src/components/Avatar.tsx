@@ -19,7 +19,7 @@ const sizes = {
 export default function Avatar({ name, src, size = 'md', eager = false, className = '' }: AvatarProps) {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   return (
-    <span className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-100 font-black text-emerald-800 ring-1 ring-emerald-950/10 ${sizes[size]} ${className}`} aria-hidden="true">
+    <span className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-100 font-black text-brand-800 ring-1 ring-brand-950/10 ${sizes[size]} ${className}`} aria-hidden="true">
       {src ? (
         <img
           src={src}
@@ -34,3 +34,5 @@ export default function Avatar({ name, src, size = 'md', eager = false, classNam
     </span>
   );
 }
+
+

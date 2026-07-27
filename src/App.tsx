@@ -909,7 +909,7 @@ export default function App() {
 
       {appNotice && (
         <div className="fixed bottom-6 left-6 z-50 animate-fade-in">
-          <div className="bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-xl flex items-center space-x-3 border border-emerald-500/50">
+          <div className="bg-brand-600 text-white px-5 py-3.5 rounded-2xl shadow-xl flex items-center space-x-3 border border-brand-500/50">
             <div className="p-1 bg-white/15 rounded-lg text-white">
               <CheckCircle2 className="h-4 w-4" />
             </div>
@@ -989,7 +989,7 @@ export default function App() {
                     <h4 className="text-sm font-black text-slate-900">Profile check</h4>
                     <p className="mt-1 text-xs font-semibold text-slate-500">Basic public profile fields are required before switching.</p>
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${canConfirmRoleSwitch ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${canConfirmRoleSwitch ? 'bg-brand-50 text-brand-700' : 'bg-amber-50 text-amber-700'}`}>
                     {canConfirmRoleSwitch ? 'Ready' : 'Incomplete'}
                   </span>
                 </div>
@@ -1004,7 +1004,7 @@ export default function App() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="mt-3 text-xs font-semibold text-emerald-700">Your basic profile is ready for role switching.</p>
+                  <p className="mt-3 text-xs font-semibold text-brand-700">Your basic profile is ready for role switching.</p>
                 )}
 
                 {canConfirmRoleSwitch && (
@@ -1079,3 +1079,5 @@ export default function App() {
     </div>
   );
 }
+
+

@@ -465,7 +465,7 @@ async function startServer() {
     if (normalized.startsWith('252')) return /^252\d{8,9}$/.test(normalized) ? `+${normalized}` : null;
     return /^\d{8,15}$/.test(normalized) ? `+${normalized}` : null;
   };
-  const normalizeSomaliPhone = (value: any) => { const digits = String(value || "").replace(/\D/g, ""); const national = digits.startsWith("252") && digits.length > 12 ? digits.slice(3) : digits; return /^\d{8,12}$/.test(national) ? "+252" + national : null; };
+  const normalizeSomaliPhone = (value: any) => { const digits = String(value || "").replace(/\D/g, ""); const national = digits.startsWith("252") ? digits.slice(3) : digits; return /^\d{8,12}$/.test(national) ? "+252" + national : null; };
   const getUserById = async (id: string) => db.get('SELECT * FROM users WHERE id = $1', [id]);
   const createSession = async (res: any, userId: string) => {
     const token = randomBytes(32).toString('base64url');
@@ -772,7 +772,9 @@ async function startServer() {
     }
   }
 
-  await ensureDemoCredentials(db);
+  if (!isProduction) {
+    await ensureDemoCredentials(db);
+  }
 
   // --- API Routes ---
 
@@ -860,6 +862,7 @@ async function startServer() {
 
   app.post('/api/demo/reset', async (req, res) => {
     try {
+      if (isProduction) return res.status(403).json({ error: 'Demo reset disabled in production' });
       if (!await adminOnly(req, res)) return;
       await db.run('DELETE FROM reviews');
       await db.run('DELETE FROM applications');

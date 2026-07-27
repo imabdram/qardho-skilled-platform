@@ -126,7 +126,7 @@ export default function Dashboard({
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800">
-          <Phone className="h-3.5 w-3.5 text-[#008060]" />
+          <Phone className="h-3.5 w-3.5 text-[#3b82f6]" />
           <span className="text-slate-500">{label}:</span>
           <span className="font-mono text-slate-950 select-all">{phone}</span>
         </span>
@@ -148,7 +148,7 @@ export default function Dashboard({
   const getStatusBadge = (status: 'pending' | 'accepted' | 'declined') => {
     const styles = {
       pending: 'bg-amber-50 text-amber-700 border-amber-100',
-      accepted: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      accepted: 'bg-brand-50 text-brand-700 border-brand-100',
       declined: 'bg-rose-50 text-rose-700 border-rose-100',
     }[status];
     const Icon = status === 'accepted' ? CheckCircle2 : status === 'declined' ? X : Clock;
@@ -162,9 +162,9 @@ export default function Dashboard({
 
   const getJobStatusBadge = (status: JobStatus) => {
     const styles = {
-      open: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      in_progress: 'bg-[#b7f25c]/35 text-[#005f49] border-[#b7f25c]/70',
-      active: 'bg-[#b7f25c]/35 text-[#005f49] border-[#b7f25c]/70',
+      open: 'bg-brand-50 text-brand-700 border-brand-100',
+      in_progress: 'bg-[#93c5fd]/35 text-[#1e40af] border-[#93c5fd]/70',
+      active: 'bg-[#93c5fd]/35 text-[#1e40af] border-[#93c5fd]/70',
       completion_requested_by_worker: 'bg-amber-50 text-amber-700 border-amber-100',
       completion_requested_by_employer: 'bg-amber-50 text-amber-700 border-amber-100',
       completed: 'bg-slate-100 text-slate-700 border-slate-200',
@@ -206,7 +206,7 @@ export default function Dashboard({
     <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       {steps.map(step => (
         <div key={step.label} className={`rounded-lg border px-2 py-2 text-center text-[10px] font-black uppercase ${
-          step.done ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-slate-100 bg-slate-50 text-slate-400'
+          step.done ? 'border-brand-100 bg-brand-50 text-brand-700' : 'border-slate-100 bg-slate-50 text-slate-400'
         }`}>
           {step.label}
         </div>
@@ -221,10 +221,10 @@ export default function Dashboard({
     const hasApplications = applications.some(app => app.jobId === job.id);
 
     return (
-      <article key={job.id} className="rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm">
+      <article key={job.id} className="rounded-xl border border-brand-950/10 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h3 className="line-clamp-2 text-base font-black text-slate-900">{job.title}</h3><p className="mt-1 text-xs font-semibold text-slate-500">{job.category || "Local work"}"��y��y� {job.location} �w^~)�v Posted {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(job.createdAt))}</p>
+            <h3 className="line-clamp-2 text-base font-black text-slate-900">{job.title}</h3><p className="mt-1 text-xs font-semibold text-slate-500">{job.category || "Local work"} &middot; {job.location} &middot; Posted {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(job.createdAt))}</p>
             <p className="mt-1 text-xs font-medium text-slate-500">{workerName ? `Worker: ${workerName}` : 'No worker accepted yet'}</p>
           </div>
           {getJobStatusBadge(job.status)}
@@ -242,22 +242,22 @@ export default function Dashboard({
                 actionKey: `complete-${job.id}`,
                 onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_employer'),
               })}
-              disabled={actionKey === `complete-${job.id}`} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#008060] px-3 text-xs font-black text-white hover:bg-[#005f49] disabled:cursor-not-allowed disabled:bg-emerald-300"
+              disabled={actionKey === `complete-${job.id}`} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#3b82f6] px-3 text-xs font-black text-white hover:bg-[#1e40af] disabled:cursor-not-allowed disabled:bg-brand-300"
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
               {actionKey === `complete-${job.id}` ? 'Requesting...' : 'Request completion'}
             </button>
           )}
           {job.status === 'completion_requested_by_employer' && <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">Waiting for the worker</span>}
-          {job.status === 'completion_requested_by_worker' && <><button onClick={() => openConfirmation({ title: 'Confirm job completion?', description: `Confirm that "${job.title}" is finished.`, confirmLabel: 'Confirm completion', tone: 'neutral', actionKey: `confirm-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completed') })} className="min-h-10 rounded-full bg-emerald-600 px-3 text-xs font-black text-white">Confirm completion</button><button onClick={() => openConfirmation({ title: 'Report a completion issue?', description: 'The job will remain unresolved and the dispute will be recorded.', confirmLabel: 'Report issue', tone: 'danger', actionKey: `dispute-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_disputed') })} className="min-h-10 rounded-full border border-rose-200 px-3 text-xs font-black text-rose-700">Report issue</button></>}
+          {job.status === 'completion_requested_by_worker' && <><button onClick={() => openConfirmation({ title: 'Confirm job completion?', description: `Confirm that "${job.title}" is finished.`, confirmLabel: 'Confirm completion', tone: 'neutral', actionKey: `confirm-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completed') })} className="min-h-10 rounded-full bg-brand-600 px-3 text-xs font-black text-white">Confirm completion</button><button onClick={() => openConfirmation({ title: 'Report a completion issue?', description: 'The job will remain unresolved and the dispute will be recorded.', confirmLabel: 'Report issue', tone: 'danger', actionKey: `dispute-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_disputed') })} className="min-h-10 rounded-full border border-rose-200 px-3 text-xs font-black text-rose-700">Report issue</button></>}
           {job.status === 'completed' && !reviewed && (
-            <button onClick={() => { const reviewWorker = getWorker(job.assignedWorkerId || accepted?.applicantId); if (reviewWorker) onViewWorkerProfile(reviewWorker); else onNavigate('workers'); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-xs font-black text-white hover:bg-emerald-700">
+            <button onClick={() => { const reviewWorker = getWorker(job.assignedWorkerId || accepted?.applicantId); if (reviewWorker) onViewWorkerProfile(reviewWorker); else onNavigate('workers'); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-600 px-3 text-xs font-black text-white hover:bg-brand-700">
               <Star className="h-3.5 w-3.5" />
               Leave review
             </button>
           )}
           {job.status === 'completed' && reviewed && (
-            <span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-50 px-3 text-xs font-black text-emerald-700">
+            <span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-50 px-3 text-xs font-black text-brand-700">
               <Star className="h-3.5 w-3.5" />
               Reviewed
             </span>
@@ -277,15 +277,15 @@ export default function Dashboard({
               {actionKey === `close-${job.id}` ? 'Closing...' : 'Close job'}
             </button>
           )}
-          <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-emerald-700 px-3 text-xs font-black text-emerald-800 hover:bg-emerald-50">View details</button>
-          {hasApplications && job.status === 'open' && <button onClick={() => setActiveTab('applications')} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-600 px-3 text-xs font-black text-white hover:bg-emerald-700">View candidates</button>}
+          <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-brand-700 px-3 text-xs font-black text-brand-800 hover:bg-brand-50">View details</button>
+          {hasApplications && job.status === 'open' && <button onClick={() => setActiveTab('applications')} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-brand-600 px-3 text-xs font-black text-white hover:bg-brand-700">View candidates</button>}
         </div>
       </article>
     );
   };
 
   const renderWorkerProgressCard = ({ application, job }: { application: Application; job: Job }) => (
-    <article key={application.id} className="rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm">
+    <article key={application.id} className="rounded-xl border border-brand-950/10 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-sm font-black text-slate-900">{job.title}</h3>
@@ -295,14 +295,14 @@ export default function Dashboard({
       </div>
       <Timeline steps={getTimelineSteps(job, true, true, reviews.some(review => review.jobId === job.id))} />
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        {['active', 'in_progress'].includes(job.status) && <><span className="rounded-lg bg-[#b7f25c]/35 px-3 py-2 text-xs font-bold text-[#005f49]">Active job</span><button onClick={() => openConfirmation({ title: 'Request job completion?', description: `Ask the employer to confirm that "${job.title}" is finished.`, confirmLabel: 'Request completion', tone: 'neutral', actionKey: `worker-request-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_worker') })} className="min-h-10 rounded-full bg-[#008060] px-3 text-xs font-black text-white">Request completion</button></>}
-        {job.status === 'completed' && <span className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">Completed</span>}
+        {['active', 'in_progress'].includes(job.status) && <><span className="rounded-lg bg-[#93c5fd]/35 px-3 py-2 text-xs font-bold text-[#1e40af]">Active job</span><button onClick={() => openConfirmation({ title: 'Request job completion?', description: `Ask the employer to confirm that "${job.title}" is finished.`, confirmLabel: 'Request completion', tone: 'neutral', actionKey: `worker-request-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_worker') })} className="min-h-10 rounded-full bg-[#3b82f6] px-3 text-xs font-black text-white">Request completion</button></>}
+        {job.status === 'completed' && <span className="rounded-lg bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700">Completed</span>}
         <ContactActions phone={job.phone} label="Employer" whatsappMessage={`Hello, my name is ${currentUser.name}. I am contacting you through Qardho Skilled Platform regarding the job "${job.title}". My application has been accepted, and I would like to discuss the next steps.`} />
         {job.status === 'completion_requested_by_employer' && (
           <button
             onClick={() => openConfirmation({ title: 'Confirm work completed?', description: `This confirms you finished "${job.title}". The employer can review the job after this.`, confirmLabel: actionKey === `worker-complete-${job.id}` ? 'Confirming...' : 'Confirm completed', tone: 'neutral', actionKey: `worker-complete-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completed') })}
             disabled={actionKey === `worker-complete-${job.id}`}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-600 px-3 text-xs font-black text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-600 px-3 text-xs font-black text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             {actionKey === `worker-complete-${job.id}` ? 'Confirming...' : 'Confirm completed'}
@@ -323,8 +323,8 @@ export default function Dashboard({
     jobs: myPostedJobs.length,
   };
 
-  const NeedsAttentionCard = ({ title, detail, action, onClick, tone = 'blue' }: { title: string; detail: string; action: string; onClick: () => void; tone?: 'blue' | 'amber' | 'emerald' }) => {
-    const toneClass = tone === 'amber' ? 'bg-amber-50 text-amber-800 border-amber-100' : tone === 'emerald' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-[#b7f25c]/30 text-[#005f49] border-[#b7f25c]/60';
+  const NeedsAttentionCard = ({ title, detail, action, onClick, tone = 'blue' }: { title: string; detail: string; action: string; onClick: () => void; tone?: 'blue' | 'amber' | 'brand' }) => {
+    const toneClass = tone === 'amber' ? 'bg-amber-50 text-amber-800 border-amber-100' : tone === 'brand' ? 'bg-brand-50 text-brand-800 border-brand-100' : 'bg-[#93c5fd]/30 text-[#1e40af] border-[#93c5fd]/60';
     return (
       <button onClick={onClick} className={`min-h-28 rounded-xl border p-4 text-left transition hover:shadow-sm ${toneClass}`}>
         <span className="block text-sm font-black">{title}</span>
@@ -335,11 +335,11 @@ export default function Dashboard({
   };
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" id="dashboard-container">
-      <div className="mb-8 flex flex-col gap-5 rounded-2xl bg-[#111615] p-6 text-white shadow-xl shadow-emerald-950/15 sm:p-8 md:flex-row md:items-center md:justify-between">
+      <div className="mb-8 flex flex-col gap-5 rounded-2xl bg-[#111615] p-6 text-white shadow-xl shadow-brand-950/15 sm:p-8 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <h1 className="font-display text-xl font-black sm:text-2xl">My Dashboard Panel</h1>
-            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${isWorker ? 'bg-emerald-500/20 text-emerald-300' : 'bg-indigo-500/20 text-indigo-300'}`}>
+            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${isWorker ? 'bg-brand-500/20 text-brand-300' : 'bg-indigo-500/20 text-indigo-300'}`}>
               {isWorker ? 'Skilled Worker' : 'Employer'}
             </span>
           </div>
@@ -349,8 +349,8 @@ export default function Dashboard({
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           {!isWorker && (
-            <button onClick={() => onNavigate('post-job')} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#b7f25c] px-4 py-2.5 text-xs font-black text-[#111615] hover:bg-[#c8ff74]">
-              <PlusCircle className="h-4 w-4 text-[#005f49]" />
+            <button onClick={() => onNavigate('post-job')} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#93c5fd] px-4 py-2.5 text-xs font-black text-[#111615] hover:bg-[#c8ff74]">
+              <PlusCircle className="h-4 w-4 text-[#1e40af]" />
               Post a Job
             </button>
           )}
@@ -382,19 +382,19 @@ export default function Dashboard({
             <NeedsAttentionCard title={`${pendingConnections} hire request${pendingConnections === 1 ? '' : 's'}`} detail={isWorker ? 'Accept to reveal contact details.' : 'Waiting for worker response.'} action="Open requests" onClick={() => setActiveTab('connections')} />
           )}
           {completionRequests > 0 && (
-            <NeedsAttentionCard title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`} detail={isWorker ? 'The other participant requested completion.' : 'Waiting for the other participant.'} action="Open progress" onClick={() => setActiveTab(isWorker ? 'progress' : 'jobs')} tone="emerald" />
+            <NeedsAttentionCard title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`} detail={isWorker ? 'The other participant requested completion.' : 'Waiting for the other participant.'} action="Open progress" onClick={() => setActiveTab(isWorker ? 'progress' : 'jobs')} tone="brand" />
           )}
           {activeJobsCount > 0 && (
             <NeedsAttentionCard title={`${activeJobsCount} active job${activeJobsCount === 1 ? '' : 's'}`} detail={isWorker ? 'Keep contact details handy.' : 'Request completion when finished.'} action="Open progress" onClick={() => setActiveTab('progress')} />
           )}
           {!isWorker && reviewReadyJobs.length > 0 && (
-            <NeedsAttentionCard title={`${reviewReadyJobs.length} review${reviewReadyJobs.length === 1 ? '' : 's'} needed`} detail="Completed jobs are waiting for feedback." action="Leave review" onClick={() => setActiveTab('progress')} tone="emerald" />
+            <NeedsAttentionCard title={`${reviewReadyJobs.length} review${reviewReadyJobs.length === 1 ? '' : 's'} needed`} detail="Completed jobs are waiting for feedback." action="Leave review" onClick={() => setActiveTab('progress')} tone="brand" />
           )}
           {missingProfileFields.length > 0 && (
             <NeedsAttentionCard title="Profile incomplete" detail={`Missing: ${missingProfileFields.slice(0, 3).join(', ')}${missingProfileFields.length > 3 ? '...' : ''}`} action="Complete profile" onClick={() => onNavigate('profile')} tone="amber" />
           )}
           {pendingApplications === 0 && pendingConnections === 0 && activeJobsCount === 0 && reviewReadyJobs.length === 0 && missingProfileFields.length === 0 && (
-            <NeedsAttentionCard title="Nothing urgent" detail="Your dashboard is clear right now." action={isWorker ? 'Browse jobs' : 'Post a job'} onClick={() => onNavigate(isWorker ? 'jobs' : 'post-job')} tone="emerald" />
+            <NeedsAttentionCard title="Nothing urgent" detail="Your dashboard is clear right now." action={isWorker ? 'Browse jobs' : 'Post a job'} onClick={() => onNavigate(isWorker ? 'jobs' : 'post-job')} tone="brand" />
           )}
         </div>
       </section>
@@ -441,21 +441,21 @@ export default function Dashboard({
           { label: isWorker ? 'Active Jobs' : 'Open Jobs', value: isWorker ? activeJobsCount : openJobs },
           { label: 'Completed Jobs', value: isWorker ? workerProgressItems.filter(item => item.job.status === 'completed').length : completedJobs },
         ].map(metric => (
-          <div key={metric.label} className="rounded-xl border border-emerald-950/10 bg-white p-4 shadow-sm">
+          <div key={metric.label} className="rounded-xl border border-brand-950/10 bg-white p-4 shadow-sm">
             <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">{metric.label}</span>
             <span className="mt-1 block text-2xl font-black text-slate-900">{metric.value}</span>
           </div>
         ))}
       </div>
 
-      <div className="sticky top-[104px] z-30 -mx-4 mb-6 flex gap-2 overflow-x-auto border-y border-emerald-950/10 bg-[#f6fbf8]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex-wrap sm:border-b sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-3 sm:pt-0">
+      <div className="sticky top-[104px] z-30 -mx-4 mb-6 flex gap-2 overflow-x-auto border-y border-brand-950/10 bg-[#f6fbf8]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex-wrap sm:border-b sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-3 sm:pt-0">
         {[
           ...(isWorker ? [{ key: 'progress' as const, label: 'Job Progress' }] : []),
           { key: 'applications' as const, label: isWorker ? 'Applications' : 'Candidates' },
           { key: 'connections' as const, label: isWorker ? 'Hire Requests' : 'Connections' },
           ...(!isWorker ? [{ key: 'jobs' as const, label: 'Posted Jobs' }] : []),
         ].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)} aria-selected={activeTab === tab.key} className={`min-w-[110px] shrink-0 rounded-full border px-3 py-2 text-xs font-bold sm:flex-1 ${activeTab === tab.key ? 'border-[#008060] bg-[#008060] text-white' : 'border-emerald-950/10 bg-white text-slate-600 hover:bg-emerald-50 hover:text-[#005f49]'}`}>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} aria-selected={activeTab === tab.key} className={`min-w-[110px] shrink-0 rounded-full border px-3 py-2 text-xs font-bold sm:flex-1 ${activeTab === tab.key ? 'border-[#3b82f6] bg-[#3b82f6] text-white' : 'border-brand-950/10 bg-white text-slate-600 hover:bg-brand-50 hover:text-[#1e40af]'}`}>
             {tab.label} ({tabCounts[tab.key]})
           </button>
         ))}
@@ -516,7 +516,7 @@ export default function Dashboard({
                 {isWorker && conn.status === 'pending' && (
                   <div className="flex gap-2">
                     <button onClick={() => openConfirmation({ title: 'Decline this hire request?', description: `This will mark the request from ${conn.fromUserName} as declined.`, confirmLabel: actionKey === `decline-conn-${conn.id}` ? 'Declining...' : 'Decline request', tone: 'danger', actionKey: `decline-conn-${conn.id}`, onConfirm: () => onUpdateConnectionStatus(conn.id, 'declined') })} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:border-red-100 hover:bg-red-50 hover:text-red-600"><X className="h-4 w-4" /></button>
-                    <button onClick={() => openConfirmation({ title: 'Accept this hire request?', description: `This will reveal contact info for ${conn.fromUserName} and mark the request as accepted.`, confirmLabel: actionKey === `accept-conn-${conn.id}` ? 'Accepting...' : 'Accept request', tone: 'neutral', actionKey: `accept-conn-${conn.id}`, onConfirm: () => onUpdateConnectionStatus(conn.id, 'accepted') })} className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"><Check className="h-3.5 w-3.5" />{actionKey === `accept-conn-${conn.id}` ? 'Accepting...' : 'Accept'}</button>
+                    <button onClick={() => openConfirmation({ title: 'Accept this hire request?', description: `This will reveal contact info for ${conn.fromUserName} and mark the request as accepted.`, confirmLabel: actionKey === `accept-conn-${conn.id}` ? 'Accepting...' : 'Accept request', tone: 'neutral', actionKey: `accept-conn-${conn.id}`, onConfirm: () => onUpdateConnectionStatus(conn.id, 'accepted') })} className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-700"><Check className="h-3.5 w-3.5" />{actionKey === `accept-conn-${conn.id}` ? 'Accepting...' : 'Accept'}</button>
                   </div>
                 )}
               </div>
@@ -553,7 +553,7 @@ export default function Dashboard({
                   <div className="flex gap-2">
                     <button onClick={() => setSelectedApplication(app)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Details</button>
                     <button onClick={() => openConfirmation({ title: 'Decline this candidate application?', description: `This will mark ${app.applicantName}'s application for "${app.jobTitle}" as declined.`, confirmLabel: actionKey === `decline-app-${app.id}` ? 'Declining...' : 'Decline application', tone: 'danger', actionKey: `decline-app-${app.id}`, onConfirm: () => onUpdateApplicationStatus(app.id, 'declined') })} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:border-red-100 hover:bg-red-50 hover:text-red-600"><X className="h-4 w-4" /></button>
-                    <button onClick={() => openConfirmation({ title: 'Accept this candidate application?', description: `This will hire ${app.applicantName}, move the job to in progress, and mark other pending applications as not selected.`, confirmLabel: actionKey === `accept-app-${app.id}` ? 'Hiring...' : 'Hire candidate', tone: 'neutral', actionKey: `accept-app-${app.id}`, onConfirm: () => onUpdateApplicationStatus(app.id, 'accepted') })} className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"><Check className="h-3.5 w-3.5" />{actionKey === `accept-app-${app.id}` ? 'Hiring...' : 'Hire'}</button>{getWorker(app.applicantId) && <button onClick={() => onViewWorkerProfile(getWorker(app.applicantId)!)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">View profile</button>}
+                    <button onClick={() => openConfirmation({ title: 'Accept this candidate application?', description: `This will hire ${app.applicantName}, move the job to in progress, and mark other pending applications as not selected.`, confirmLabel: actionKey === `accept-app-${app.id}` ? 'Hiring...' : 'Hire candidate', tone: 'neutral', actionKey: `accept-app-${app.id}`, onConfirm: () => onUpdateApplicationStatus(app.id, 'accepted') })} className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-700"><Check className="h-3.5 w-3.5" />{actionKey === `accept-app-${app.id}` ? 'Hiring...' : 'Hire'}</button>{getWorker(app.applicantId) && <button onClick={() => onViewWorkerProfile(getWorker(app.applicantId)!)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">View profile</button>}
                   </div>
                 )}
                 {isWorker && app.status === 'accepted' && (
@@ -601,7 +601,7 @@ export default function Dashboard({
             <div className="flex flex-col gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row">
               {getWorker(selectedApplication.applicantId) && <button onClick={() => { const worker = getWorker(selectedApplication.applicantId); setSelectedApplication(null); if (worker) onViewWorkerProfile(worker); }} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-50">View profile</button>}
               {selectedApplication.status === 'pending' && <button onClick={() => openConfirmation({ title: 'Decline this candidate application?', description: `This will mark ${selectedApplication.applicantName}'s application for "${selectedApplication.jobTitle}" as declined.`, confirmLabel: 'Decline application', tone: 'danger', actionKey: `decline-app-${selectedApplication.id}`, onConfirm: () => onUpdateApplicationStatus(selectedApplication.id, 'declined') })} className="flex-1 rounded-xl border border-rose-200 px-4 py-2.5 text-xs font-black text-rose-700 hover:bg-rose-50">Decline</button>}
-              {selectedApplication.status === 'pending' && <button onClick={() => openConfirmation({ title: 'Accept this candidate application?', description: `This will hire ${selectedApplication.applicantName}, move the job to in progress, and mark other pending applications as not selected.`, confirmLabel: 'Hire candidate', tone: 'neutral', actionKey: `accept-app-${selectedApplication.id}`, onConfirm: () => onUpdateApplicationStatus(selectedApplication.id, 'accepted') })} className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-700">Accept applicant</button>}
+              {selectedApplication.status === 'pending' && <button onClick={() => openConfirmation({ title: 'Accept this candidate application?', description: `This will hire ${selectedApplication.applicantName}, move the job to in progress, and mark other pending applications as not selected.`, confirmLabel: 'Hire candidate', tone: 'neutral', actionKey: `accept-app-${selectedApplication.id}`, onConfirm: () => onUpdateApplicationStatus(selectedApplication.id, 'accepted') })} className="flex-1 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-black text-white hover:bg-brand-700">Accept applicant</button>}
             </div>
           </div>
         </div>
@@ -623,6 +623,8 @@ export default function Dashboard({
     </div>
   );
 }
+
+
 
 
 

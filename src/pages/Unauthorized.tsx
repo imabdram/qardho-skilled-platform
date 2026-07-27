@@ -10,8 +10,9 @@ export default function Unauthorized() {
       <p className="mt-2 text-sm font-medium leading-6 text-slate-600">You do not have permission to access this page.</p>
       <div className="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
         <button onClick={() => navigate(-1)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700 hover:bg-slate-50"><ArrowLeft className="h-4 w-4" />Go back</button>
-        <Link to="/" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#008060] px-4 text-sm font-black text-white hover:bg-[#006b50]">Go to home</Link>
+        <Link to="/" className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#3b82f6] px-4 text-sm font-black text-white hover:bg-[#1d4ed8]">Go to home</Link>
       </div>
     </section>
   </main>;
 }
+

@@ -24,9 +24,9 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
   const getJobStatusBadge = (status: JobStatus) => {
     const label = status.replace('_', ' ');
     const styles = {
-      open: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      in_progress: 'bg-[#b7f25c]/35 text-[#005f49] border-[#b7f25c]/70',
-      active: 'bg-[#b7f25c]/35 text-[#005f49] border-[#b7f25c]/70',
+      open: 'bg-brand-50 text-brand-700 border-brand-100',
+      in_progress: 'bg-[#93c5fd]/35 text-[#1e40af] border-[#93c5fd]/70',
+      active: 'bg-[#93c5fd]/35 text-[#1e40af] border-[#93c5fd]/70',
       completion_requested_by_worker: 'bg-amber-50 text-amber-700 border-amber-100',
       completion_requested_by_employer: 'bg-amber-50 text-amber-700 border-amber-100',
       completed: 'bg-slate-100 text-slate-700 border-slate-200',
@@ -46,7 +46,7 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
     const Icon = status === 'accepted' ? CheckCircle2 : status === 'declined' ? X : Clock;
     const styles = {
       pending: 'border-amber-100 bg-amber-50 text-amber-700',
-      accepted: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      accepted: 'border-brand-100 bg-brand-50 text-brand-700',
       declined: 'border-rose-100 bg-rose-50 text-rose-700',
     }[status];
     const label = status === 'pending' ? 'Applied: waiting' : `Applied: ${status}`;
@@ -61,12 +61,12 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
 
   return (
     <div
-      className="flex flex-col justify-between rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#008060]/30 hover:shadow-md"
+      className="flex flex-col justify-between rounded-xl border border-brand-950/10 bg-white p-5 shadow-sm premium-hover"
       id={`job-card-${job.id}`}
     >
       <div>
         <div>
-          <h3 className="font-display text-lg font-bold text-[#111615] leading-snug transition-colors hover:text-[#008060]">
+          <h3 className="font-display text-lg font-bold text-[#111615] leading-snug transition-colors hover:text-[#3b82f6]">
             {job.title}
           </h3>
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block font-mono mt-1">
@@ -90,8 +90,8 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
             <MapPin className="h-3 w-3 text-slate-400 mr-1 shrink-0" />
             <span>Qardho ({job.location})</span>
           </div>
-          <div className="flex items-center text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-md">
-            <DollarSign className="h-3 w-3 text-emerald-500 mr-1 shrink-0" />
+          <div className="flex items-center text-xs text-brand-700 font-bold bg-brand-50 px-2.5 py-1 rounded-md">
+            <DollarSign className="h-3 w-3 text-brand-500 mr-1 shrink-0" />
             <span>{job.rate}</span>
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
         {onViewDetails && (
           <button
             onClick={() => onViewDetails(job)}
-            className="w-full inline-flex items-center justify-center space-x-1.5 rounded-full border border-emerald-950/10 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-all hover:bg-emerald-50 hover:text-[#005f49]"
+            className="w-full inline-flex items-center justify-center space-x-1.5 rounded-full border border-brand-950/10 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-all hover:bg-brand-50 hover:text-[#1e40af]"
           >
             <span>View Details</span>
             <ArrowRight className="h-3.5 w-3.5" />
@@ -120,3 +120,5 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
     </div>
   );
 }
+
+

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { SearchX } from 'lucide-react';
 import { PAGE_ROUTES } from '../routes';
@@ -22,3 +22,5 @@ export default function NotFound() {
     </div>
   );
 }
+
+

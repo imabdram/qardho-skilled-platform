@@ -272,7 +272,7 @@ export default function Profile({
                   </div>
                 )}
                 {targetUser.role === 'worker' && targetUser.verified && (
-                  <div className="flex items-center space-x-1 text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg text-xs font-bold">
+                  <div className="flex items-center space-x-1 text-brand-700 bg-brand-50 border border-brand-100 px-2 py-0.5 rounded-lg text-xs font-bold">
                     <ShieldCheck className="h-3.5 w-3.5" />
                     <span>Verified</span>
                   </div>
@@ -281,7 +281,7 @@ export default function Profile({
               <div className="flex items-center mt-1.5 space-x-2">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
                   targetUser.role === 'worker'
-                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200/80'
+                    ? 'bg-brand-100 text-brand-800 border-brand-200/80'
                     : 'bg-indigo-100 text-indigo-800 border-indigo-200/80'
                 }`}>
                   {targetUser.role === 'worker' ? 'Skilled Worker' : 'Employer'}
@@ -317,11 +317,11 @@ export default function Profile({
                 <span className="text-2xl font-black text-slate-950">{profileStrength}%</span>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${profileStrength}%` }} />
+                <div className="h-full rounded-full bg-brand-500" style={{ width: `${profileStrength}%` }} />
               </div>
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {profileChecks.map(item => (
-                  <div key={item.label} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${item.complete ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
+                  <div key={item.label} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${item.complete ? 'border-brand-100 bg-brand-50 text-brand-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
                     {item.complete ? 'Done' : 'Missing'}: {item.label}
                   </div>
                 ))}
@@ -329,20 +329,20 @@ export default function Profile({
             </div>
           )}
           {successMsg && (
-            <div className="mb-6 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-semibold text-emerald-800 flex items-center space-x-1.5 animate-fade-in">
-              <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+            <div className="mb-6 p-3 bg-brand-50 border border-brand-100 rounded-xl text-xs font-semibold text-brand-800 flex items-center space-x-1.5 animate-fade-in">
+              <CheckCircle className="h-4 w-4 text-brand-600 shrink-0" />
               <span>{successMsg}</span>
             </div>
           )}
           {saveError && <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-700" role="alert">{saveError}</div>}
 
           {isOwnProfile && (
-            <section className="mb-6 rounded-2xl border border-emerald-950/10 bg-white p-4" aria-labelledby="profile-image-heading">
+            <section className="mb-6 rounded-2xl border border-brand-950/10 bg-white p-4" aria-labelledby="profile-image-heading">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div><h2 id="profile-image-heading" className="text-sm font-black text-slate-950">Profile Image</h2><p className="mt-1 text-xs font-medium text-slate-500">JPEG, PNG, or WebP. Maximum 5 MB. The server crops and compresses it to WebP.</p></div>
                 <div className="flex flex-wrap gap-2">
                   <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-slate-200 px-4 text-xs font-black hover:bg-slate-50"><Upload className="h-4 w-4" />Choose image<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => chooseAvatar(event.target.files?.[0])} /></label>
-                  {avatarPreview && <button type="button" onClick={uploadAvatar} disabled={avatarState === 'uploading'} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#008060] px-4 text-xs font-black text-white disabled:opacity-60"><Save className="h-4 w-4" />{avatarState === 'uploading' ? 'Uploading...' : 'Save image'}</button>}
+                  {avatarPreview && <button type="button" onClick={uploadAvatar} disabled={avatarState === 'uploading'} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#3b82f6] px-4 text-xs font-black text-white disabled:opacity-60"><Save className="h-4 w-4" />{avatarState === 'uploading' ? 'Uploading...' : 'Save image'}</button>}
                   {(avatarUrl || avatarPreview) && <button type="button" onClick={avatarPreview ? () => { setAvatarPreview(''); setAvatarFile(null); } : removeAvatar} disabled={avatarState === 'uploading'} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-rose-200 px-4 text-xs font-black text-rose-700"><ImageOff className="h-4 w-4" />{avatarPreview ? 'Cancel preview' : 'Remove'}</button>}
                 </div>
               </div>
@@ -352,7 +352,7 @@ export default function Profile({
 
           {isEditing && isOwnProfile ? (
             <form onSubmit={handleSave} className="space-y-4" id="profile-edit-form">
-              <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#008060]">Personal Information</p><p className="mt-1 text-xs font-medium text-slate-500">Keep your public name and basic details accurate.</p></div>
+              <div><p className="text-xs font-black uppercase tracking-[0.18em] text-[#3b82f6]">Personal Information</p><p className="mt-1 text-xs font-medium text-slate-500">Keep your public name and basic details accurate.</p></div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Full Name</label>
@@ -373,7 +373,7 @@ export default function Profile({
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div><label className="mb-1.5 block text-sm font-bold">WhatsApp number <span className="font-medium text-slate-500">(optional)</span></label><div className="profile-phone-field"><span className="profile-phone-prefix">+252</span><input type="tel" inputMode="numeric" autoComplete="tel-national" value={whatsappPhone} onChange={(event) => setWhatsappPhone(event.target.value.replace(/\D/g, '').replace(/^252/, ''))} placeholder="Enter WhatsApp number" /></div><p className="mt-1 text-xs text-slate-500">Shared only after an application or hiring request is accepted.</p></div>
-                <div><label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">Gender (Optional)</label><select value={gender || ''} onChange={(event) => setGender((event.target.value || undefined) as UserType['gender'])} className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#008060]"><option value="">Not specified</option><option value="male">Male</option><option value="female">Female</option><option value="prefer_not_to_say">Prefer not to say</option></select></div>
+                <div><label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-700">Gender (Optional)</label><select value={gender || ''} onChange={(event) => setGender((event.target.value || undefined) as UserType['gender'])} className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#3b82f6]"><option value="">Not specified</option><option value="male">Male</option><option value="female">Female</option><option value="prefer_not_to_say">Prefer not to say</option></select></div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -433,7 +433,7 @@ export default function Profile({
                 </div>
               )}
 
-              {currentUser.role === 'worker' && <fieldset className="rounded-2xl border border-slate-100 p-4"><legend className="px-2 text-xs font-black uppercase tracking-[0.18em] text-[#008060]">Professional Pricing (Optional)</legend><div className="grid gap-3 sm:grid-cols-3"><select value={pricingType} onChange={(event) => setPricingType(event.target.value as PricingType | '')} className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold"><option value="">No pricing type</option><option value="project">Per project</option><option value="hour">Per hour</option><option value="day">Per day</option></select><input type="number" min="0" step="0.01" value={pricingAmount} onChange={(event) => setPricingAmount(event.target.value)} placeholder="Amount" className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold" /><input value={pricingCurrency} onChange={(event) => setPricingCurrency(event.target.value.toUpperCase().slice(0, 8))} aria-label="Pricing currency" className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-black" /></div><input value={pricingNote} onChange={(event) => setPricingNote(event.target.value)} placeholder="Optional pricing note" className="mt-3 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold" /></fieldset>}
+              {currentUser.role === 'worker' && <fieldset className="rounded-2xl border border-slate-100 p-4"><legend className="px-2 text-xs font-black uppercase tracking-[0.18em] text-[#3b82f6]">Professional Pricing (Optional)</legend><div className="grid gap-3 sm:grid-cols-3"><select value={pricingType} onChange={(event) => setPricingType(event.target.value as PricingType | '')} className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold"><option value="">No pricing type</option><option value="project">Per project</option><option value="hour">Per hour</option><option value="day">Per day</option></select><input type="number" min="0" step="0.01" value={pricingAmount} onChange={(event) => setPricingAmount(event.target.value)} placeholder="Amount" className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-semibold" /><input value={pricingCurrency} onChange={(event) => setPricingCurrency(event.target.value.toUpperCase().slice(0, 8))} aria-label="Pricing currency" className="min-h-11 rounded-xl border border-slate-200 px-3 text-sm font-black" /></div><input value={pricingNote} onChange={(event) => setPricingNote(event.target.value)} placeholder="Optional pricing note" className="mt-3 min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold" /></fieldset>}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Bio / Profile Description</label>
@@ -539,7 +539,7 @@ export default function Profile({
                             ? 'bg-amber-500'
                             : targetUser.availability === 'unavailable'
                               ? 'bg-rose-500'
-                              : 'bg-emerald-500'
+                              : 'bg-brand-500'
                         }`} />
                         <span className="capitalize">{targetUser.availability || 'available'}</span>
                       </div>
@@ -561,7 +561,7 @@ export default function Profile({
                 <div className="border-t border-slate-100 pt-5">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Notification Preferences</span>
                   <div className="flex items-center space-x-3.5 p-4 bg-slate-50/70 rounded-xl border border-slate-100">
-                    <div className={`p-2.5 rounded-lg ${targetUser.smsNotificationsEnabled !== false ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                    <div className={`p-2.5 rounded-lg ${targetUser.smsNotificationsEnabled !== false ? 'bg-brand-50 text-brand-600' : 'bg-slate-100 text-slate-400'}`}>
                       {targetUser.smsNotificationsEnabled !== false ? (
                         <Bell className="h-4 w-4 animate-bounce" style={{ animationDuration: '3s' }} />
                       ) : (
@@ -580,7 +580,7 @@ export default function Profile({
                     </div>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
                       targetUser.smsNotificationsEnabled !== false 
-                        ? 'bg-emerald-100/50 text-emerald-800 border-emerald-200/50' 
+                        ? 'bg-brand-100/50 text-brand-800 border-brand-200/50' 
                         : 'bg-slate-150 text-slate-600 border border-slate-200/60'
                     }`}>
                       {targetUser.smsNotificationsEnabled !== false ? 'Active' : 'Muted'}
@@ -617,8 +617,8 @@ export default function Profile({
                       </h3>
 
                       {reviewSuccess && (
-                        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-semibold text-emerald-800 flex items-center space-x-1.5 animate-fade-in">
-                          <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <div className="mb-4 p-3 bg-brand-50 border border-brand-100 rounded-xl text-xs font-semibold text-brand-800 flex items-center space-x-1.5 animate-fade-in">
+                          <CheckCircle className="h-4 w-4 text-brand-600 shrink-0" />
                           <span>{reviewSuccess}</span>
                         </div>
                       )}
@@ -767,15 +767,15 @@ export default function Profile({
           )}
 
           {isOwnProfile && (
-            <section className="mt-8 border-t border-emerald-950/10 pt-6" aria-labelledby="more-settings-heading">
-              <button type="button" aria-expanded={moreSettingsOpen} aria-controls="more-settings-panel" onClick={() => setMoreSettingsOpen((open) => !open)} className="flex min-h-12 w-full items-center justify-between rounded-xl border border-emerald-950/10 bg-slate-50 px-4 text-left text-sm font-black text-slate-900 hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060]">
-                <span className="inline-flex items-center gap-2"><Settings className="h-4 w-4 text-[#008060]" />More Settings</span><span aria-hidden="true">{moreSettingsOpen ? '�w^~)�t' : '�w^~)�v'}</span>
+            <section className="mt-8 border-t border-brand-950/10 pt-6" aria-labelledby="more-settings-heading">
+              <button type="button" aria-expanded={moreSettingsOpen} aria-controls="more-settings-panel" onClick={() => setMoreSettingsOpen((open) => !open)} className="flex min-h-12 w-full items-center justify-between rounded-xl border border-brand-950/10 bg-slate-50 px-4 text-left text-sm font-black text-slate-900 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]">
+                <span className="inline-flex items-center gap-2"><Settings className="h-4 w-4 text-[#3b82f6]" />More Settings</span><span aria-hidden="true">{moreSettingsOpen ? '�w^~)�t' : '�w^~)�v'}</span>
               </button>
               {moreSettingsOpen && <div id="more-settings-panel" className="mt-4 space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
                 <div>
                   <h2 id="more-settings-heading" className="text-base font-black text-slate-950">Account role</h2>
                   <p className="mt-1 text-sm font-medium text-slate-600">Current role: <strong>{currentUser.role === 'worker' ? 'Worker' : 'Employer'}</strong>. Role switching preserves compatible profile information and may require additional setup.</p>
-                  {['worker', 'employer'].includes(currentUser.role || '') && <button type="button" onClick={onSwitchRole} className="mt-4 min-h-11 rounded-xl border border-emerald-700 bg-white px-4 text-sm font-black text-[#00715a] hover:bg-emerald-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060]">Change role</button>}
+                  {['worker', 'employer'].includes(currentUser.role || '') && <button type="button" onClick={onSwitchRole} className="mt-4 min-h-11 rounded-xl border border-brand-700 bg-white px-4 text-sm font-black text-[#2563eb] hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]">Change role</button>}
                 </div>
                 {isOwnProfile && onRequestDeleteAccount && <div className="border-t border-rose-200 pt-5" aria-labelledby="danger-zone-heading">
                   <h2 id="danger-zone-heading" className="text-base font-black text-rose-950">Danger Zone</h2>
@@ -792,6 +792,8 @@ export default function Profile({
     </div>
   );
 }
+
+
 
 
 

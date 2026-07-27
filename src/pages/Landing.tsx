@@ -72,7 +72,7 @@ const getInitials = (name: string) => name.split(' ').map(part => part[0]).slice
 function SectionHeading({ eyebrow, title, description, align = 'left' }: SectionHeadingProps) {
   return (
     <div className={align === 'center' ? 'text-center max-w-2xl mx-auto' : 'max-w-2xl'}>
-      {eyebrow && <p className="text-xs font-black text-[#008060] uppercase tracking-[0.18em]">{eyebrow}</p>}
+      {eyebrow && <p className="text-xs font-black text-[#3b82f6] uppercase tracking-[0.18em]">{eyebrow}</p>}
       <h2 className="font-display mt-2 text-2xl sm:text-3xl font-black text-[#111615]">{title}</h2>
       {description && <p className="mt-3 text-sm sm:text-base leading-7 text-slate-600">{description}</p>}
     </div>
@@ -81,13 +81,13 @@ function SectionHeading({ eyebrow, title, description, align = 'left' }: Section
 
 function HeroButton({ children, onClick, variant = 'primary' }: { children: React.ReactNode; onClick: () => void; variant?: 'primary' | 'secondary' }) {
   const classes = variant === 'primary'
-    ? 'bg-[#b7f25c] text-[#111615] hover:bg-[#c8ff74] active:bg-[#a5df4f] shadow-lg shadow-emerald-950/20'
+    ? 'bg-[#93c5fd] text-[#111615] hover:bg-[#c8ff74] active:bg-[#a5df4f] shadow-lg shadow-brand-950/20'
     : 'bg-white/10 text-white border border-white/30 hover:bg-white/16 active:bg-white/20 backdrop-blur-md';
 
   return (
     <button
       onClick={onClick}
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-5 sm:px-6 text-sm font-black transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#b7f25c] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${classes}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-5 sm:px-6 text-sm font-black transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${classes}`}
     >
       {children}
     </button>
@@ -106,9 +106,9 @@ function StatCard({ value, label }: { value: string | number; label: string }) {
 function CategoryCard({ category, count }: { category: CategoryConfig; count: number }) {
   const Icon = category.icon;
   return (
-    <div className="rounded-xl border border-emerald-950/10 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#008060]/30 hover:shadow-md">
+    <div className="rounded-xl border border-brand-950/10 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-[#3b82f6]/30 hover:shadow-md">
       <div className="flex items-start gap-3">
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#b7f25c]/35 text-[#005f49]">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#93c5fd]/35 text-[#1e40af]">
           <Icon className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">
@@ -122,11 +122,11 @@ function CategoryCard({ category, count }: { category: CategoryConfig; count: nu
 
 function StepCard({ audience, accent, icon: Icon, steps, cta, to }: { audience: string; accent: 'blue' | 'green'; icon: LucideIcon; steps: string[]; cta: string; to: string }) {
   const styles = accent === 'blue'
-    ? { icon: 'bg-[#b7f25c]/35 text-[#005f49]', marker: 'bg-[#008060] text-white', button: 'bg-[#008060] text-white shadow-sm shadow-emerald-950/15 hover:bg-[#005f49] active:bg-[#004b3a] focus-visible:ring-[#008060]' }
-    : { icon: 'bg-emerald-50 text-[#008060]', marker: 'bg-[#b7f25c] text-[#111615]', button: 'bg-[#111615] text-white shadow-sm shadow-slate-950/15 hover:bg-[#1d2422] active:bg-black focus-visible:ring-[#111615]' };
+    ? { icon: 'bg-[#93c5fd]/35 text-[#1e40af]', marker: 'bg-[#3b82f6] text-white', button: 'bg-[#3b82f6] text-white shadow-sm shadow-brand-950/15 hover:bg-[#1e40af] active:bg-[#004b3a] focus-visible:ring-[#3b82f6]' }
+    : { icon: 'bg-brand-50 text-[#3b82f6]', marker: 'bg-[#93c5fd] text-[#111615]', button: 'bg-[#111615] text-white shadow-sm shadow-slate-950/15 hover:bg-[#1d2422] active:bg-black focus-visible:ring-[#111615]' };
 
   return (
-    <div className="flex h-full flex-col rounded-xl border border-emerald-950/10 bg-white p-5 sm:p-6 shadow-sm">
+    <div className="flex h-full flex-col rounded-xl border border-brand-950/10 bg-white p-5 sm:p-6 shadow-sm">
       <div className="flex items-center gap-3">
         <span className={`inline-flex h-11 w-11 items-center justify-center rounded-xl ${styles.icon}`}>
           <Icon className="h-5 w-5" aria-hidden="true" />
@@ -161,14 +161,14 @@ function FeaturedWorkerCard({ worker, reviews, onView }: { worker: User; reviews
     : null;
 
   return (
-    <article className="flex h-full flex-col rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm transition duration-200 hover:border-[#008060]/30 hover:shadow-md">
+    <article className="flex h-full flex-col rounded-xl border border-brand-950/10 bg-white p-5 shadow-sm transition duration-200 hover:border-[#3b82f6]/30 hover:shadow-md">
       <div className="flex items-start gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-black text-slate-700">
           {getInitials(worker.name)}
         </div>
         <div className="min-w-0">
           <h3 className="truncate text-base font-black text-slate-950">{worker.name}</h3>
-          {worker.skill && <p className="mt-1 truncate text-sm font-semibold text-[#008060]">{worker.skill}</p>}
+          {worker.skill && <p className="mt-1 truncate text-sm font-semibold text-[#3b82f6]">{worker.skill}</p>}
           {worker.location && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-slate-500"><MapPin className="h-3.5 w-3.5" aria-hidden="true" />{worker.location}</p>}
         </div>
       </div>
@@ -179,13 +179,13 @@ function FeaturedWorkerCard({ worker, reviews, onView }: { worker: User; reviews
             {avgRating} ({workerReviews.length})
           </span>
         )}
-        {worker.rate && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800"><DollarSign className="h-3.5 w-3.5" aria-hidden="true" />{worker.rate}</span>}
+        {worker.rate && <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-brand-800"><DollarSign className="h-3.5 w-3.5" aria-hidden="true" />{worker.rate}</span>}
         {worker.availability && <span className="rounded-full bg-slate-100 px-2.5 py-1 capitalize text-slate-700">{worker.availability}</span>}
       </div>
       {worker.bio && <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">{worker.bio}</p>}
       <button
         onClick={onView}
-        className="mt-auto inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-950/10 px-4 py-2 text-sm font-black text-slate-800 transition hover:border-[#008060]/30 hover:bg-emerald-50 hover:text-[#005f49] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060]"
+        className="mt-auto inline-flex min-h-11 items-center justify-center rounded-full border border-brand-950/10 px-4 py-2 text-sm font-black text-slate-800 transition hover:border-[#3b82f6]/30 hover:bg-brand-50 hover:text-[#1e40af] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]"
       >
         View Profile
       </button>
@@ -195,22 +195,22 @@ function FeaturedWorkerCard({ worker, reviews, onView }: { worker: User; reviews
 
 function JobPreviewCard({ job, onView }: { job: Job; onView: () => void }) {
   return (
-    <article className="flex h-full flex-col rounded-xl border border-emerald-950/10 bg-white p-5 shadow-sm transition duration-200 hover:border-[#008060]/30 hover:shadow-md">
+    <article className="flex h-full flex-col rounded-xl border border-brand-950/10 bg-white p-5 shadow-sm transition duration-200 hover:border-[#3b82f6]/30 hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="line-clamp-2 text-base font-black leading-6 text-slate-950">{job.title}</h3>
           <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-400">{formatDate(job.createdAt)}</p>
         </div>
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase text-emerald-700">{job.status.replace('_', ' ')}</span>
+        <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-black uppercase text-brand-700">{job.status.replace('_', ' ')}</span>
       </div>
       <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
         <span className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-1"><MapPin className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />{job.location}</span>
-        {job.rate && <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-700"><DollarSign className="h-3.5 w-3.5" aria-hidden="true" />{job.rate}</span>}
+        {job.rate && <span className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2.5 py-1 text-brand-700"><DollarSign className="h-3.5 w-3.5" aria-hidden="true" />{job.rate}</span>}
       </div>
       <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">{job.description}</p>
       <button
         onClick={onView}
-        className="mt-auto inline-flex min-h-11 items-center justify-center rounded-full bg-[#111615] px-4 py-2 text-sm font-black text-white transition hover:bg-[#1d2422] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060] focus-visible:ring-offset-2"
+        className="mt-auto inline-flex min-h-11 items-center justify-center rounded-full bg-[#111615] px-4 py-2 text-sm font-black text-white transition hover:bg-[#1d2422] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2"
       >
         View Job
       </button>
@@ -245,7 +245,7 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
         <div className="absolute inset-0 bg-gradient-to-t from-[#111615]/80 via-[#111615]/10 to-[#111615]/12" />
         <div className="relative z-10 mx-auto flex w-full max-w-7xl items-center px-4 pb-20 pt-16 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-[#b7f25c] backdrop-blur-md">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-[#93c5fd] backdrop-blur-md">
               <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
               Qardho, Karkaar Region
             </div>
@@ -278,7 +278,7 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
       </section>
 
       <section className="mx-auto -mt-10 max-w-7xl px-4 pb-12 sm:px-6 lg:px-8" aria-labelledby="category-heading">
-        <div className="rounded-2xl border border-emerald-950/10 bg-white/95 p-5 shadow-xl shadow-emerald-950/10 backdrop-blur sm:p-6">
+        <div className="rounded-2xl border border-brand-950/10 bg-white/95 p-5 shadow-xl shadow-brand-950/10 backdrop-blur sm:p-6">
         <SectionHeading title="Find help by skill" description="Browse the trade areas represented by current worker profiles." />
         <div className="mt-7 grid grid-cols-1 gap-4 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {categoryCounts.map(({ category, count }) => (
@@ -312,12 +312,12 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
         </div>
       </section>
 
-      <section className="border-y border-emerald-950/10 bg-white py-12" aria-labelledby="benefits-heading">
+      <section className="border-y border-brand-950/10 bg-white py-12" aria-labelledby="benefits-heading">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {[
-              { title: 'Local Worker Profiles', desc: 'Review skills, area, bio, price, and availability when workers provide them.', icon: ShieldCheck, color: 'bg-[#b7f25c]/35 text-[#005f49]' },
-              { title: 'Direct Negotiation', desc: 'Message workers or applicants directly and agree on scope, timing, and payment.', icon: CheckCircle2, color: 'bg-emerald-50 text-emerald-600' },
+              { title: 'Local Worker Profiles', desc: 'Review skills, area, bio, price, and availability when workers provide them.', icon: ShieldCheck, color: 'bg-[#93c5fd]/35 text-[#1e40af]' },
+              { title: 'Direct Negotiation', desc: 'Message workers or applicants directly and agree on scope, timing, and payment.', icon: CheckCircle2, color: 'bg-brand-50 text-brand-600' },
               { title: 'Neighborhood-Specific Results', desc: 'Find help around Kaambo, Qoryacad, Xorgoble, Xiingood, Xiddo, Sheerbi, and Waaciye.', icon: MapPin, color: 'bg-amber-50 text-amber-600' },
             ].map(item => {
               const Icon = item.icon;
@@ -340,7 +340,7 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-labelledby="featured-workers-heading">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <SectionHeading title="Featured Skilled Workers" description="A short preview of worker profiles currently available in the platform." />
-          <button onClick={() => onNavigate('workers')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-black text-[#008060] hover:text-[#005f49] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060]">
+          <button onClick={() => onNavigate('workers')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-black text-[#3b82f6] hover:text-[#1e40af] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]">
             View all workers <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
@@ -360,7 +360,7 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-labelledby="active-jobs-heading">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <SectionHeading title="Available Jobs in Qardho" description="Recent local job posts from employers in the platform." />
-          <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-black text-[#008060] hover:text-[#005f49] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#008060]">
+          <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-black text-[#3b82f6] hover:text-[#1e40af] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]">
             Browse all jobs <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
@@ -388,11 +388,13 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Search local profiles or create a worker account so nearby employers can contact you.</p>
           </div>
           <div className="mt-6 flex flex-wrap gap-3 md:mt-0 md:shrink-0">
-            <button onClick={() => onNavigate('workers')} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#b7f25c] px-5 text-sm font-black text-[#111615] transition hover:bg-[#c8ff74] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#b7f25c] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Find Skilled Workers</button>
-            <Link to={PAGE_ROUTES.register} className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#b7f25c] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Create Worker Profile</Link>
+            <button onClick={() => onNavigate('workers')} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#93c5fd] px-5 text-sm font-black text-[#111615] transition hover:bg-[#c8ff74] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Find Skilled Workers</button>
+            <Link to={PAGE_ROUTES.register} className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Create Worker Profile</Link>
           </div>
         </div>
       </section>
     </div>
   );
 }
+
+

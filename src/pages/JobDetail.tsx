@@ -23,7 +23,7 @@ const formatDate = (date?: string) => {
 
 const statusStyles = {
   pending: 'border-amber-100 bg-amber-50 text-amber-700',
-  accepted: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+  accepted: 'border-brand-100 bg-brand-50 text-brand-700',
   declined: 'border-rose-100 bg-rose-50 text-rose-700',
 };
 
@@ -87,7 +87,7 @@ export default function JobDetail({ job, currentUser, applications, onApply, onN
                 <span className="text-sm font-bold text-slate-900">Qardho - {job.location}</span>
               </div>
               <div className="rounded-xl border border-slate-100 p-4">
-                <DollarSign className="h-4 w-4 text-emerald-600" />
+                <DollarSign className="h-4 w-4 text-brand-600" />
                 <span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Offer</span>
                 <span className="text-sm font-bold text-slate-900">{job.rate}</span>
               </div>
@@ -106,16 +106,16 @@ export default function JobDetail({ job, currentUser, applications, onApply, onN
             {job.requirements && <div><h2 className="text-base font-black text-slate-950">Requirements</h2><p className="mt-3 whitespace-pre-line rounded-xl border border-slate-100 bg-white p-4 text-sm leading-7 text-slate-700">{job.requirements}</p></div>}
 
             {(job.category || job.workType || job.expectedDuration) && <div className="grid gap-3 sm:grid-cols-3">
-              {job.category && <div className="rounded-xl border border-slate-100 p-4"><Briefcase className="h-4 w-4 text-[#008060]" /><span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Category</span><span className="text-sm font-bold text-slate-900">{job.category}</span></div>}
-              {job.workType && <div className="rounded-xl border border-slate-100 p-4"><UserRound className="h-4 w-4 text-[#008060]" /><span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Work type</span><span className="text-sm font-bold text-slate-900">{job.workType}</span></div>}
-              {job.expectedDuration && <div className="rounded-xl border border-slate-100 p-4"><Clock3 className="h-4 w-4 text-[#008060]" /><span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Expected duration</span><span className="text-sm font-bold text-slate-900">{job.expectedDuration}</span></div>}
+              {job.category && <div className="rounded-xl border border-slate-100 p-4"><Briefcase className="h-4 w-4 text-[#3b82f6]" /><span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Category</span><span className="text-sm font-bold text-slate-900">{job.category}</span></div>}
+              {job.workType && <div className="rounded-xl border border-slate-100 p-4"><UserRound className="h-4 w-4 text-[#3b82f6]" /><span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Work type</span><span className="text-sm font-bold text-slate-900">{job.workType}</span></div>}
+              {job.expectedDuration && <div className="rounded-xl border border-slate-100 p-4"><Clock3 className="h-4 w-4 text-[#3b82f6]" /><span className="mt-2 block text-[10px] font-black uppercase text-slate-400">Expected duration</span><span className="text-sm font-bold text-slate-900">{job.expectedDuration}</span></div>}
             </div>}
 
             <div>
               <h2 className="text-base font-black text-slate-950">Status timeline</h2>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
                 {timeline.map((step) => (
-                  <div key={step.label} className={`rounded-lg border px-2 py-2 text-center text-[10px] font-black uppercase ${step.done ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-slate-100 bg-white text-slate-400'}`}>
+                  <div key={step.label} className={`rounded-lg border px-2 py-2 text-center text-[10px] font-black uppercase ${step.done ? 'border-brand-100 bg-brand-50 text-brand-700' : 'border-slate-100 bg-white text-slate-400'}`}>
                     {step.label}
                   </div>
                 ))}
@@ -160,4 +160,6 @@ export default function JobDetail({ job, currentUser, applications, onApply, onN
     </main>
   );
 }
+
+
 

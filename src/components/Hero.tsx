@@ -27,7 +27,7 @@ export default function Hero() {
             <span className="font-medium text-slate-200">50+ Active Tradesmen</span>
           </div>
           <div className="flex items-center space-x-1.5 bg-slate-800/60 px-3.5 py-1.5 rounded-lg border border-slate-700/50">
-            <Briefcase className="h-4 w-4 text-emerald-500" />
+            <Briefcase className="h-4 w-4 text-brand-500" />
             <span className="font-medium text-slate-200">Verified Job Postings</span>
           </div>
           <div className="flex items-center space-x-1.5 bg-slate-800/60 px-3.5 py-1.5 rounded-lg border border-slate-700/50">
@@ -42,3 +42,5 @@ export default function Hero() {
     </div>
   );
 }
+
+

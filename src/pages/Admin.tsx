@@ -166,10 +166,10 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
         </div>
       </section>
 
-      <section className={`mt-6 overflow-hidden rounded-3xl border ${counts.waiting > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-emerald-200 bg-emerald-50/50'}`}>
+      <section className={`mt-6 overflow-hidden rounded-3xl border ${counts.waiting > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-brand-200 bg-brand-50/50'}`}>
         <div className="flex flex-col gap-3 border-b border-black/5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <div className={`rounded-2xl p-2.5 ${counts.waiting > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+            <div className={`rounded-2xl p-2.5 ${counts.waiting > 0 ? 'bg-amber-100 text-amber-700' : 'bg-brand-100 text-brand-700'}`}>
               {counts.waiting > 0 ? <Clock3 className="h-5 w-5" /> : <BadgeCheck className="h-5 w-5" />}
             </div>
             <div>
@@ -222,7 +222,7 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-lg font-black text-slate-950">{user.name}</h2>
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-700">{user.role || 'pending'}</span>
-                  {user.verified && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-700"><BadgeCheck className="h-3 w-3" /> Verified</span>}
+                  {user.verified && <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-brand-700"><BadgeCheck className="h-3 w-3" /> Verified</span>}
                   {!user.verified && user.role !== 'admin' && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-800"><Clock3 className="h-3 w-3" /> Waiting for verification</span>}
                   {user.suspended && <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-700"><UserX className="h-3 w-3" /> Suspended</span>}
                 </div>
@@ -378,7 +378,7 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
                 </label>
 
                 {messageFeedback && (
-                  <div className={messageFeedback.type === 'success' ? 'mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-bold text-emerald-800' : 'mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-xs font-bold text-rose-700'}>
+                  <div className={messageFeedback.type === 'success' ? 'mt-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-3 text-xs font-bold text-brand-800' : 'mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-xs font-bold text-rose-700'}>
                     {messageFeedback.text}
                   </div>
                 )}
@@ -388,7 +388,7 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
                     <MessageSquare className="h-4 w-4" />{messageBusy ? 'Sending message...' : latestVerificationMessage ? 'Replace in-app message' : 'Send in-app message'}
                   </button>
                   {whatsAppUrl && (
-                    <a href={whatsAppUrl} target="_blank" rel="noreferrer" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-700">
+                    <a href={whatsAppUrl} target="_blank" rel="noreferrer" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-brand-700">
                       Open prepared WhatsApp
                     </a>
                   )}
@@ -402,7 +402,7 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
 
             <footer className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:flex-row sm:justify-end sm:px-7">
               <button onClick={() => setReviewingUser(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700 transition hover:bg-slate-50">Close review</button>
-              <button disabled={busyId === `verify-${reviewingUser.id}`} onClick={verifyReviewedUser} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-black text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60">
+              <button disabled={busyId === `verify-${reviewingUser.id}`} onClick={verifyReviewedUser} className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-xs font-black text-white transition hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60">
                 <BadgeCheck className="h-4 w-4" />{busyId === `verify-${reviewingUser.id}` ? 'Verifying account...' : 'Verify this account'}
               </button>
             </footer>
@@ -412,3 +412,5 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
     </main>
   );
 }
+
+
