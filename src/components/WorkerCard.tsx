@@ -54,12 +54,12 @@ export default function WorkerCard({ worker, currentUser, onViewProfile, isCurre
   const workerReviews = reviews.filter(r => r.workerId === worker.id);
   const avgRating = workerReviews.length > 0
     ? (workerReviews.reduce((sum, r) => sum + r.rating, 0) / workerReviews.length).toFixed(1)
-    : worker.rating ? worker.rating.toFixed(1) : null;
+    : null;
 
   return (
     <article
       id={`worker-card-${worker.id}`}
-      className="worker-card group flex h-full flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#073f34] hover:shadow-md"
+      className="worker-card group flex h-full flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#2563eb] hover:shadow-md"
     >
       <div className="space-y-4">
         {/* Header: Avatar, Name & Availability Pill */}
@@ -67,11 +67,11 @@ export default function WorkerCard({ worker, currentUser, onViewProfile, isCurre
           <div className="flex items-center gap-3 min-w-0">
             <Avatar name={worker.name} src={avatarSrc} eager={isCurrentUser} />
             <div className="min-w-0">
-              <h3 className="text-lg font-black text-slate-900 leading-snug group-hover:text-[#073f34] transition truncate">
+              <h3 className="text-lg font-black text-slate-900 leading-snug group-hover:text-[#2563eb] transition truncate">
                 {worker.name}
               </h3>
               <p className="text-xs font-bold text-slate-500 truncate mt-0.5">
-                {worker.skill || worker.category || 'Skilled professional'}
+                {worker.skill || 'Skilled professional'}
               </p>
             </div>
           </div>
@@ -86,12 +86,12 @@ export default function WorkerCard({ worker, currentUser, onViewProfile, isCurre
         {/* Metadata Badges */}
         <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600 pt-2 border-t border-slate-100">
           <div className="flex items-center gap-1.5 rounded-xl bg-slate-50 p-2.5 border border-slate-100">
-            <MapPin className="h-3.5 w-3.5 text-[#073f34] shrink-0" />
+            <MapPin className="h-3.5 w-3.5 text-[#2563eb] shrink-0" />
             <span className="truncate text-slate-900 font-bold">{worker.location ? `Qardho - ${worker.location}` : 'Qardho'}</span>
           </div>
 
           <div className="flex items-center gap-1.5 rounded-xl bg-slate-50 p-2.5 border border-slate-100">
-            <DollarSign className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+            <DollarSign className="h-3.5 w-3.5 text-blue-600 shrink-0" />
             <span className="truncate text-slate-900 font-bold">{rateDisplay}</span>
           </div>
         </div>
@@ -99,8 +99,8 @@ export default function WorkerCard({ worker, currentUser, onViewProfile, isCurre
         {/* Verification & Rating Badges */}
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 font-medium">
           {worker.verified ? (
-            <span className="inline-flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[11px]">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+            <span className="inline-flex items-center gap-1 text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 text-[11px]">
+              <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
               Verified Worker
             </span>
           ) : (
@@ -130,7 +130,7 @@ export default function WorkerCard({ worker, currentUser, onViewProfile, isCurre
           <button
             type="button"
             onClick={() => onViewProfile(worker)}
-            className="view-profile-button inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#0b5c4d] group-hover:bg-[#0b5c4d] hover:shadow-md transition-all duration-200"
+            className="view-profile-button inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] group-hover:bg-[#1d4ed8] hover:shadow-md transition-all duration-200"
           >
             <span>View Profile</span>
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

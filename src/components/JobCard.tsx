@@ -62,14 +62,14 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
 
   return (
     <article
-      className="group flex h-full flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#073f34] hover:shadow-md"
+      className="group flex h-full flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#2563eb] hover:shadow-md"
       id={`job-card-${job.id}`}
     >
       <div className="space-y-4">
         {/* Header: Title & Badges */}
         <div>
           <div className="flex items-start justify-between gap-3">
-            <h3 className="text-lg font-black text-slate-900 leading-snug group-hover:text-[#073f34] transition">
+            <h3 className="text-lg font-black text-slate-900 leading-snug group-hover:text-[#2563eb] transition">
               {job.title}
             </h3>
             <span
@@ -86,8 +86,8 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
 
         {/* Application status if worker applied */}
         {application && (
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-800">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-800">
+            <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" />
             <span>Applied: {application.status}</span>
           </div>
         )}
@@ -95,12 +95,12 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
         {/* Metadata Badges */}
         <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600 pt-2 border-t border-slate-100">
           <div className="flex items-center gap-1.5 rounded-xl bg-slate-50 p-2.5 border border-slate-100">
-            <MapPin className="h-3.5 w-3.5 text-[#073f34] shrink-0" />
+            <MapPin className="h-3.5 w-3.5 text-[#2563eb] shrink-0" />
             <span className="truncate text-slate-900 font-bold">{job.location ? `Qardho - ${job.location}` : 'Qardho'}</span>
           </div>
 
           <div className="flex items-center gap-1.5 rounded-xl bg-slate-50 p-2.5 border border-slate-100">
-            <DollarSign className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+            <DollarSign className="h-3.5 w-3.5 text-blue-600 shrink-0" />
             <span className="truncate text-slate-900 font-bold">{paymentDisplay}</span>
           </div>
         </div>
@@ -131,7 +131,7 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
           <button
             type="button"
             onClick={() => onViewDetails(job)}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#0b5c4d] group-hover:bg-[#0b5c4d] hover:shadow-md transition-all duration-200"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] group-hover:bg-[#1d4ed8] hover:shadow-md transition-all duration-200"
           >
             <span>View Job</span>
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

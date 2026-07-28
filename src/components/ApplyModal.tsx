@@ -122,7 +122,7 @@ export default function ApplyModal({ job, currentUser, onClose, onSubmit }: Appl
               Application Review
             </h2>
             <p className="mt-0.5 text-xs font-semibold text-slate-600">
-              Apply for <span className="font-bold text-[#073f34]">"{job.title}"</span>
+              Apply for <span className="font-bold text-[#2563eb]">"{job.title}"</span>
             </p>
             <p className="text-xs font-medium text-slate-400">{job.employerName}</p>
           </div>
@@ -152,7 +152,7 @@ export default function ApplyModal({ job, currentUser, onClose, onSubmit }: Appl
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Job Budget</span>
-                <p className="mt-0.5 truncate text-xs font-black text-[#073f34]">{jobOfferDisplay}</p>
+                <p className="mt-0.5 truncate text-xs font-black text-[#2563eb]">{jobOfferDisplay}</p>
               </div>
             </div>
 
@@ -286,7 +286,7 @@ export default function ApplyModal({ job, currentUser, onClose, onSubmit }: Appl
             <button
               type="submit"
               disabled={isSubmitting || submittedSuccess || !message.trim()}
-              className="inline-flex min-h-12 flex-1 sm:flex-initial min-w-[180px] items-center justify-center gap-2 rounded-xl bg-[#073f34] px-6 text-xs font-black text-white hover:bg-[#064e3b] transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+              className="inline-flex min-h-12 flex-1 sm:flex-initial min-w-[180px] items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-xs font-black text-white hover:bg-[#1d4ed8] transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
             >
               <Send className="h-4 w-4" />
               <span>

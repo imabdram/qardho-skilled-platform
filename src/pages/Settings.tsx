@@ -45,7 +45,7 @@ export default function Settings({
           <span className="text-xs font-bold text-slate-400">Platform Settings</span>
         </div>
 
-        <header className="mb-6 rounded-2xl bg-[#073f34] p-6 text-white sm:p-8">
+        <header className="mb-6 rounded-2xl bg-[#2563eb] p-6 text-white sm:p-8">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[#93c5fd]">Account & Preferences</p>
           <h1 className="mt-2 text-2xl font-black sm:text-3xl">Platform Settings</h1>
           <p className="mt-2 max-w-xl text-xs font-medium text-brand-50/80 sm:text-sm">
@@ -119,7 +119,7 @@ export default function Settings({
                     onChange={(e) => setEmailEnabled(e.target.checked)}
                     className="peer sr-only"
                   />
-                  <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-[#073f34] peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+                  <div className="peer h-6 w-11 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-[#2563eb] peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
                 </label>
               </div>
             </div>

@@ -83,7 +83,7 @@ export default function CandidateReviewModal({
               {application.applicantName}
             </h2>
             <p className="text-xs font-semibold text-slate-500">
-              Applied for: <span className="font-bold text-[#073f34]">"{application.jobTitle}"</span>
+              Applied for: <span className="font-bold text-[#2563eb]">"{application.jobTitle}"</span>
             </p>
           </div>
           <button
@@ -117,7 +117,7 @@ export default function CandidateReviewModal({
                     </span>
                   )}
                 </div>
-                <p className="text-xs font-semibold text-[#073f34]">{application.applicantSkill || 'Skilled Worker'}</p>
+                <p className="text-xs font-semibold text-[#2563eb]">{application.applicantSkill || 'Skilled Worker'}</p>
                 <p className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mt-0.5">
                   <MapPin className="h-3 w-3 text-slate-400" />
                   {application.location || 'Qardho'}
@@ -237,7 +237,7 @@ export default function CandidateReviewModal({
               <button
                 type="button"
                 onClick={() => onAccept(application.id)}
-                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#073f34] px-6 text-xs font-black text-white hover:bg-[#064e3b] transition shadow-xs"
+                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-xs font-black text-white hover:bg-[#1d4ed8] transition shadow-xs"
               >
                 <UserCheck className="h-4 w-4" />
                 <span>Accept & Hire</span>

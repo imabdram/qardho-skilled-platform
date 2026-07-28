@@ -5,7 +5,7 @@ export default function AboutContact() {
   const [sent, setSent] = useState(false);
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-      <section className="overflow-hidden rounded-[2rem] bg-[#073f34] px-6 py-10 text-white sm:px-10 sm:py-14">
+      <section className="overflow-hidden rounded-[2rem] bg-[#2563eb] px-6 py-10 text-white sm:px-10 sm:py-14">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-[#93c5fd]">Qardho Skilled Platform</p>
         <h1 className="mt-4 max-w-3xl text-4xl font-black leading-tight sm:text-5xl">Local skill, clearer opportunities, safer connections.</h1>
         <p className="mt-5 max-w-2xl text-sm font-semibold leading-7 text-brand-50/80 sm:text-base">We help workers in Qardho present their skills and help employers review local talent and job applications before private contact details are shared.</p>

@@ -124,7 +124,7 @@ export default function ProfileEdit({
           <span className="text-xs font-bold text-slate-400">Editing Profile</span>
         </div>
 
-        <header className="mb-6 rounded-2xl bg-[#073f34] p-6 text-white sm:p-8">
+        <header className="mb-6 rounded-2xl bg-[#2563eb] p-6 text-white sm:p-8">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[#93c5fd]">Profile Setup</p>
           <h1 className="mt-2 text-2xl font-black sm:text-3xl">Edit Your Profile Information</h1>
           <p className="mt-2 max-w-xl text-xs font-medium text-brand-50/80 sm:text-sm">
@@ -166,7 +166,7 @@ export default function ProfileEdit({
                   <button
                     type="button"
                     onClick={() => openUserProfile?.()}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#064e3b] transition"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
                   >
                     <Upload className="h-4 w-4" />
                     <span>Change Photo</span>
@@ -430,7 +430,7 @@ export default function ProfileEdit({
             <button
               type="submit"
               disabled={isSaving}
-              className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#073f34] px-8 text-sm font-black text-white hover:bg-[#064e3b] disabled:opacity-60"
+              className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#2563eb] px-8 text-sm font-black text-white hover:bg-[#1d4ed8] disabled:opacity-60"
             >
               <Save className="h-4 w-4" />
               {isSaving ? 'Saving Changes...' : 'Save Profile'}
@@ -449,7 +449,7 @@ export default function ProfileEdit({
             <button
               type="submit"
               disabled={isSaving}
-              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#073f34] text-xs font-black text-white disabled:opacity-60"
+              className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#2563eb] text-xs font-black text-white disabled:opacity-60"
             >
               <Save className="h-4 w-4" />
               {isSaving ? 'Saving...' : 'Save Profile'}

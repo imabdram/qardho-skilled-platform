@@ -34,11 +34,17 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
     const query = searchQuery.trim().toLowerCase();
     const matchesSearch =
       !query ||
-      [worker.name, worker.skill, worker.bio, worker.category, worker.location]
+      [worker.name, worker.skill, worker.bio, worker.location]
         .some((val) => val?.toLowerCase().includes(query));
     const matchesLocation = !selectedLocation || worker.location === selectedLocation;
     return matchesSearch && matchesLocation;
   });
+
+  const getWorkerRating = (workerId: string) => {
+    const workerReviews = reviews.filter((r) => r.workerId === workerId);
+    if (workerReviews.length === 0) return 0;
+    return workerReviews.reduce((sum, r) => sum + r.rating, 0) / workerReviews.length;
+  };
 
   const sortedWorkers = [...filteredWorkers].sort((a, b) => {
     if (sortOrder === 'newest') {
@@ -47,8 +53,8 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
       return dateB - dateA;
     }
     if (sortOrder === 'rating') {
-      const ratingA = a.rating || 0;
-      const ratingB = b.rating || 0;
+      const ratingA = getWorkerRating(a.id);
+      const ratingB = getWorkerRating(b.id);
       return ratingB - ratingA;
     }
     if (sortOrder === 'name') {
@@ -106,7 +112,7 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
               <p className="mt-0.5 text-xs text-slate-600">Create a worker profile to showcase your skills.</p>
               <button
                 onClick={() => navigate(PAGE_ROUTES.register)}
-                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#064e3b] transition"
+                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
               >
                 Create a profile
               </button>
@@ -116,8 +122,8 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
               <p className="text-xs font-black text-slate-900">Need work done?</p>
               <p className="mt-0.5 text-xs text-slate-600">Post a job to get proposals from skilled workers.</p>
               <button
-                onClick={() => navigate(PAGE_ROUTES.postJob)}
-                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#064e3b] transition"
+                onClick={() => navigate(PAGE_ROUTES['post-job'])}
+                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
               >
                 Post a Job
               </button>
@@ -250,7 +256,7 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
             {hasActiveFilters && (
               <button
                 onClick={clearSearch}
-                className="mt-2 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#073f34] px-5 text-xs font-black text-white hover:bg-[#064e3b] transition"
+                className="mt-2 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#2563eb] px-5 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
               >
                 Clear Filters
               </button>

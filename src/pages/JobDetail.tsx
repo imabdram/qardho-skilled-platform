@@ -62,7 +62,7 @@ export default function JobDetail({
           <p className="mt-2 text-sm font-medium text-slate-500">It may have been removed, filled, or closed by the employer.</p>
           <button
             onClick={() => onNavigate('jobs')}
-            className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#073f34] px-6 text-sm font-black text-white hover:bg-[#064e3b] transition"
+            className="mt-6 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-sm font-black text-white hover:bg-[#1d4ed8] transition"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Jobs
@@ -174,7 +174,7 @@ export default function JobDetail({
               <h1 className="text-2xl font-black text-slate-900 sm:text-3xl lg:text-4xl tracking-tight leading-tight">
                 {job.title}
               </h1>
-              <p className="text-sm font-bold text-[#073f34] flex items-center gap-1.5">
+              <p className="text-sm font-bold text-[#2563eb] flex items-center gap-1.5">
                 <UserRound className="h-4 w-4 text-slate-400" />
                 <span>{job.employerName}</span>
               </p>
@@ -195,7 +195,7 @@ export default function JobDetail({
           <div className="mt-6 grid grid-cols-2 gap-3 border-t border-slate-100 pt-6 sm:grid-cols-4">
             <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-100">
               <div className="flex items-center gap-1.5 text-slate-400">
-                <MapPin className="h-4 w-4 text-[#073f34]" />
+                <MapPin className="h-4 w-4 text-[#2563eb]" />
                 <span className="text-[10px] font-black uppercase text-slate-500">Location</span>
               </div>
               <p className="mt-1 truncate text-xs font-black text-slate-900">
@@ -295,7 +295,7 @@ export default function JobDetail({
                     <div
                       className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-black transition ${
                         step.done
-                          ? 'border-[#073f34] bg-[#073f34] text-white'
+                          ? 'border-[#2563eb] bg-[#2563eb] text-white'
                           : 'border-slate-200 bg-white text-slate-400'
                       }`}
                     >
@@ -316,14 +316,14 @@ export default function JobDetail({
                       <div
                         className={`flex h-7 w-7 items-center justify-center rounded-full border-2 text-xs font-black ${
                           step.done
-                            ? 'border-[#073f34] bg-[#073f34] text-white'
+                            ? 'border-[#2563eb] bg-[#2563eb] text-white'
                             : 'border-slate-200 bg-white text-slate-400'
                         }`}
                       >
                         {step.done ? <Check className="h-3.5 w-3.5" /> : idx + 1}
                       </div>
                       {idx < timelineSteps.length - 1 && (
-                        <div className={`h-8 w-0.5 mt-1 ${step.done ? 'bg-[#073f34]' : 'bg-slate-200'}`} />
+                        <div className={`h-8 w-0.5 mt-1 ${step.done ? 'bg-[#2563eb]' : 'bg-slate-200'}`} />
                       )}
                     </div>
                     <div className="pt-0.5">
@@ -348,7 +348,7 @@ export default function JobDetail({
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Employer</span>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-[#073f34] font-black text-lg">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-[#2563eb] font-black text-lg">
                     {job.employerName ? job.employerName.charAt(0).toUpperCase() : 'E'}
                   </div>
                   <div>
@@ -387,7 +387,7 @@ export default function JobDetail({
                   type="button"
                   onClick={handleApplyClick}
                   disabled={applyButtonDisabled}
-                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#073f34] px-6 text-sm font-black text-white hover:bg-[#064e3b] transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-sm font-black text-white hover:bg-[#1d4ed8] transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
                 >
                   <CheckCircle2 className="h-4.5 w-4.5" />
                   <span>{applyButtonLabel}</span>
@@ -405,7 +405,7 @@ export default function JobDetail({
           type="button"
           onClick={handleApplyClick}
           disabled={applyButtonDisabled}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#073f34] px-6 text-sm font-black text-white hover:bg-[#064e3b] disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-sm font-black text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
         >
           <CheckCircle2 className="h-4.5 w-4.5" />
           <span>{applyButtonLabel}</span>

@@ -151,8 +151,8 @@ export default function Profile({
           </button>
         )}
 
-        {/* 1. Profile Header (Branded Green Card, No Tall Blue Cover) */}
-        <div className="overflow-hidden rounded-3xl border border-brand-950/10 bg-[#073f34] p-6 text-white shadow-lg sm:p-8">
+        {/* 1. Profile Header (Branded Blue Card, No Tall Blue Cover) */}
+        <div className="overflow-hidden rounded-3xl border border-brand-950/10 bg-[#2563eb] p-6 text-white shadow-lg sm:p-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col sm:flex-row sm:items-center gap-5">
               {/* Profile Photo */}
@@ -169,7 +169,7 @@ export default function Profile({
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-black text-white sm:text-3xl">{targetUser.name}</h1>
                   {targetUser.verified && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-bold text-emerald-300 border border-emerald-500/30">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2.5 py-0.5 text-xs font-bold text-blue-300 border border-blue-500/30">
                       <ShieldCheck className="h-3.5 w-3.5" />
                       Verified
                     </span>
@@ -184,12 +184,12 @@ export default function Profile({
 
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-brand-50/80">
                   <span className="inline-flex items-center gap-1.5 font-medium">
-                    <MapPin className="h-3.5 w-3.5 text-emerald-400" />
+                    <MapPin className="h-3.5 w-3.5 text-blue-300" />
                     {targetUser.location || 'Qardho'}
                   </span>
                   <span>·</span>
                   <span className="inline-flex items-center gap-1.5 font-medium">
-                    <span className={`h-2 w-2 rounded-full ${targetUser.availability === 'busy' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                    <span className={`h-2 w-2 rounded-full ${targetUser.availability === 'busy' ? 'bg-amber-400' : 'bg-blue-300'}`} />
                     {targetUser.availability === 'busy' ? 'Currently busy' : 'Available for work'}
                   </span>
                 </div>
@@ -202,7 +202,7 @@ export default function Profile({
                 <>
                   <button
                     onClick={() => navigate('/profile/edit')}
-                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-[#073f34] hover:bg-slate-100 transition"
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-[#2563eb] hover:bg-slate-100 transition"
                   >
                     <Edit3 className="h-4 w-4" />
                     Edit Profile
@@ -294,7 +294,7 @@ export default function Profile({
                         key={skillName}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-800"
                       >
-                        <Wrench className="h-3.5 w-3.5 text-[#073f34]" />
+                        <Wrench className="h-3.5 w-3.5 text-[#2563eb]" />
                         {skillName}
                       </span>
                     ))
@@ -383,7 +383,7 @@ export default function Profile({
                   <button
                     type="submit"
                     disabled={!newComment.trim() || isSubmittingReview}
-                    className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#064e3b] disabled:opacity-50"
+                    className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] disabled:opacity-50"
                   >
                     <Send className="h-3.5 w-3.5" />
                     Submit Review

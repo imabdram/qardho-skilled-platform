@@ -95,6 +95,7 @@ export default function App() {
 
   useEffect(() => {
     setCurrentPage(getPageForPath(location.pathname));
+    window.scrollTo(0, 0);
   }, [location.pathname]);
 
   // Load and refresh all data from the PostgreSQL database

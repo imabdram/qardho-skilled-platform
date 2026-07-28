@@ -89,7 +89,7 @@ export default function Jobs({ jobs = [], currentUser, applications = [], isLoad
               <p className="mt-0.5 text-xs text-slate-600">Sign in as an employer to post jobs.</p>
               <button
                 onClick={() => navigate(PAGE_ROUTES.auth)}
-                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#064e3b] transition"
+                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
               >
                 Sign in to post
               </button>
@@ -225,7 +225,7 @@ export default function Jobs({ jobs = [], currentUser, applications = [], isLoad
             {hasActiveFilters && (
               <button
                 onClick={clearSearch}
-                className="mt-2 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#073f34] px-5 text-xs font-black text-white hover:bg-[#064e3b] transition"
+                className="mt-2 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#2563eb] px-5 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
               >
                 Clear Filters
               </button>

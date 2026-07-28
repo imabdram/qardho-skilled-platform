@@ -136,7 +136,7 @@ export default function Dashboard({
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 mr-2">
-          <Phone className="h-3.5 w-3.5 text-[#073f34]" />
+          <Phone className="h-3.5 w-3.5 text-[#2563eb]" />
           <span className="text-slate-500">{label}:</span>
           <span className="font-mono text-slate-950 select-all">{formatPhoneDisplay(phone)}</span>
         </span>
