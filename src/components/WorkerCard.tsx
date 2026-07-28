@@ -1,4 +1,5 @@
 import React from 'react';
+import { useUser } from '@clerk/react';
 import { DollarSign, ShieldCheck } from 'lucide-react';
 import { User as UserType, Review } from '../types';
 import Avatar from './Avatar';
@@ -6,20 +7,29 @@ import Avatar from './Avatar';
 interface WorkerCardProps {
   key?: string;
   worker: UserType;
+  currentUser?: UserType | null;
   onConnect?: (worker: UserType) => void;
   onViewProfile?: (worker: UserType) => void;
   isCurrentUser: boolean;
   reviews?: Review[];
 }
 
-export default function WorkerCard({ worker, onViewProfile, isCurrentUser }: WorkerCardProps) {
+export default function WorkerCard({ worker, currentUser, onViewProfile, isCurrentUser }: WorkerCardProps) {
+  const { user: clerkUser } = useUser();
   const availability = worker.availability || 'available';
   const availabilityLabel = availability === 'available' ? 'Available' : availability === 'busy' ? 'Busy' : 'Unavailable';
+
+  const avatarSrc = (isCurrentUser && clerkUser?.imageUrl)
+    ? clerkUser.imageUrl
+    : (isCurrentUser && currentUser?.avatarUrl)
+    ? currentUser.avatarUrl
+    : worker.avatarUrl;
+
   return (
-    <article id={`worker-card-${worker.id}`} className="worker-card flex h-full flex-col justify-between rounded-2xl border border-brand-950/10 bg-white p-5 shadow-sm premium-hover">
+    <article id={`worker-card-${worker.id}`} className="worker-card flex h-full flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#073f34] hover:shadow-md">
       <div>
         <div className="flex items-start gap-4">
-          <Avatar name={worker.name} src={worker.avatarUrl} />
+          <Avatar name={worker.name} src={avatarSrc} eager={isCurrentUser} />
           <div className="min-w-0 flex-1">
             <h3 className="line-clamp-2 text-base font-black text-slate-950">{worker.name}</h3>
             <p className="mt-1 truncate text-sm font-bold text-slate-600">{worker.skill || 'Skilled professional'}</p>

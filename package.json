@@ -12,6 +12,8 @@
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "@clerk/express": "^2.1.46",
+    "@clerk/react": "^6.12.8",
     "@tailwindcss/vite": "^4.1.14",
     "@types/pg": "^8.20.0",
     "@vitejs/plugin-react": "^5.0.4",

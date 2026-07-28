@@ -7,6 +7,7 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { mkdir, unlink, writeFile } from 'fs/promises';
 import { Pool } from 'pg';
 import sharp from 'sharp';
+import { clerkMiddleware, getAuth, clerkClient } from '@clerk/express';
 import { isProfileFieldKey } from './src/validation';
 
 declare global {
@@ -99,9 +100,12 @@ function createPostgresDb(databaseUrl: string) {
   const normalizedDatabaseUrl = normalizePostgresUrl(databaseUrl);
   const pool = new Pool({
     connectionString: normalizedDatabaseUrl,
+    connectionTimeoutMillis: 5000,
+    query_timeout: 10000,
   });
   const isPreConnectionReset = (error: any) =>
-    error?.code === 'ECONNRESET' &&
+    error?.code === 'ECONNRESET' ||
+    String(error?.message || '').includes('ECONNRESET') ||
     String(error?.message || '').includes('before secure TLS connection was established');
   const queryWithRetry = async (sql: string, params: any[] = []) => {
     try {
@@ -350,6 +354,7 @@ async function startServer() {
   `);
 
   await db.exec(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS "clerkUserId" TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS "passwordHash" TEXT;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT 'available';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT false;
@@ -361,6 +366,7 @@ async function startServer() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS "pricingAmount" NUMERIC;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS "pricingCurrency" TEXT DEFAULT 'USD';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS "pricingNote" TEXT;
+    ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;
     ALTER TABLE jobs ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open';
     ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "assignedWorkerId" TEXT;
     ALTER TABLE jobs ADD COLUMN IF NOT EXISTS "assignedWorkerName" TEXT;
@@ -392,6 +398,7 @@ async function startServer() {
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "jobTitle" TEXT;
   `);
   await db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_clerk_user_id_unique ON users ("clerkUserId") WHERE "clerkUserId" IS NOT NULL;
     DO $migration$
     BEGIN
       CREATE UNIQUE INDEX IF NOT EXISTS applications_job_applicant_unique ON applications ("jobId", "applicantId");
@@ -423,11 +430,11 @@ async function startServer() {
     ['Bulsho', 'Xiingood'],
     ['Rafto', 'Xiddo'],
   ];
-  for (const [oldLocation, newLocation] of locationMappings) {
+  await Promise.all(locationMappings.map(async ([oldLocation, newLocation]) => {
     await db.run('UPDATE users SET location = $1 WHERE location = $2', [newLocation, oldLocation]);
     await db.run('UPDATE jobs SET location = $1 WHERE location = $2', [newLocation, oldLocation]);
     await db.run('UPDATE applications SET location = $1 WHERE location = $2', [newLocation, oldLocation]);
-  }
+  }));
 
   const formatUser = (user: any) => ({
     ...sanitizeUser(user),
@@ -479,17 +486,67 @@ async function startServer() {
     if (token) await db.run('DELETE FROM sessions WHERE "tokenHash" = $1', [hashToken(token)]);
     res.setHeader('Set-Cookie', `qardho_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${isProduction ? '; Secure' : ''}`);
   };
-  app.use(async (req: any, _res, next) => {
-    try {
-      const token = parseCookies(req.headers.cookie || '').qardho_session;
-      if (token) {
-        req.authUser = await db.get(`SELECT u.* FROM sessions s JOIN users u ON u.id = s."userId" WHERE s."tokenHash" = $1 AND s."expiresAt" > $2`, [hashToken(token), new Date().toISOString()]);
-      }
-    } catch (error) {
-      console.error('Session lookup failed', error);
+  app.use(clerkMiddleware());
+
+  const requireClerkAuth = (req: any, res: any, next: any) => {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: 'Please sign in to continue.', code: 'AUTH_REQUIRED' });
     }
     next();
-  });
+  };
+
+  const loadPlatformUser = async (req: any, res: any, next: any) => {
+    try {
+      const auth = getAuth(req);
+      if (!auth?.userId) {
+        return res.status(401).json({ error: 'Please sign in to continue.', code: 'AUTH_REQUIRED' });
+      }
+
+      const platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [auth.userId]);
+      if (!platformUser) {
+        return res.status(401).json({ error: 'Platform profile not synchronized.', code: 'PROFILE_NOT_SYNCED' });
+      }
+      if (platformUser.suspended) {
+        return res.status(403).json({ error: 'This account is currently suspended.', code: 'ACCOUNT_SUSPENDED' });
+      }
+
+      req.authUser = platformUser;
+      next();
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  };
+
+  const optionalPlatformUser = async (req: any, res: any, next: any) => {
+    try {
+      const auth = getAuth(req);
+      if (auth?.userId) {
+        const platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [auth.userId]);
+        if (platformUser && !platformUser.suspended) {
+          req.authUser = platformUser;
+        }
+      }
+    } catch (err: any) {
+      console.error('optionalPlatformUser error', err);
+    } finally {
+      next();
+    }
+  };
+  
+  app.use(optionalPlatformUser);
+
+  const requirePlatformRole = (...roles: string[]) => [
+    requireClerkAuth,
+    loadPlatformUser,
+    (req: any, res: any, next: any) => {
+      if (!roles.includes(req.authUser.role)) {
+        return res.status(403).json({ error: 'You do not have permission to perform this action.', code: 'FORBIDDEN_ROLE' });
+      }
+      next();
+    }
+  ];
+
   const authenticated = (req: any, res: any) => {
     if (!req.authUser || req.authUser.suspended) {
       res.status(401).json({ error: 'Please sign in to continue.' });
@@ -497,11 +554,7 @@ async function startServer() {
     }
     return req.authUser;
   };
-  const requireRole = (...roles: string[]) => (req: any, res: any, next: any) => {
-    if (!req.authUser || req.authUser.suspended) return res.status(401).json({ error: 'Please sign in to continue.', code: 'AUTH_REQUIRED' });
-    if (!roles.includes(req.authUser.role)) return res.status(403).json({ error: 'You do not have permission to perform this action.', code: 'FORBIDDEN_ROLE' });
-    next();
-  };
+  const requireRole = (...roles: string[]) => requirePlatformRole(...roles);
   const addNotification = async (userId: string, type: string, title: string, message: string, href?: string) => {
     await db.run('INSERT INTO notifications (id, "userId", type, title, message, href, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)', [`notice-${Date.now()}-${randomBytes(4).toString('hex')}`, userId, type, title, message, href || null, new Date().toISOString()]);
   };
@@ -887,92 +940,7 @@ async function startServer() {
         'INSERT INTO connections (id, "fromUserId", "fromUserName", "toUserId", "toUserName", status, message, phone, "createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
         ['conn-demo-1', 'employer-1', 'Qardho Agricultural Co.', 'worker-1', 'Ahmed Mohamed Ali', 'pending', 'We would like to discuss a solar installation job.', '+252 90 700 1122', createdAt]
       );
-
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-  // Auth Operations
-  app.post('/api/auth/register', async (req, res) => {
-    const { id, name, email, phone, whatsappPhone, password, role, skill, location, bio, rate, smsNotificationsEnabled, availability } = req.body;
-    try {
-      if (isBlank(name) || isBlank(phone)) {
-        return res.status(400).json({ error: 'Name and phone are required.' });
-      }
-      if (isBlank(password)) {
-        return res.status(400).json({ error: 'Password is required.' });
-      }
-      if (String(password).length < 8) {
-        return res.status(400).json({ error: 'Password must be at least 8 characters.' });
-      }
-      if (role && !validRoles.includes(role)) {
-        return res.status(400).json({ error: 'Invalid user role.' });
-      }
-      if (role === 'admin') {
-        return res.status(403).json({ error: 'Admin accounts cannot be created through public signup.' });
-      }
-      if (availability && !validAvailability.includes(availability)) {
-        return res.status(400).json({ error: 'Invalid availability value.' });
-      }
-      const normalizedPhone = normalizeSomaliPhone(phone);
-      const normalizedWhatsapp = whatsappPhone ? normalizeSomaliPhone(whatsappPhone) : null;
-      if (!normalizedPhone || (whatsappPhone && !normalizedWhatsapp)) {
-        return res.status(400).json({ error: 'Enter valid international phone numbers.' });
-      }
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
-        return res.status(400).json({ error: 'Enter a valid email address.' });
-      }
-
-      const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
-      const existingUser = await db.get('SELECT * FROM users WHERE phone = $1 OR (email IS NOT NULL AND LOWER(email) = LOWER($2))', [normalizedPhone, normalizedEmail]);
-      if (existingUser) {
-        return res.status(400).json({ error: 'A user with this phone or email already exists.' });
-      }
-
-      const newId = id || `user-${Date.now()}`;
-      const createdAt = new Date().toISOString();
-      const passwordHash = hashPassword(password);
-      await db.run(
-        'INSERT INTO users (id, name, email, phone, "whatsappPhone", role, skill, location, bio, rate, "createdAt", "smsNotificationsEnabled", "passwordHash", availability, verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, false)',
-        [newId, cleanText(name, 120), normalizedEmail, normalizedPhone, normalizedWhatsapp, role || 'pending', cleanText(skill, 120) || null, cleanText(location, 120) || null, cleanText(bio, 2000) || null, cleanText(rate, 120) || null, createdAt, !!smsNotificationsEnabled, passwordHash, availability || 'available']
-      );
-
-      const user = await db.get('SELECT * FROM users WHERE id = $1', [newId]);
-      res.json({
-        success: true,
-        user: formatUser(user)
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.post('/api/auth/login', async (req, res) => {
-    const { identifier, password } = req.body;
-    try {
-      if (!identifier || !password) {
-        return res.status(400).json({ success: false, error: 'Email/phone and password are required.' });
-      }
-
-      const trimmedIdentifier = String(identifier).trim();
-      const normalizedPhoneIdentifier = trimmedIdentifier.replace(/[\s-]/g, '');
-      const user = await db.get(
-        `SELECT * FROM users
-          WHERE LOWER(email) = LOWER($1)
-            OR phone = $2
-            OR REPLACE(REPLACE(phone, ' ', ''), '-', '') = $3`,
-        [trimmedIdentifier, trimmedIdentifier, normalizedPhoneIdentifier]
-      );
-      if (user && verifyPassword(password, user.passwordHash)) {
-        if (user.suspended) return res.status(403).json({ success: false, error: 'This account is currently unavailable. Contact support.' });
-        await createSession(res, user.id);
-        return res.json({
-          success: true,
-          user: formatUser(user)
-        });
-      }
-      res.status(401).json({ success: false, error: 'Invalid email/phone or password.' });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1111,57 +1079,82 @@ async function startServer() {
     res.json({ success: true, user: formatUser(await getUserById(actor.id)) });
   });
 
-  app.post('/api/auth/forgot-password', async (req, res) => {
-    const neutral = { success: true, message: 'If an account matches that email, a reset link will be sent shortly.' };
+  app.post('/api/auth/forgot-password', (req, res) => {
+    res.status(410).json({ error: 'Password reset is managed through Clerk.' });
+  });
+
+  app.post('/api/auth/reset-password', (req, res) => {
+    res.status(410).json({ error: 'Password reset is managed through Clerk.' });
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    res.json({ success: true, message: 'Logged out.' });
+  });
+
+  app.get('/api/auth/me', requireClerkAuth, async (req: any, res: any) => {
     try {
-      const email = String(req.body?.email || '').trim().toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.json(neutral);
-      const user = await db.get('SELECT * FROM users WHERE LOWER(email) = LOWER($1) AND COALESCE(suspended, false) = false', [email]);
-      if (!user) return res.json(neutral);
-      await db.run('DELETE FROM password_reset_tokens WHERE "userId" = $1 OR "expiresAt" <= $2', [user.id, new Date().toISOString()]);
-      const token = randomBytes(32).toString('base64url');
-      const expiresAt = new Date(Date.now() + 1000 * 60 * 30).toISOString();
-      await db.run('INSERT INTO password_reset_tokens ("tokenHash", "userId", "createdAt", "expiresAt") VALUES ($1, $2, $3, $4)', [hashToken(token), user.id, new Date().toISOString(), expiresAt]);
-      const origin = process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get('host')}`;
-      const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
-      if (process.env.RESET_WEBHOOK_URL) {
-        await fetch(process.env.RESET_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...(process.env.RESET_WEBHOOK_SECRET ? { Authorization: `Bearer ${process.env.RESET_WEBHOOK_SECRET}` } : {}) },
-          body: JSON.stringify({ to: user.email, name: user.name, resetUrl, expiresInMinutes: 30 }),
-        });
-      } else if (!isProduction) {
-        console.log(`Password reset link for ${user.email}: ${resetUrl}`);
-        return res.json({ ...neutral, developmentResetUrl: resetUrl });
+      const auth = getAuth(req);
+      const clerkUserId = auth.userId;
+      if (!clerkUserId) {
+        return res.status(401).json({ user: null });
       }
-      return res.json(neutral);
-    } catch (error) {
-      console.error('Forgot password failed', error);
-      return res.json(neutral);
+
+      // Fetch Clerk details via clerkClient
+      const clerkUserObj = await clerkClient.users.getUser(clerkUserId);
+      const clerkImageUrl = clerkUserObj.imageUrl || null;
+
+      // 1. Look for existing linked account
+      const linkedUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [clerkUserId]);
+      if (linkedUser) {
+        if (linkedUser.suspended) {
+          return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+        }
+        if (clerkImageUrl && !linkedUser.avatarUrl) {
+          await db.run('UPDATE users SET "avatarUrl" = $1 WHERE id = $2', [clerkImageUrl, linkedUser.id]);
+          linkedUser.avatarUrl = clerkImageUrl;
+        }
+        return res.json({ user: formatUser(linkedUser) });
+      }
+
+      const primaryEmailObj = clerkUserObj.emailAddresses?.find(e => e.id === clerkUserObj.primaryEmailAddressId) || clerkUserObj.emailAddresses?.[0];
+      const rawEmail = primaryEmailObj?.emailAddress || '';
+      const normalizedEmail = rawEmail.trim().toLowerCase();
+
+      const firstName = clerkUserObj.firstName || '';
+      const lastName = clerkUserObj.lastName || '';
+      const displayName = (firstName || lastName) ? `${firstName} ${lastName}`.trim() : (normalizedEmail.split('@')[0] || 'User');
+
+      if (normalizedEmail) {
+        const matches = await db.all('SELECT * FROM users WHERE LOWER(email) = $1 AND "clerkUserId" IS NULL', [normalizedEmail]);
+        if (matches.length === 1) {
+          const existingUser = matches[0];
+          if (existingUser.suspended) {
+            return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+          }
+          await db.run('UPDATE users SET "clerkUserId" = $1, "avatarUrl" = COALESCE("avatarUrl", $2) WHERE id = $3', [clerkUserId, clerkImageUrl, existingUser.id]);
+          const updated = await getUserById(existingUser.id);
+          return res.json({ user: formatUser(updated) });
+        } else if (matches.length > 1) {
+          return res.status(409).json({ error: 'Multiple accounts match this email address. Please contact an administrator.', user: null });
+        }
+      }
+
+      // 3. Create new PostgreSQL profile for Clerk user
+      const newInternalId = `user-${Date.now()}-${randomBytes(4).toString('hex')}`;
+      const createdAt = new Date().toISOString();
+      await db.run(
+        `INSERT INTO users (
+          id, "clerkUserId", name, email, phone, role, verified, suspended, "createdAt", availability, "avatarUrl"
+        ) VALUES ($1, $2, $3, $4, NULL, 'pending', false, false, $5, 'available', $6)`,
+        [newInternalId, clerkUserId, displayName, normalizedEmail || null, createdAt, clerkImageUrl]
+      );
+
+      const newUser = await getUserById(newInternalId);
+      res.json({ user: formatUser(newUser) });
+    } catch (err: any) {
+      console.error('Error in /api/auth/me sync:', err);
+      res.status(500).json({ error: err.message });
     }
-  });
-
-  app.post('/api/auth/reset-password', async (req, res) => {
-    const token = String(req.body?.token || '');
-    const password = String(req.body?.password || '');
-    if (!token || password.length < 8) return res.status(400).json({ error: 'Use a valid reset link and a password of at least 8 characters.' });
-    const reset = await db.get('SELECT * FROM password_reset_tokens WHERE "tokenHash" = $1 AND "usedAt" IS NULL AND "expiresAt" > $2', [hashToken(token), new Date().toISOString()]);
-    if (!reset) return res.status(400).json({ error: 'This reset link is invalid or has expired.' });
-    const usedAt = new Date().toISOString();
-    await db.run('UPDATE users SET "passwordHash" = $1 WHERE id = $2', [hashPassword(password), reset.userId]);
-    await db.run('UPDATE password_reset_tokens SET "usedAt" = $1 WHERE "tokenHash" = $2', [usedAt, hashToken(token)]);
-    await db.run('DELETE FROM sessions WHERE "userId" = $1', [reset.userId]);
-    res.json({ success: true, message: 'Password updated. Please sign in again.' });
-  });
-
-  app.get('/api/auth/me', async (req: any, res) => {
-    if (!req.authUser || req.authUser.suspended) return res.status(401).json({ user: null });
-    res.json({ user: formatUser(req.authUser) });
-  });
-
-  app.post('/api/auth/logout', async (req, res) => {
-    await clearSession(req, res);
-    res.json({ success: true });
   });
 
   app.get('/api/notifications', async (req, res) => {
@@ -1288,19 +1281,38 @@ async function startServer() {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
-  app.post('/api/account/delete', async (req, res) => {
+  app.post('/api/account/delete', requireClerkAuth, async (req: any, res: any) => {
     try {
-      const actor = authenticated(req, res);
-      if (!actor) return;
+      const auth = getAuth(req);
+      const clerkUserId = auth.userId;
+      if (!clerkUserId) return res.status(401).json({ error: 'Please sign in to continue.' });
+
       if (req.body?.confirmation !== 'I confirm') return res.status(400).json({ error: 'Type I confirm exactly to delete your account.' });
-      const sessionToken = parseCookies(req.headers.cookie || '').qardho_session;
-      const session = sessionToken ? await db.get('SELECT * FROM sessions WHERE "tokenHash" = $1', [hashToken(sessionToken)]) : null;
-      const recentlyAuthenticated = session && Date.now() - new Date(session.createdAt).getTime() < 1000 * 60 * 30;
-      if (!recentlyAuthenticated && !verifyPassword(String(req.body?.password || ''), actor.passwordHash)) return res.status(401).json({ error: 'Please sign in again before deleting your account.' });
 
-      await db.transaction((tx: any) => deleteUserCascade(actor.id, tx));
+      const platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [clerkUserId]);
+      if (!platformUser) return res.status(404).json({ error: 'Platform account not found.' });
 
-      await clearSession(req, res);
+      if (platformUser.role === 'admin') {
+        const adminCountRow = await db.get("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
+        if (Number(adminCountRow.count) <= 1) {
+          return res.status(403).json({ error: 'Cannot delete the final administrator account.' });
+        }
+      }
+
+      await db.transaction((tx: any) => deleteUserCascade(platformUser.id, tx));
+
+      let clerkDeleted = false;
+      try {
+        await clerkClient.users.deleteUser(clerkUserId);
+        clerkDeleted = true;
+      } catch (clerkErr) {
+        console.error('Failed to delete Clerk user:', clerkErr);
+      }
+
+      if (!clerkDeleted) {
+        return res.json({ success: true, warning: 'PostgreSQL platform account deleted, but Clerk identity deletion failed.' });
+      }
+
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1315,8 +1327,8 @@ async function startServer() {
       if (!employer) return;
       if (employer.role !== 'employer' && employer.role !== 'admin') return res.status(403).json({ error: 'Only employers can post jobs.' });
       if ([title, location, description, requirements].some(isBlank)) return res.status(400).json({ error: 'Title, location, description, and requirements are required.' });
-      if (cleanText(description).length < 100) return res.status(400).json({ error: 'Job description must be at least 100 characters.' });
-      if (cleanText(requirements).length < 50) return res.status(400).json({ error: 'Requirements must be at least 50 characters.' });
+      if (cleanText(description).length < 30) return res.status(400).json({ error: 'Job description must be at least 30 characters.' });
+      if (cleanText(requirements).length < 30) return res.status(400).json({ error: 'Requirements must be at least 30 characters.' });
       if (pricingType && !validPricingTypes.includes(pricingType)) return res.status(400).json({ error: 'Invalid pricing type.' });
       if (!validNonNegativeAmount(pricingAmount)) return res.status(400).json({ error: 'Budget cannot be negative.' });
 
@@ -1550,9 +1562,6 @@ async function startServer() {
         'SELECT * FROM reviews WHERE "jobId" = $1 AND "workerId" = $2 AND "employerId" = $3',
         [jobId, workerId, employer.id]
       );
-      if (employer.role !== 'employer') {
-        return res.status(403).json({ error: 'Only employers can submit worker reviews.' });
-      }
       if (!worker || worker.role !== 'worker') {
         return res.status(400).json({ error: 'Reviews can only target workers.' });
       }
@@ -1585,7 +1594,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -1610,11 +1619,3 @@ async function startServerWithRetry() {
 startServerWithRetry().catch(err => {
   console.error("Failed to start server", err);
 });
-
-
-
-
-
-
-
-

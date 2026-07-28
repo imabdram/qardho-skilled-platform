@@ -43,8 +43,10 @@ export const hasMinimumJobRequirements = (value: unknown) => typeof value === 's
 export const normalizeInternationalPhone = (value: unknown) => {
   const normalized = typeof value === 'string' ? value.replace(/[^\d+]/g, '') : '';
   if (!normalized) return null;
-  const withPrefix = normalized.startsWith('+') ? normalized : normalized.startsWith('252') ? `+${normalized}` : `+${normalized}`;
-  return /^\+\d{8,15}$/.test(withPrefix) ? withPrefix : null;
+  const cleanDigits = normalized.startsWith('+') ? normalized.slice(1) : normalized;
+  const digits = cleanDigits.startsWith('252') ? cleanDigits.slice(3) : cleanDigits;
+  const withPrefix = `+252${digits}`;
+  return /^\+252\d{8,9}$/.test(withPrefix) ? withPrefix : null;
 };
 export const PROFILE_FIELD_LABELS: Record<ProfileFieldKey, string> = {
   name: 'Full name',

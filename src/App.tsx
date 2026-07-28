@@ -5,6 +5,8 @@ import Workers from './pages/Workers';
 import Jobs from './pages/Jobs';
 import JobDetail from './pages/JobDetail';
 import Profile from './pages/Profile';
+import ProfileEdit from './pages/ProfileEdit';
+import Settings from './pages/Settings';
 import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
 import PostJob, { JobFormData } from './pages/PostJob';
@@ -21,27 +23,21 @@ import ConfirmDialog from './components/ConfirmDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getPageForPath, getRouteForPage, PageId } from './routes';
 
+import { useAuth, useUser } from '@clerk/react';
+import { useApi } from './useApi';
 const getDefaultRouteForUser = (user: User) => user.role === 'admin' ? '/admin' : user.role === 'employer' ? '/dashboard' : user.role === 'worker' ? '/dashboard' : '/onboarding';
 
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
-
-  const loadSavedUser = (): User | null => {
-    const saved = localStorage.getItem('currentUser');
-    if (!saved) return null;
-
-    try {
-      return JSON.parse(saved);
-    } catch {
-      localStorage.removeItem('currentUser');
-      return null;
-    }
-  };
+  const { isSignedIn, isLoaded: isClerkLoaded, signOut } = useAuth();
+  const { user: clerkUser } = useUser();
+  const fetchAuth = useApi();
+  const fetch = fetchAuth;
 
   // Navigation & User session states
   const [currentPage, setCurrentPage] = useState<PageId>(() => getPageForPath(location.pathname));
-  const [currentUser, setCurrentUser] = useState<User | null>(() => loadSavedUser());
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [viewingProfileUser, setViewingProfileUser] = useState<User | null>(null);
 
@@ -139,29 +135,34 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    if (!isClerkLoaded) return;
+
     const bootstrap = async () => {
       let sessionUser: User | null = null;
-      try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) sessionUser = (await response.json()).user || null;
-      } catch {
-        sessionUser = null;
+      if (isSignedIn) {
+        try {
+          const response = await fetch('/api/auth/me');
+          if (response.ok) sessionUser = (await response.json()).user || null;
+        } catch {
+          sessionUser = null;
+        }
+      }
+      if (sessionUser && clerkUser?.imageUrl) {
+        sessionUser = { ...sessionUser, avatarUrl: sessionUser.avatarUrl || clerkUser.imageUrl };
       }
       if (!active) return;
       setCurrentUser(sessionUser);
-      if (sessionUser) localStorage.setItem('currentUser', JSON.stringify(sessionUser));
-      else localStorage.removeItem('currentUser');
       await refreshAllData(sessionUser);
     };
     bootstrap().finally(() => { if (active) setSessionLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [isClerkLoaded, isSignedIn, clerkUser?.id]);
 
   useEffect(() => {
     if (sessionLoading) return;
     const path = location.pathname;
     const guestOnly = ['/login', '/auth', '/register', '/forgot-password', '/reset-password'].includes(path);
-    const protectedPath = ['/profile', '/dashboard', '/worker/dashboard', '/employer/dashboard', '/post-job', '/admin', '/onboarding'].includes(path);
+    const protectedPath = ['/profile', '/profile/edit', '/settings', '/dashboard', '/worker/dashboard', '/employer/dashboard', '/post-job', '/admin', '/onboarding'].includes(path);
     let target: string | null = null;
     if (guestOnly && currentUser) target = getDefaultRouteForUser(currentUser);
     else if (!currentUser && protectedPath) target = '/login';
@@ -170,7 +171,7 @@ export default function App() {
     else if (currentUser && path === '/admin' && currentUser.role !== 'admin') target = '/unauthorized';
     else if (currentUser && (path === '/post-job' || path === '/employer/dashboard') && currentUser.role !== 'employer') target = currentUser.role === 'pending' ? '/onboarding' : '/unauthorized';
     else if (currentUser && path === '/worker/dashboard' && currentUser.role !== 'worker') target = currentUser.role === 'pending' ? '/onboarding' : '/unauthorized';
-    else if (currentUser && path === '/profile' && currentUser.role === 'pending') target = '/onboarding';
+    else if (currentUser && (path === '/profile' || path === '/profile/edit' || path === '/settings') && currentUser.role === 'pending') target = '/onboarding';
     if (target && target !== path) navigate(target, { replace: true });
   }, [sessionLoading, currentUser?.id, currentUser?.role, location.pathname, navigate]);
 
@@ -209,7 +210,7 @@ export default function App() {
     const data = await res.json();
     setVerificationMessage(data.message || null);
   };
-  // Auth Operations
+
   const handleLogin = async ({ identifier, password }: any) => {
     try {
       const res = await fetch('/api/auth/login', {
@@ -266,16 +267,19 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
+        
         setCurrentUser(data.user);
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
-        await refreshAllData();
-        showAppNotice('Onboarding saved.');
-
+        
         if (data.user.role === 'worker') {
           navigateTo('jobs');
         } else if (data.user.role === 'employer') {
-          navigateTo('post-job');
+          navigateTo('workers');
+        } else if (data.user.role === 'admin') {
+          navigateTo('admin');
         }
+
+        await refreshAllData();
+        showAppNotice('Onboarding saved.');
       }
     } catch (e) {
       console.error('Failed to complete onboarding', e);
@@ -284,8 +288,8 @@ export default function App() {
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+    await signOut().catch(() => undefined);
     setCurrentUser(null);
-    localStorage.removeItem('currentUser');
     navigateTo('home');
   };
 
@@ -311,7 +315,6 @@ export default function App() {
       setShowDeleteAccountModal(false);
       setViewingProfileUser(null);
       setCurrentUser(null);
-      localStorage.removeItem('currentUser');
       await refreshAllData();
       navigateTo('home');
       showAppNotice('Your account has been removed.');
@@ -373,7 +376,6 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setCurrentUser(data.user);
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
         setRoleToast(`Success! Switched to ${targetRoleName} Mode`);
         showAppNotice(`Switched to ${newRole === 'worker' ? 'worker' : 'employer'} mode.`);
         await refreshAllData(data.user);
@@ -394,6 +396,7 @@ export default function App() {
       setIsSwitchingRole(false);
     }
   };
+
   // Connection Request Action
   const triggerConnect = (worker: User) => {
     if (!currentUser) {
@@ -458,7 +461,7 @@ export default function App() {
     setSelectedJobForApply(job);
   };
 
-  const submitApply = async ({ message, proposedPricingType, proposedAmount, proposedCurrency, proposedNote, expectedTimeline }: { message: string; proposedPricingType?: PricingType; proposedAmount?: number; proposedCurrency?: string; proposedNote?: string; expectedTimeline?: string }) => {
+  const submitApply = async (applicationData: { message: string; proposedPricingType?: PricingType; proposedAmount?: number | null; proposedCurrency?: string; proposedNote?: string; expectedTimeline?: string }) => {
     if (!currentUser || !selectedJobForApply) return;
 
     try {
@@ -467,12 +470,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jobId: selectedJobForApply.id,
-          message,
-          proposedPricingType,
-          proposedAmount,
-          proposedCurrency,
-          proposedNote,
-          expectedTimeline,
+          ...applicationData,
         })
       });
       if (res.ok) {
@@ -558,7 +556,6 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setCurrentUser(data.user);
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
         await refreshAllData(data.user);
         showAppNotice('Profile updated.');
       } else {
@@ -725,8 +722,28 @@ export default function App() {
             onRequestDeleteAccount={requestDeleteAccount}
             onAvatarUpdated={(user) => {
               setCurrentUser(user);
-              localStorage.setItem('currentUser', JSON.stringify(user));
             }}
+          />
+        );
+      case 'profile-edit':
+        if (!currentUser) return null;
+        return (
+          <ProfileEdit
+            currentUser={currentUser}
+            onUpdateProfile={updateProfile}
+            onAvatarUpdated={(user) => setCurrentUser(user)}
+            onNavigate={handleNavigate}
+          />
+        );
+      case 'settings':
+        if (!currentUser) return null;
+        return (
+          <Settings
+            currentUser={currentUser}
+            onUpdateProfile={updateProfile}
+            onSwitchRole={handleSwitchRole}
+            onRequestDeleteAccount={requestDeleteAccount}
+            onNavigate={handleNavigate}
           />
         );
       case 'dashboard':
@@ -820,29 +837,11 @@ export default function App() {
       case 'register':
       case 'forgot-password':
       case 'reset-password':
-        return <Auth onLogin={handleLogin} onSignup={handleSignup} />;
+        return <Auth />;
       case 'not-found':
         return <NotFound />;
       default:
-        return (
-          <Landing
-            workers={workers}
-            jobs={jobs}
-            reviews={reviews}
-            workersCount={workers.length}
-            jobsCount={jobs.length}
-            onNavigate={handleNavigate}
-            onViewWorkerProfile={(worker) => {
-              if (!currentUser) {
-                navigateTo('auth');
-                return;
-              }
-              setViewingProfileUser(worker);
-              navigateTo('profile');
-            }}
-            currentUser={currentUser}
-          />
-        );
+        return <NotFound />;
     }
   };
 

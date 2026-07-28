@@ -3,8 +3,5 @@ export const QARDHO_NEIGHBORHOODS = [
   'Qoryacad',
   'Xorgoble',
   'Xiingood',
-  'Xiddo',
-  'Sheerbi',
-  'Waaciye',
 ];
 

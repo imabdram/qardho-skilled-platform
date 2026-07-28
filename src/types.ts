@@ -5,6 +5,7 @@
 
 export interface User {
   id: string;
+  clerkUserId?: string;
   name: string;
   email?: string;
   phone: string;

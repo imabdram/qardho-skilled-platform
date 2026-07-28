@@ -1,20 +1,20 @@
 # Qardho Skilled Platform
 
+# Qardho Skilled Platform
+
 **Live Demo:** [https://qardho-skilled-platform.onrender.com/](https://qardho-skilled-platform.onrender.com/)
 
 Qardho Skilled Platform is a local skilled-labor marketplace for Qardho, Somalia. It helps households, farms, schools, businesses, and employers find local workers such as solar technicians, plumbers, builders, tailors, teachers, electricians, and general trade professionals.
 
 The project is currently an MVP/demo app with a real React frontend, Express API, and PostgreSQL database. It supports the core marketplace loop: browse workers, browse jobs, post a job, apply to a job, send hire connection requests, manage requests from a dashboard, edit profiles, and leave worker reviews.
 
-## Current Status
+### Current Status
 
-- **Fully Migrated to Native PostgreSQL:** The database layer communicates directly using native parameterized queries (`$1`, `$2`, etc.) and quoted camelCase identifiers. The old SQLite dynamic translation layer and leftover `.sqlite` files have been completely removed.
-- Demo quick-login flows for both worker and employer roles.
-- Production build and TypeScript check currently pass.
-- Authentication uses hashed passwords and secure, HTTP-only database sessions. Protected API routes derive identity and permissions from the session instead of client-supplied user IDs.
-- Password reset links use hashed, expiring, one-use tokens. Configure the reset webhook below to deliver links outside development.
-- SMS preferences are stored in profiles, but real SMS delivery is not integrated yet.
-- The app does not include direct chat, payments, escrow, scheduling, or admin moderation tools yet.
+- **Clerk Authentication Integration**: Identity, email registration, OTP verification, password login, password reset, logout, and secure browser sessions are handled exclusively by Clerk (`@clerk/react` and `@clerk/express`).
+- **PostgreSQL Authorization & Data**: PostgreSQL continues to own user roles (`pending`, `worker`, `employer`, `admin`), worker & employer profiles, Somali phone numbers, WhatsApp numbers, pricing, jobs, applications, connections, reviews, notifications, and verification status.
+- **Identity Mapping**: Clerk `userId` maps to `users.clerkUserId` in PostgreSQL, with automatic profile linking on email match for existing platform users or new `pending` user creation upon first login.
+- **Somali Phone Normalization**: Phone and WhatsApp numbers are validated to ensure international Somali formatting without duplicate `+252` prefixes.
+- **Production Build & Test Suite**: All unit tests pass, TypeScript typechecks cleanly, and Vite + esbuild production builds execute without errors.
 
 ## Features
 
@@ -46,27 +46,6 @@ The app is usable as an MVP, but these production features are still missing:
 - Scheduling, milestones, and full dispute-resolution tooling beyond the completion audit trail.
 - Saved searches, bookmarks, recommendations, and richer discovery tools.
 - Full localization. SO, EN, and AR selectors currently prepare language and RTL state but copy is still primarily English.
-- A complete automated end-to-end test suite for the main marketplace flows.
-
-## Tech Stack
-
-| Area | Technology | Purpose |
-| --- | --- | --- |
-| Frontend | React 19 | Interactive single-page app UI. |
-| Frontend | TypeScript | Shared typing for users, jobs, applications, connections, reviews, and server code. |
-| Frontend | Vite | Development middleware and frontend production build. |
-| Frontend | Tailwind CSS 4 | Utility-first styling. |
-| Frontend | Lucide React | Icons for navigation, actions, status badges, forms, and dashboards. |
-| Backend | Node.js | Runtime for the local server. |
-| Backend | Express | API routes, JSON handling, Vite middleware in development, and static serving in production. |
-| Database | PostgreSQL | Persistent hosted data store, tested for Neon-style connection strings. |
-| Database | `pg` | Node PostgreSQL client used by the Express API. |
-| Build | esbuild | Bundles `server.ts` into `dist/server.mjs`. |
-
-## Data Model
-
-The backend creates these PostgreSQL tables when the app starts:
-
 - `users`: workers, employers, pending onboarding users, profile details, availability, verification, and notification preferences.
 - `jobs`: job posts created by employers.
 - `connections`: employer-to-worker hire/contact requests.

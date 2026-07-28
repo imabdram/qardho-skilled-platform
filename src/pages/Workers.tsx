@@ -52,7 +52,7 @@ export default function Workers({ workers, currentUser, onConnect, reviews, onVi
 
       <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-black text-slate-900">Worker listings</h2><span className="text-xs font-semibold text-slate-500">{isLoading ? 'Loading...' : `${filteredWorkers.length} shown`}</span></div>
       {isLoading ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <WorkerSkeleton key={index} />)}</div> : filteredWorkers.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" id="workers-grid">{filteredWorkers.map((worker) => <WorkerCard key={worker.id} worker={worker} onConnect={onConnect} onViewProfile={onViewProfile} isCurrentUser={currentUser?.id === worker.id} reviews={reviews} />)}</div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" id="workers-grid">{filteredWorkers.map((worker) => <WorkerCard key={worker.id} worker={worker} currentUser={currentUser} onConnect={onConnect} onViewProfile={onViewProfile} isCurrentUser={currentUser?.id === worker.id} reviews={reviews} />)}</div>
       ) : <div className="rounded-2xl border border-brand-950/10 bg-white py-16 text-center"><p className="font-bold text-slate-700">No workers match this search.</p><button onClick={clearSearch} className="mt-3 min-h-11 rounded-full px-4 text-sm font-black text-[#2563eb] hover:bg-brand-50">Clear search</button></div>}
     </div>
   );

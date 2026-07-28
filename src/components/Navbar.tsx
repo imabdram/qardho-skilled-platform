@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  AlertCircle, Bell, BriefcaseBusiness, CheckCircle2, ChevronDown, Globe2,
-  LayoutDashboard, Loader2, LogOut, Menu, Monitor, Moon, Sun, UserRound,
+  AlertCircle, Bell, BriefcaseBusiness, CheckCircle2, ChevronDown, Edit3, Globe2,
+  LayoutDashboard, Loader2, LogOut, Menu, Monitor, Moon, Settings, Sun, UserRound,
   Users, X,
 } from 'lucide-react';
 import { Application, Connection, Job, Notification, Review, User } from '../types';
 import { PAGE_ROUTES } from '../routes';
 import Avatar from './Avatar';
+import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react';
+import { useApi } from '../useApi';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -28,7 +30,22 @@ type ThemeMode = 'light' | 'dark' | 'system';
 
 const focusRing = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2';
 
-export default function Navbar({ currentUser, currentPage, onNavigate, onLogout, workersCount, jobsCount }: NavbarProps) {
+export default function Navbar({
+  currentUser,
+  currentPage,
+  onNavigate,
+  onLogout,
+  workersCount,
+  jobsCount,
+  onSwitchRole,
+  isSwitchingRole,
+  connections = [],
+  applications = [],
+  jobs = [],
+  reviews = [],
+}: NavbarProps) {
+  const fetchAuth = useApi();
+  const fetch = fetchAuth;
   const navigate = useNavigate();
   const shellRef = useRef<HTMLDivElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -197,21 +214,47 @@ export default function Navbar({ currentUser, currentPage, onNavigate, onLogout,
           </div>
 
           <div className="order-2 hidden items-center gap-2 md:flex">
-            {currentUser ? (
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button className={`inline-flex min-h-11 items-center gap-2 rounded-full bg-[#3b82f6] px-5 text-sm font-black text-white hover:bg-[#1d4ed8] ${focusRing}`}>
+                  <UserRound className="h-4 w-4" />Sign In
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-brand-950/10 bg-white px-4 text-sm font-black text-slate-700 hover:bg-brand-50 ${focusRing}`}>
+                  Sign Up
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <UserButton showName appearance={{ elements: { userButtonBox: 'flex-row-reverse gap-2 font-black text-slate-800' } }}>
+                <UserButton.MenuItems>
+                  <UserButton.Action
+                    label="View Profile"
+                    labelIcon={<UserRound className="h-4 w-4" />}
+                    onClick={() => navigate(PAGE_ROUTES.profile)}
+                  />
+                  <UserButton.Action
+                    label="Edit Profile"
+                    labelIcon={<Edit3 className="h-4 w-4" />}
+                    onClick={() => navigate(PAGE_ROUTES['profile-edit'])}
+                  />
+                  <UserButton.Action
+                    label="Platform Settings"
+                    labelIcon={<Settings className="h-4 w-4" />}
+                    onClick={() => navigate(PAGE_ROUTES.settings)}
+                  />
+                </UserButton.MenuItems>
+              </UserButton>
+            </Show>
+            {currentUser && (
               <>
                 <NotificationButton />
                 <span title={currentUser.role === 'worker' ? 'Worker account' : currentUser.role === 'employer' ? 'Employer account' : 'Administrator account'} aria-label={currentUser.role ? `${currentUser.role} account` : 'Account role'} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-brand-950/10 bg-white text-[#2563eb]">{currentUser.role === 'employer' ? <BriefcaseBusiness className="h-5 w-5" /> : <UserRound className="h-5 w-5" />}</span>
-                <div className="relative">
-                  <button onClick={() => { setProfileOpen((open) => !open); setNotificationsOpen(false); }} className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-brand-950/10 bg-white py-1.5 pl-1.5 pr-3 text-sm font-black text-slate-800 hover:bg-brand-50 ${focusRing}`} aria-expanded={profileOpen}>
-                    <Avatar name={currentUser.name} src={currentUser.avatarUrl} size="sm" eager />
-                    <span className="max-w-28 truncate">{firstName}</span><ChevronDown className="h-4 w-4" />
-                  </button>
-                  {profileOpen && <div className="absolute right-0 top-12 w-72 overflow-hidden rounded-2xl border border-brand-950/10 bg-white shadow-xl"><Link to={PAGE_ROUTES.profile} onClick={closeMenus} className="flex min-h-12 items-center gap-2 px-4 text-sm font-black hover:bg-brand-50"><UserRound className="h-4 w-4" />Profile & settings</Link><ThemeControls /><button onClick={onLogout} className="flex min-h-12 w-full items-center gap-2 border-t border-slate-100 px-4 text-sm font-black text-rose-700 hover:bg-rose-50"><LogOut className="h-4 w-4" />Sign out</button></div>}
-                </div>
               </>
-            ) : (
+            )}
+            {!currentUser && (
               <>
-                <Link to={PAGE_ROUTES.auth} className={`inline-flex min-h-11 items-center gap-2 rounded-full bg-[#3b82f6] px-5 text-sm font-black text-white hover:bg-[#1d4ed8] ${focusRing}`}><UserRound className="h-4 w-4" />Sign In</Link>
                 <div className="relative">
                   <button onClick={() => setMoreOpen((open) => !open)} className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-brand-950/10 bg-white px-4 text-sm font-black text-slate-700 hover:bg-brand-50 ${focusRing}`} aria-expanded={moreOpen}>More<ChevronDown className="h-4 w-4" /></button>
                   {moreOpen && <div className="absolute right-0 top-12 w-72 overflow-hidden rounded-2xl border border-brand-950/10 bg-white shadow-xl"><ThemeControls /><Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-black hover:bg-brand-50"><Globe2 className="h-4 w-4" />About & Contact</Link></div>}
@@ -228,7 +271,7 @@ export default function Navbar({ currentUser, currentPage, onNavigate, onLogout,
             <div className="ml-auto flex h-full w-[min(90vw,22rem)] flex-col overflow-y-auto border-l border-brand-950/10 bg-white p-4 shadow-2xl">
               {currentUser && <div className="mb-4 flex items-center gap-3 rounded-2xl bg-brand-50 p-3"><Avatar name={currentUser.name} src={currentUser.avatarUrl} /><div className="min-w-0"><p className="truncate font-black text-slate-950">{currentUser.name}</p><p className="text-xs font-bold capitalize text-[#2563eb]">{currentUser.role} account</p></div></div>}
               <div className="space-y-1">
-                {currentUser ? <><NavLink {...mainLink} /><NavLink page="dashboard" label="Dashboard" Icon={LayoutDashboard} /><Link to={PAGE_ROUTES.profile} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-brand-50"><UserRound className="h-4 w-4" />Profile & settings</Link></> : <><NavLink page="workers" label="Workers" count={workersCount} /><NavLink page="jobs" label="Jobs" count={jobsCount} /><Link to={PAGE_ROUTES.auth} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl bg-[#3b82f6] px-4 text-sm font-black text-white"><UserRound className="h-4 w-4" />Sign In</Link></>}
+                {currentUser ? <><NavLink {...mainLink} /><NavLink page="dashboard" label="Dashboard" Icon={LayoutDashboard} /><Link to={PAGE_ROUTES.profile} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-brand-50"><UserRound className="h-4 w-4" />View profile</Link><Link to={PAGE_ROUTES['profile-edit']} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-brand-50"><Edit3 className="h-4 w-4" />Edit profile</Link><Link to={PAGE_ROUTES.settings} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-brand-50"><Settings className="h-4 w-4" />Settings</Link></> : <><NavLink page="workers" label="Workers" count={workersCount} /><NavLink page="jobs" label="Jobs" count={jobsCount} /><Link to={PAGE_ROUTES.auth} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl bg-[#3b82f6] px-4 text-sm font-black text-white"><UserRound className="h-4 w-4" />Sign In</Link></>}
                 <Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-brand-50"><Globe2 className="h-4 w-4" />About & Contact</Link>
               </div>
               <div className="mt-4 rounded-2xl border border-slate-100"><ThemeControls /></div>

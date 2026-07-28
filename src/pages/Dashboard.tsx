@@ -5,6 +5,7 @@ import {
   Clock, CheckCircle2, RefreshCw, PlusCircle, Star, ArrowRight, Copy
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
+import CandidateReviewModal from '../components/CandidateReviewModal';
 import { getMissingProfileFields, PROFILE_FIELD_LABELS } from '../validation';
 
 interface DashboardProps {
@@ -121,18 +122,27 @@ export default function Dashboard({
 
   const cleanPhoneHref = (phone: string) => `tel:${phone.replace(/[^+\d]/g, '')}`;
 
+  const formatPhoneDisplay = (phoneStr?: string) => {
+    if (!phoneStr) return '';
+    const digits = phoneStr.replace(/\D/g, '');
+    if (digits.startsWith('252')) {
+      return `+252 ${digits.slice(3)}`;
+    }
+    return phoneStr;
+  };
+
   const ContactActions = ({ phone, label = 'Phone', whatsappMessage }: { phone?: string; label?: string; whatsappMessage?: string }) => {
     if (!phone) return <span className="text-[11px] italic text-slate-400">Phone not shared</span>;
     return (
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
-        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800">
-          <Phone className="h-3.5 w-3.5 text-[#3b82f6]" />
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 mr-2">
+          <Phone className="h-3.5 w-3.5 text-[#073f34]" />
           <span className="text-slate-500">{label}:</span>
-          <span className="font-mono text-slate-950 select-all">{phone}</span>
+          <span className="font-mono text-slate-950 select-all">{formatPhoneDisplay(phone)}</span>
         </span>
-        <a href={cleanPhoneHref(phone)} className="inline-flex min-h-8 items-center justify-center rounded-md bg-slate-900 px-2.5 text-[11px] font-black text-white hover:bg-slate-800">Call</a>
-        {whatsappMessage && <a href={`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-8 items-center justify-center rounded-md bg-[#25D366] px-2.5 text-[11px] font-black text-slate-950 hover:bg-[#20bd5a]">WhatsApp</a>}
-        <button onClick={() => copyPhone(phone)} className="inline-flex min-h-8 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-black text-slate-700 hover:bg-slate-50">
+        <a href={cleanPhoneHref(phone)} className="inline-flex h-9 w-24 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-black text-white hover:bg-slate-800 transition">Call</a>
+        {whatsappMessage && <a href={`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`} target="_blank" rel="noreferrer" className="inline-flex h-9 w-24 shrink-0 items-center justify-center rounded-lg bg-[#25D366] text-xs font-black text-slate-950 hover:bg-[#20bd5a] transition">WhatsApp</a>}
+        <button onClick={() => copyPhone(phone)} className="inline-flex h-9 w-20 shrink-0 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white text-xs font-black text-slate-700 hover:bg-slate-50 transition">
           <Copy className="h-3 w-3" />
           {copiedPhone === phone ? 'Copied' : 'Copy'}
         </button>
@@ -224,7 +234,7 @@ export default function Dashboard({
       <article key={job.id} className="rounded-xl border border-brand-950/10 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h3 className="line-clamp-2 text-base font-black text-slate-900">{job.title}</h3><p className="mt-1 text-xs font-semibold text-slate-500">{job.category || "Local work"} &middot; {job.location} &middot; Posted {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(job.createdAt))}</p>
+            <h3 className="line-clamp-2 text-base font-black text-slate-900">{job.title}</h3><p className="mt-1 text-xs font-semibold text-slate-500">{job.category || "Local work"} · {job.location} · Posted {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(job.createdAt))}</p>
             <p className="mt-1 text-xs font-medium text-slate-500">{workerName ? `Worker: ${workerName}` : 'No worker accepted yet'}</p>
           </div>
           {getJobStatusBadge(job.status)}
@@ -434,16 +444,16 @@ export default function Dashboard({
         </section>
       )}
 
-      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           { label: isWorker ? 'Pending Hire Requests' : 'Pending Connections', value: pendingConnections },
           { label: isWorker ? 'Waiting Applications' : 'Candidates Waiting', value: pendingApplications },
           { label: isWorker ? 'Active Jobs' : 'Open Jobs', value: isWorker ? activeJobsCount : openJobs },
           { label: 'Completed Jobs', value: isWorker ? workerProgressItems.filter(item => item.job.status === 'completed').length : completedJobs },
         ].map(metric => (
-          <div key={metric.label} className="rounded-xl border border-brand-950/10 bg-white p-4 shadow-sm">
-            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">{metric.label}</span>
-            <span className="mt-1 block text-2xl font-black text-slate-900">{metric.value}</span>
+          <div key={metric.label} className="py-1">
+            <span className="block text-xs font-black uppercase tracking-wider text-slate-500">{metric.label}</span>
+            <span className="mt-1 block text-3xl font-black text-slate-900">{metric.value}</span>
           </div>
         ))}
       </div>
@@ -455,7 +465,7 @@ export default function Dashboard({
           { key: 'connections' as const, label: isWorker ? 'Hire Requests' : 'Connections' },
           ...(!isWorker ? [{ key: 'jobs' as const, label: 'Posted Jobs' }] : []),
         ].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)} aria-selected={activeTab === tab.key} className={`min-w-[110px] shrink-0 rounded-full border px-3 py-2 text-xs font-bold sm:flex-1 ${activeTab === tab.key ? 'border-[#3b82f6] bg-[#3b82f6] text-white' : 'border-brand-950/10 bg-white text-slate-600 hover:bg-brand-50 hover:text-[#1e40af]'}`}>
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)} aria-selected={activeTab === tab.key} className={`min-w-[120px] min-h-12 shrink-0 rounded-full border px-5 py-3 text-sm font-black transition sm:flex-1 ${activeTab === tab.key ? 'border-[#3b82f6] bg-[#3b82f6] text-white shadow-md shadow-brand-500/10' : 'border-brand-950/10 bg-white text-slate-700 hover:bg-brand-50 hover:text-[#1e40af]'}`}>
             {tab.label} ({tabCounts[tab.key]})
           </button>
         ))}
@@ -580,31 +590,38 @@ export default function Dashboard({
       )}
 
       {selectedApplication && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Application detail</p>
-                <h3 className="mt-0.5 text-base font-black text-slate-950">{selectedApplication.applicantName}</h3>
-                <p className="mt-1 text-xs font-semibold text-slate-500">{selectedApplication.applicantSkill} for {selectedApplication.jobTitle}</p>
-              </div>
-              <button onClick={() => setSelectedApplication(null)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X className="h-4 w-4" /></button>
-            </div>
-            <div className="space-y-4 px-5 py-4">
-              {getStatusBadge(selectedApplication.status)}
-              <p className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs italic text-slate-700">"{selectedApplication.message}"</p>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-slate-100 p-3"><span className="block text-[10px] font-black uppercase text-slate-400">Location</span><span className="text-sm font-bold text-slate-900">{selectedApplication.location}</span></div>
-                <div className="rounded-xl border border-slate-100 p-3"><span className="block text-[10px] font-black uppercase text-slate-400">Phone</span>{selectedApplication.status === 'accepted' ? <ContactActions phone={selectedApplication.phone} label="Applicant" whatsappMessage={`Hello ${selectedApplication.applicantName}, I am ${currentUser.name}. I am contacting you through Qardho Skilled Platform regarding the job "${selectedApplication.jobTitle}". I would like to discuss the work details and next steps.`} /> : <span className="text-xs font-semibold text-slate-500">Contact unlocks after accepted application or hire request.</span>}</div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row">
-              {getWorker(selectedApplication.applicantId) && <button onClick={() => { const worker = getWorker(selectedApplication.applicantId); setSelectedApplication(null); if (worker) onViewWorkerProfile(worker); }} className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-50">View profile</button>}
-              {selectedApplication.status === 'pending' && <button onClick={() => openConfirmation({ title: 'Decline this candidate application?', description: `This will mark ${selectedApplication.applicantName}'s application for "${selectedApplication.jobTitle}" as declined.`, confirmLabel: 'Decline application', tone: 'danger', actionKey: `decline-app-${selectedApplication.id}`, onConfirm: () => onUpdateApplicationStatus(selectedApplication.id, 'declined') })} className="flex-1 rounded-xl border border-rose-200 px-4 py-2.5 text-xs font-black text-rose-700 hover:bg-rose-50">Decline</button>}
-              {selectedApplication.status === 'pending' && <button onClick={() => openConfirmation({ title: 'Accept this candidate application?', description: `This will hire ${selectedApplication.applicantName}, move the job to in progress, and mark other pending applications as not selected.`, confirmLabel: 'Hire candidate', tone: 'neutral', actionKey: `accept-app-${selectedApplication.id}`, onConfirm: () => onUpdateApplicationStatus(selectedApplication.id, 'accepted') })} className="flex-1 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-black text-white hover:bg-brand-700">Accept applicant</button>}
-            </div>
-          </div>
-        </div>
+        <CandidateReviewModal
+          application={selectedApplication}
+          worker={getWorker(selectedApplication.applicantId)}
+          currentUser={currentUser}
+          job={getJobForApplication(selectedApplication)}
+          onClose={() => setSelectedApplication(null)}
+          onViewWorkerProfile={onViewWorkerProfile}
+          onAccept={(appId) => {
+            const app = selectedApplication;
+            setSelectedApplication(null);
+            openConfirmation({
+              title: 'Accept & Hire Candidate?',
+              description: `This will hire ${app.applicantName}, move "${app.jobTitle}" to in progress, and notify the candidate.`,
+              confirmLabel: 'Hire candidate',
+              tone: 'neutral',
+              actionKey: `accept-app-${appId}`,
+              onConfirm: () => onUpdateApplicationStatus(appId, 'accepted'),
+            });
+          }}
+          onDecline={(appId) => {
+            const app = selectedApplication;
+            setSelectedApplication(null);
+            openConfirmation({
+              title: 'Decline application?',
+              description: `This will mark ${app.applicantName}'s application for "${app.jobTitle}" as declined.`,
+              confirmLabel: 'Decline application',
+              tone: 'danger',
+              actionKey: `decline-app-${appId}`,
+              onConfirm: () => onUpdateApplicationStatus(appId, 'declined'),
+            });
+          }}
+        />
       )}
       {pendingAction && (
         <ConfirmDialog

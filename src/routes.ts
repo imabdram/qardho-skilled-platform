@@ -1,4 +1,4 @@
-export type PageId = 'home' | 'workers' | 'jobs' | 'job-detail' | 'profile' | 'dashboard' | 'admin' | 'post-job' | 'auth' | 'register' | 'forgot-password' | 'reset-password' | 'about' | 'unauthorized' | 'not-found';
+export type PageId = 'home' | 'workers' | 'jobs' | 'job-detail' | 'profile' | 'profile-edit' | 'settings' | 'dashboard' | 'admin' | 'post-job' | 'auth' | 'register' | 'forgot-password' | 'reset-password' | 'about' | 'unauthorized' | 'not-found';
 
 export const PAGE_ROUTES: Record<PageId, string> = {
   home: '/',
@@ -6,6 +6,8 @@ export const PAGE_ROUTES: Record<PageId, string> = {
   jobs: '/jobs',
   'job-detail': '/jobs',
   profile: '/profile',
+  'profile-edit': '/profile/edit',
+  settings: '/settings',
   dashboard: '/dashboard',
   admin: '/admin',
   'post-job': '/post-job',
@@ -23,6 +25,8 @@ export const ROUTE_PAGES: Record<string, PageId> = {
   '/workers': 'workers',
   '/jobs': 'jobs',
   '/profile': 'profile',
+  '/profile/edit': 'profile-edit',
+  '/settings': 'settings',
   '/dashboard': 'dashboard',
   '/worker/dashboard': 'dashboard',
   '/employer/dashboard': 'dashboard',
@@ -43,6 +47,3 @@ export const getPageForPath = (pathname: string): PageId => {
   if (/^\/jobs\/[^/]+$/.test(pathname)) return 'job-detail';
   return ROUTE_PAGES[pathname] || 'not-found';
 };
-
-
-
