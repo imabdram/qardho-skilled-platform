@@ -26,8 +26,6 @@ interface NavbarProps {
   reviews?: Review[];
 }
 
-type ThemeMode = 'light' | 'dark' | 'system';
-
 const focusRing = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2';
 
 export default function Navbar({
@@ -54,7 +52,6 @@ export default function Navbar({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationState, setNotificationState] = useState<'idle' | 'loading' | 'error'>('idle');
-  const [theme, setTheme] = useState<ThemeMode>(() => (localStorage.getItem('qardho-theme') as ThemeMode) || 'system');
   const [language, setLanguage] = useState(() => localStorage.getItem('qardho-language') || 'EN');
 
   const closeMenus = () => {
@@ -85,18 +82,10 @@ export default function Navbar({
   }, [mobileOpen]);
 
   useEffect(() => {
-    localStorage.setItem('qardho-theme', theme);
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const applyTheme = () => {
-      const dark = theme === 'dark' || (theme === 'system' && media.matches);
-      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
-      document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', dark ? '#08110e' : '#f6fbf8');
-    };
-    applyTheme();
-    if (theme === 'system') media.addEventListener('change', applyTheme);
-    return () => media.removeEventListener('change', applyTheme);
-  }, [theme]);
+    document.documentElement.dataset.theme = 'light';
+    document.documentElement.style.colorScheme = 'light';
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', '#f6fbf8');
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('qardho-language', language);
@@ -154,23 +143,20 @@ export default function Navbar({
     </Link>
   );
 
-  const ThemeControls = () => (
+  const LanguageControls = () => (
     <div className="p-2">
-      <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">Theme</p>
+      <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">Language</p>
       <div className="grid grid-cols-3 gap-1">
-        {([
-          ['light', 'Light', Sun],
-          ['dark', 'Dark', Moon],
-          ['system', 'System', Monitor],
-        ] as const).map(([value, label, Icon]) => (
-          <button key={value} onClick={() => setTheme(value)} className={`min-h-11 rounded-xl px-2 text-[11px] font-black ${theme === value ? 'bg-brand-100 text-brand-900' : 'hover:bg-slate-50'}`} aria-pressed={theme === value}>
-            <Icon className="mx-auto mb-1 h-4 w-4" />{label}
+        {['SO', 'EN', 'AR'].map((value) => (
+          <button
+            key={value}
+            onClick={() => setLanguage(value)}
+            className={`min-h-11 rounded-xl text-xs font-black ${language === value ? 'bg-[#073f34] text-white' : 'hover:bg-slate-50'}`}
+            aria-pressed={language === value}
+          >
+            {value}
           </button>
         ))}
-      </div>
-      <p className="mt-2 px-2 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">Language</p>
-      <div className="grid grid-cols-3 gap-1">
-        {['SO', 'EN', 'AR'].map((value) => <button key={value} onClick={() => setLanguage(value)} className={`min-h-11 rounded-xl text-xs font-black ${language === value ? 'bg-[#3b82f6] text-white' : 'hover:bg-slate-50'}`} aria-pressed={language === value}>{value}</button>)}
       </div>
     </div>
   );
@@ -257,7 +243,7 @@ export default function Navbar({
               <>
                 <div className="relative">
                   <button onClick={() => setMoreOpen((open) => !open)} className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-brand-950/10 bg-white px-4 text-sm font-black text-slate-700 hover:bg-brand-50 ${focusRing}`} aria-expanded={moreOpen}>More<ChevronDown className="h-4 w-4" /></button>
-                  {moreOpen && <div className="absolute right-0 top-12 w-72 overflow-hidden rounded-2xl border border-brand-950/10 bg-white shadow-xl"><ThemeControls /><Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-black hover:bg-brand-50"><Globe2 className="h-4 w-4" />About & Contact</Link></div>}
+                  {moreOpen && <div className="absolute right-0 top-12 w-72 overflow-hidden rounded-2xl border border-brand-950/10 bg-white shadow-xl"><LanguageControls /><Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-black hover:bg-brand-50"><Globe2 className="h-4 w-4" />About & Contact</Link></div>}
                 </div>
               </>
             )}
@@ -274,7 +260,7 @@ export default function Navbar({
                 {currentUser ? <><NavLink {...mainLink} /><NavLink page="dashboard" label="Dashboard" Icon={LayoutDashboard} /><Link to={PAGE_ROUTES.profile} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-brand-50"><UserRound className="h-4 w-4" />View profile</Link><Link to={PAGE_ROUTES['profile-edit']} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-brand-50"><Edit3 className="h-4 w-4" />Edit profile</Link><Link to={PAGE_ROUTES.settings} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-brand-50"><Settings className="h-4 w-4" />Settings</Link></> : <><NavLink page="workers" label="Workers" count={workersCount} /><NavLink page="jobs" label="Jobs" count={jobsCount} /><Link to={PAGE_ROUTES.auth} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl bg-[#3b82f6] px-4 text-sm font-black text-white"><UserRound className="h-4 w-4" />Sign In</Link></>}
                 <Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-brand-50"><Globe2 className="h-4 w-4" />About & Contact</Link>
               </div>
-              <div className="mt-4 rounded-2xl border border-slate-100"><ThemeControls /></div>
+              <div className="mt-4 rounded-2xl border border-slate-100"><LanguageControls /></div>
               {currentUser && <button onClick={onLogout} className="mt-auto flex min-h-12 items-center justify-center gap-2 rounded-full border border-rose-200 text-sm font-black text-rose-700 hover:bg-rose-50"><LogOut className="h-4 w-4" />Sign out</button>}
             </div>
           </div>

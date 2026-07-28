@@ -7,15 +7,8 @@
     <title>Skilled Labor</title>
     <script>
       (() => {
-        try {
-          const saved = localStorage.getItem('qardho-theme') || 'system';
-          const dark = saved === 'dark' || (saved === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
-          document.querySelector('meta[name="theme-color"]').content = dark ? '#08110e' : '#f6fbf8';
-        } catch {
-          document.documentElement.dataset.theme = 'light';
-        }
+        document.documentElement.dataset.theme = 'light';
+        document.documentElement.style.colorScheme = 'light';
       })();
     </script>
   </head>
