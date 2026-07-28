@@ -1,6 +1,6 @@
 import React from 'react';
 import { useUser } from '@clerk/react';
-import { DollarSign, ShieldCheck } from 'lucide-react';
+import { ArrowRight, DollarSign, MapPin, ShieldCheck, Star, Wrench } from 'lucide-react';
 import { User as UserType, Review } from '../types';
 import Avatar from './Avatar';
 
@@ -14,10 +14,36 @@ interface WorkerCardProps {
   reviews?: Review[];
 }
 
-export default function WorkerCard({ worker, currentUser, onViewProfile, isCurrentUser }: WorkerCardProps) {
+const getAvailabilityStatus = (availability?: string) => {
+  switch (availability) {
+    case 'available':
+      return { label: 'Available', className: 'bg-emerald-50 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' };
+    case 'busy':
+      return { label: 'Busy', className: 'bg-amber-50 text-amber-800 border-amber-200', dot: 'bg-amber-500' };
+    case 'unavailable':
+    default:
+      return { label: 'Unavailable', className: 'bg-slate-100 text-slate-600 border-slate-200', dot: 'bg-slate-400' };
+  }
+};
+
+const formatRateDisplay = (worker: UserType) => {
+  if (worker.rate && worker.rate.trim()) {
+    const cleanRate = worker.rate.trim();
+    if (worker.pricingType) {
+      const typeLabel = worker.pricingType === 'project' ? 'project' : worker.pricingType === 'hour' ? 'hr' : 'day';
+      if (!cleanRate.includes('/')) {
+        return `${cleanRate} / ${typeLabel}`;
+      }
+    }
+    return cleanRate;
+  }
+  return 'Rate on request';
+};
+
+export default function WorkerCard({ worker, currentUser, onViewProfile, isCurrentUser, reviews = [] }: WorkerCardProps) {
   const { user: clerkUser } = useUser();
-  const availability = worker.availability || 'available';
-  const availabilityLabel = availability === 'available' ? 'Available' : availability === 'busy' ? 'Busy' : 'Unavailable';
+  const statusInfo = getAvailabilityStatus(worker.availability);
+  const rateDisplay = formatRateDisplay(worker);
 
   const avatarSrc = (isCurrentUser && clerkUser?.imageUrl)
     ? clerkUser.imageUrl
@@ -25,32 +51,101 @@ export default function WorkerCard({ worker, currentUser, onViewProfile, isCurre
     ? currentUser.avatarUrl
     : worker.avatarUrl;
 
+  const workerReviews = reviews.filter(r => r.workerId === worker.id);
+  const avgRating = workerReviews.length > 0
+    ? (workerReviews.reduce((sum, r) => sum + r.rating, 0) / workerReviews.length).toFixed(1)
+    : worker.rating ? worker.rating.toFixed(1) : null;
+
   return (
-    <article id={`worker-card-${worker.id}`} className="worker-card flex h-full flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#073f34] hover:shadow-md">
-      <div>
-        <div className="flex items-start gap-4">
-          <Avatar name={worker.name} src={avatarSrc} eager={isCurrentUser} />
-          <div className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 text-base font-black text-slate-950">{worker.name}</h3>
-            <p className="mt-1 truncate text-sm font-bold text-slate-600">{worker.skill || 'Skilled professional'}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {worker.verified && <span className="inline-flex items-center gap-1 rounded-full border border-brand-100 bg-brand-50 px-2 py-1 text-[11px] font-black text-brand-700"><ShieldCheck className="h-3 w-3" />Verified</span>}
-              {worker.location && <span className="rounded-full bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-600">{worker.location}</span>}
+    <article
+      id={`worker-card-${worker.id}`}
+      className="worker-card group flex h-full flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-[#073f34] hover:shadow-md"
+    >
+      <div className="space-y-4">
+        {/* Header: Avatar, Name & Availability Pill */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Avatar name={worker.name} src={avatarSrc} eager={isCurrentUser} />
+            <div className="min-w-0">
+              <h3 className="text-lg font-black text-slate-900 leading-snug group-hover:text-[#073f34] transition truncate">
+                {worker.name}
+              </h3>
+              <p className="text-xs font-bold text-slate-500 truncate mt-0.5">
+                {worker.skill || worker.category || 'Skilled professional'}
+              </p>
             </div>
           </div>
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase ${statusInfo.className}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${statusInfo.dot}`} />
+            {statusInfo.label}
+          </span>
         </div>
-        <div className="mt-5 space-y-2 border-y border-slate-100 py-4 text-sm font-semibold text-slate-600">
-          <div className="flex items-center justify-between gap-3"><span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${availability === 'busy' ? 'bg-amber-500' : availability === 'unavailable' ? 'bg-rose-500' : 'bg-brand-500'}`} />{availabilityLabel}</span><span className="inline-flex items-center gap-1 text-[#2563eb]"><DollarSign className="h-3.5 w-3.5" />{worker.rate || 'Rate on request'}</span></div>
-          <p className="text-xs text-slate-500">Pricing: {worker.pricingType === 'project' ? 'Per project' : worker.pricingType === 'hour' ? 'Per hour' : worker.pricingType === 'day' ? 'Per day' : 'Not specified'}</p>
+
+        {/* Metadata Badges */}
+        <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-1.5 rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+            <MapPin className="h-3.5 w-3.5 text-[#073f34] shrink-0" />
+            <span className="truncate text-slate-900 font-bold">{worker.location ? `Qardho - ${worker.location}` : 'Qardho'}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+            <DollarSign className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+            <span className="truncate text-slate-900 font-bold">{rateDisplay}</span>
+          </div>
         </div>
-        <p className="mt-4 line-clamp-3 text-sm leading-6 text-slate-600">{worker.bio || 'Professional skilled worker ready to discuss the right fit for your job.'}</p>
+
+        {/* Verification & Rating Badges */}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 font-medium">
+          {worker.verified ? (
+            <span className="inline-flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[11px]">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+              Verified Worker
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-slate-500 font-semibold text-[11px]">
+              <Wrench className="h-3 w-3 text-blue-600" />
+              Skilled Professional
+            </span>
+          )}
+
+          {avgRating && (
+            <span className="inline-flex items-center gap-1 text-slate-700 font-bold text-xs">
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              {avgRating} {workerReviews.length > 0 ? `(${workerReviews.length})` : ''}
+            </span>
+          )}
+        </div>
+
+        {/* Bio / Description: Clamped to 3 lines */}
+        <p className="text-xs font-medium leading-relaxed text-slate-600 line-clamp-3 break-words [overflow-wrap:anywhere]">
+          {worker.bio || 'Professional skilled worker in Qardho ready to discuss job opportunities and deliver quality work.'}
+        </p>
       </div>
-      <div className="mt-5">
-        {onViewProfile && <button onClick={() => onViewProfile(worker)} className="view-profile-button inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-brand-700 px-4 text-sm font-black text-[#2563eb] transition hover:bg-[#3b82f6] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2">View Profile</button>}
-        {isCurrentUser && <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50 py-2.5 text-center text-xs font-semibold text-slate-400">This is you</div>}
+
+      {/* Footer Action */}
+      <div className="mt-6 border-t border-slate-100 pt-4 space-y-2">
+        {onViewProfile && (
+          <button
+            type="button"
+            onClick={() => onViewProfile(worker)}
+            className="view-profile-button inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#0b5c4d] group-hover:bg-[#0b5c4d] hover:shadow-md transition-all duration-200"
+          >
+            <span>View Profile</span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </button>
+        )}
+
+        {isCurrentUser && (
+          <div className="rounded-xl border border-blue-100 bg-blue-50 py-1.5 text-center text-[11px] font-bold text-blue-700">
+            This is your worker profile
+          </div>
+        )}
       </div>
     </article>
   );
 }
+
 
 

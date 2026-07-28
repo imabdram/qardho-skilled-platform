@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import WorkerCard from '../components/WorkerCard';
 import { User, Review } from '../types';
-import { Search, MapPin, Users, Sparkles } from 'lucide-react';
+import { MapPin, Search, Users, X } from 'lucide-react';
 import { QARDHO_NEIGHBORHOODS } from '../constants';
 import { PAGE_ROUTES } from '../routes';
 
@@ -16,46 +16,248 @@ interface WorkersProps {
   isLoading?: boolean;
 }
 
-export default function Workers({ workers, currentUser, onConnect, reviews, onViewProfile, isLoading = false }: WorkersProps) {
+export default function Workers({ workers = [], currentUser, onConnect, reviews = [], onViewProfile, isLoading = false }: WorkersProps) {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('workersFilter.search') || '');
   const [selectedLocation, setSelectedLocation] = useState(() => localStorage.getItem('workersFilter.location') || '');
-  useEffect(() => { localStorage.setItem('workersFilter.search', searchQuery); }, [searchQuery]);
-  useEffect(() => { localStorage.setItem('workersFilter.location', selectedLocation); }, [selectedLocation]);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'rating' | 'name'>('newest');
 
-  const query = searchQuery.trim().toLowerCase();
+  useEffect(() => {
+    localStorage.setItem('workersFilter.search', searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    localStorage.setItem('workersFilter.location', selectedLocation);
+  }, [selectedLocation]);
+
   const filteredWorkers = workers.filter((worker) => {
-    const haystack = [worker.name, worker.skill, worker.bio, worker.location].filter(Boolean).join(' ').toLowerCase();
-    return (!query || haystack.includes(query)) && (!selectedLocation || worker.location === selectedLocation);
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      [worker.name, worker.skill, worker.bio, worker.category, worker.location]
+        .some((val) => val?.toLowerCase().includes(query));
+    const matchesLocation = !selectedLocation || worker.location === selectedLocation;
+    return matchesSearch && matchesLocation;
   });
-  const clearSearch = () => { setSearchQuery(''); setSelectedLocation(''); };
+
+  const sortedWorkers = [...filteredWorkers].sort((a, b) => {
+    if (sortOrder === 'newest') {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    }
+    if (sortOrder === 'rating') {
+      const ratingA = a.rating || 0;
+      const ratingB = b.rating || 0;
+      return ratingB - ratingA;
+    }
+    if (sortOrder === 'name') {
+      return (a.name || '').localeCompare(b.name || '');
+    }
+    return 0;
+  });
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSelectedLocation('');
+    localStorage.removeItem('workersFilter.search');
+    localStorage.removeItem('workersFilter.location');
+  };
+
+  const hasActiveFilters = !!searchQuery.trim() || !!selectedLocation;
 
   const WorkerSkeleton = () => (
-    <div className="animate-pulse rounded-2xl border border-brand-950/10 bg-white p-5 shadow-sm">
-      <div className="flex gap-4"><div className="h-14 w-14 rounded-2xl bg-slate-100" /><div className="flex-1"><div className="h-4 w-2/3 rounded bg-slate-100" /><div className="mt-2 h-4 w-1/2 rounded bg-slate-100" /></div></div>
-      <div className="mt-5 h-20 rounded bg-slate-100" /><div className="mt-5 h-11 rounded bg-slate-100" />
+    <div className="animate-pulse rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs space-y-4">
+      <div className="flex items-center gap-4">
+        <div className="h-14 w-14 rounded-2xl bg-slate-100 shrink-0" />
+        <div className="flex-1 space-y-2">
+          <div className="h-5 w-3/4 rounded-lg bg-slate-100" />
+          <div className="h-4 w-1/2 rounded-lg bg-slate-100" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+        <div className="h-10 rounded-xl bg-slate-100" />
+        <div className="h-10 rounded-xl bg-slate-100" />
+      </div>
+      <div className="h-16 rounded-xl bg-slate-100" />
+      <div className="h-11 w-full rounded-xl bg-slate-100" />
     </div>
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" id="workers-page-container">
-      <header className="mb-8 border-b border-slate-100 pb-6">
-        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[#3b82f6]"><Users className="h-4 w-4" /><span>Local professionals</span></div>
-        <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Workers</h1>
-        <p className="mt-1 max-w-xl text-sm font-medium leading-6 text-slate-500">Browse skilled workers, review their experience, and open their full profile before hiring.</p>
-        {!currentUser && <div className="mt-5 flex max-w-xl items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4"><Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-[#3b82f6]" /><div><p className="text-sm font-black text-slate-950">Looking for local work?</p><Link to={PAGE_ROUTES.register} className="mt-1 inline-block text-sm font-black text-[#2563eb] hover:underline">Create a worker profile</Link></div></div>}
-      </header>
+    <main className="min-h-screen bg-[#f1f5f9] pb-16" id="workers-page-container">
+      {/* Centered Container ~1180px */}
+      <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 sm:py-8 space-y-6">
+        
+        {/* Page Heading & Header Banner */}
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 sm:text-3xl lg:text-4xl tracking-tight">
+              Workers
+            </h1>
+            <p className="mt-1.5 text-sm font-medium text-slate-600">
+              Browse skilled professionals, review experience, and hire top talent in Qardho.
+            </p>
+          </div>
 
-      <section className="mb-8 grid gap-3 rounded-2xl border border-brand-950/10 bg-white p-4 shadow-sm md:grid-cols-[1fr_18rem]" aria-label="Worker search">
-        <label className="relative"><span className="sr-only">Search workers</span><Search className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search name, skill, profession, or description" className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold outline-none focus:border-[#3b82f6] focus:bg-white focus:ring-4 focus:ring-brand-500/10" /></label>
-        <label className="relative"><span className="sr-only">Location</span><MapPin className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" /><select value={selectedLocation} onChange={(event) => setSelectedLocation(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold outline-none focus:border-[#3b82f6] focus:bg-white focus:ring-4 focus:ring-brand-500/10"><option value="">Every neighborhood</option>{QARDHO_NEIGHBORHOODS.map((location) => <option key={location} value={location}>{location}</option>)}</select></label>
-      </section>
+          {!currentUser ? (
+            <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-4 sm:max-w-xs shrink-0">
+              <p className="text-xs font-black text-slate-900">Looking for work in Qardho?</p>
+              <p className="mt-0.5 text-xs text-slate-600">Create a worker profile to showcase your skills.</p>
+              <button
+                onClick={() => navigate(PAGE_ROUTES.register)}
+                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#064e3b] transition"
+              >
+                Create a profile
+              </button>
+            </div>
+          ) : currentUser.role === 'employer' ? (
+            <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-4 sm:max-w-xs shrink-0">
+              <p className="text-xs font-black text-slate-900">Need work done?</p>
+              <p className="mt-0.5 text-xs text-slate-600">Post a job to get proposals from skilled workers.</p>
+              <button
+                onClick={() => navigate(PAGE_ROUTES.postJob)}
+                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-xl bg-[#073f34] px-4 text-xs font-black text-white hover:bg-[#064e3b] transition"
+              >
+                Post a Job
+              </button>
+            </div>
+          ) : null}
+        </header>
 
-      <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-black text-slate-900">Worker listings</h2><span className="text-xs font-semibold text-slate-500">{isLoading ? 'Loading...' : `${filteredWorkers.length} shown`}</span></div>
-      {isLoading ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 6 }).map((_, index) => <WorkerSkeleton key={index} />)}</div> : filteredWorkers.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" id="workers-grid">{filteredWorkers.map((worker) => <WorkerCard key={worker.id} worker={worker} currentUser={currentUser} onConnect={onConnect} onViewProfile={onViewProfile} isCurrentUser={currentUser?.id === worker.id} reviews={reviews} />)}</div>
-      ) : <div className="rounded-2xl border border-brand-950/10 bg-white py-16 text-center"><p className="font-bold text-slate-700">No workers match this search.</p><button onClick={clearSearch} className="mt-3 min-h-11 rounded-full px-4 text-sm font-black text-[#2563eb] hover:bg-brand-50">Clear search</button></div>}
-    </div>
+        {/* Search & Filter Bar */}
+        <section className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-3 sm:p-5" aria-label="Worker search">
+          <div className="grid gap-3 sm:grid-cols-12">
+            <div className="relative sm:col-span-8">
+              <Search className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search name, skill, category, or description..."
+                className="min-h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-xs font-medium text-slate-900 outline-none transition focus:border-[#3b82f6] focus:bg-white focus:ring-4 focus:ring-brand-500/10"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="relative sm:col-span-4">
+              <MapPin className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="min-h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-xs font-bold text-slate-900 outline-none transition focus:border-[#3b82f6] focus:bg-white"
+              >
+                <option value="">Every neighborhood</option>
+                {QARDHO_NEIGHBORHOODS.map((loc) => (
+                  <option key={loc} value={loc}>
+                    Qardho - {loc}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Active Filter Chips */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+              <span className="text-xs font-bold text-slate-400">Active filters:</span>
+              {searchQuery && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200">
+                  Search: "{searchQuery}"
+                  <button onClick={() => setSearchQuery('')} className="ml-1 hover:text-slate-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {selectedLocation && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 border border-slate-200">
+                  Location: {selectedLocation}
+                  <button onClick={() => setSelectedLocation('')} className="ml-1 hover:text-slate-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              <button
+                onClick={clearSearch}
+                className="text-xs font-bold text-rose-600 hover:underline ml-2"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* Results Counter & Sort Selector */}
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-black text-slate-900">Workers available</h2>
+            <p className="text-xs font-medium text-slate-500">
+              {isLoading ? 'Loading workers...' : `${sortedWorkers.length} ${sortedWorkers.length === 1 ? 'result' : 'results'}`}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline text-xs font-bold text-slate-400">Sort by:</span>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'newest' | 'rating' | 'name')}
+              className="min-h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-[#3b82f6]"
+            >
+              <option value="newest">Newest first</option>
+              <option value="rating">Highest rated</option>
+              <option value="name">Name (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Workers Grid */}
+        {isLoading ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <WorkerSkeleton key={idx} />
+            ))}
+          </div>
+        ) : sortedWorkers.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" id="workers-grid">
+            {sortedWorkers.map((worker) => (
+              <WorkerCard
+                key={worker.id}
+                worker={worker}
+                currentUser={currentUser}
+                onConnect={onConnect}
+                onViewProfile={onViewProfile}
+                isCurrentUser={currentUser?.id === worker.id}
+                reviews={reviews}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-3xl border border-slate-200/80 bg-white p-8 text-center sm:p-12 shadow-xs space-y-3">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <Users className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-black text-slate-900">No workers found</h3>
+            <p className="text-xs font-medium text-slate-500 max-w-sm mx-auto">
+              Try changing your search keywords or clearing location filters to find available workers.
+            </p>
+            {hasActiveFilters && (
+              <button
+                onClick={clearSearch}
+                className="mt-2 inline-flex min-h-10 items-center justify-center rounded-xl bg-[#073f34] px-5 text-xs font-black text-white hover:bg-[#064e3b] transition"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
-
-
