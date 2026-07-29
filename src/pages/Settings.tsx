@@ -146,25 +146,29 @@ export default function Settings({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 shrink-0">
-                  {isWorker ? <UserRound className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />}
+                  {currentUser.role === 'admin' ? <ShieldCheck className="h-4 w-4 text-amber-600" /> : isWorker ? <UserRound className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />}
                 </div>
                 <div>
                   <p className="text-sm font-bold text-slate-900">Current Role: <span className="capitalize">{currentUser.role}</span></p>
                   <p className="text-xs text-slate-500">
-                    {isWorker
+                    {currentUser.role === 'admin'
+                      ? 'You are operating as a Platform Administrator.'
+                      : isWorker
                       ? 'You are operating as a Skilled Worker. You can switch to Employer to post jobs.'
                       : 'You are operating as an Employer. You can switch to Skilled Worker to offer services.'}
                   </p>
                 </div>
               </div>
 
-              <button
-                onClick={onSwitchRole}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-800 hover:bg-slate-50 shrink-0"
-              >
-                <RefreshCw className="h-4 w-4 text-[#3b82f6]" />
-                Switch to {isWorker ? 'Employer' : 'Worker'}
-              </button>
+              {currentUser.role !== 'admin' && (
+                <button
+                  onClick={onSwitchRole}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-800 hover:bg-slate-50 shrink-0"
+                >
+                  <RefreshCw className="h-4 w-4 text-[#3b82f6]" />
+                  Switch to {isWorker ? 'Employer' : 'Worker'}
+                </button>
+              )}
             </div>
           </section>
 

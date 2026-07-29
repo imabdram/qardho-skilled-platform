@@ -472,7 +472,7 @@ export default function App() {
   };
 
   const handleSwitchRole = () => {
-    if (!currentUser || isSwitchingRole) return;
+    if (!currentUser || isSwitchingRole || currentUser.role === 'admin') return;
     setShowRoleSwitchModal(true);
   };
 

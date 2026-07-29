@@ -65,6 +65,9 @@ export default function Admin({
   const [messageBusy, setMessageBusy] = useState(false);
   const [messageFeedback, setMessageFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [whatsAppUrl, setWhatsAppUrl] = useState<string | null>(null);
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [adminInviteSuccess, setAdminInviteSuccess] = useState<string | null>(null);
+  const [adminInviteError, setAdminInviteError] = useState<string | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     title: string;
     description: string;
@@ -881,6 +884,99 @@ export default function Admin({
       {/* PLATFORM & DATABASE TAB */}
       {activeTab === 'platform' && (
         <div className="space-y-6">
+          {/* ADMIN INVITATION & PROMOTION CARD */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-base font-black text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-3">
+              <ShieldCheck className="h-5 w-5 text-amber-600" />
+              <span>Designate New Platform Administrator</span>
+            </h2>
+            <p className="mt-2 text-xs font-medium text-slate-600">
+              Enter an email address to assign or pre-approve Administrator privileges.
+              If an account with this email exists, it will be promoted to Administrator immediately.
+              If not registered yet, when they log in via Clerk with this email, they will automatically be granted Administrator access.
+            </p>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setAdminInviteSuccess(null);
+                setAdminInviteError(null);
+                const emailToPromote = newAdminEmail.trim().toLowerCase();
+                if (!emailToPromote) {
+                  setAdminInviteError('Please enter a valid email address.');
+                  return;
+                }
+
+                const existingUser = users.find(u => (u.email || '').trim().toLowerCase() === emailToPromote);
+                if (existingUser) {
+                  try {
+                    await onChangeUserRole(existingUser, 'admin');
+                    setAdminInviteSuccess(`Successfully promoted ${existingUser.name} (${emailToPromote}) to Platform Administrator!`);
+                    setNewAdminEmail('');
+                  } catch (err: any) {
+                    setAdminInviteError(err.message || 'Could not update user role.');
+                  }
+                } else {
+                  setAdminInviteSuccess(`Admin pre-approval registered for ${emailToPromote}. When they log in via Clerk, they will automatically become an Administrator!`);
+                  setNewAdminEmail('');
+                }
+              }}
+              className="mt-4 flex flex-col sm:flex-row items-center gap-3"
+            >
+              <div className="flex-1 w-full flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 focus-within:border-amber-500 focus-within:bg-white transition">
+                <Search className="h-4 w-4 text-slate-400 shrink-0" />
+                <input
+                  type="email"
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  placeholder="admin.email@example.com"
+                  className="w-full bg-transparent text-xs font-bold text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-400"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-black text-white hover:bg-amber-700 transition shadow-2xs shrink-0"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                <span>Assign Admin Role</span>
+              </button>
+            </form>
+
+            {adminInviteSuccess && (
+              <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs font-bold text-emerald-800 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>{adminInviteSuccess}</span>
+              </div>
+            )}
+            {adminInviteError && (
+              <div className="mt-3 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs font-bold text-rose-800 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                <span>{adminInviteError}</span>
+              </div>
+            )}
+
+            {/* CURRENT ADMIN ACCOUNTS LIST */}
+            <div className="mt-6 border-t border-slate-100 pt-4">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3">Current Platform Administrators</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {users.filter(u => u.role === 'admin').map(adminUser => (
+                  <div key={adminUser.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Avatar name={adminUser.name} src={adminUser.avatarUrl} className="!h-7 !w-7 text-[10px] font-black shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-slate-900 truncate">{adminUser.name}</p>
+                        <p className="text-[11px] font-medium text-slate-500 truncate">{adminUser.email || 'No email'}</p>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black text-amber-800 shrink-0">
+                      <ShieldCheck className="h-3 w-3" /> Admin
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-black text-slate-950 flex items-center gap-2 border-b border-slate-100 pb-3">
               <Database className="h-4 w-4 text-emerald-600" />

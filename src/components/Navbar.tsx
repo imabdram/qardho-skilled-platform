@@ -458,7 +458,7 @@ export default function Navbar({
                             <span>Platform Settings</span>
                           </button>
 
-                          {onSwitchRole && (
+                          {onSwitchRole && currentUser.role !== 'admin' && (
                             <button
                               type="button"
                               onClick={() => {
