@@ -1174,11 +1174,18 @@ async function startServer() {
       const clerkUserObj = await clerkClient.users.getUser(clerkUserId);
       const clerkImageUrl = clerkUserObj.imageUrl || null;
 
+      const adminEmails = (process.env.ADMIN_EMAILS || 'admin@qardho.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
       // 1. Look for existing linked account
       const linkedUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [clerkUserId]);
       if (linkedUser) {
         if (linkedUser.suspended) {
           return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+        }
+        const userEmail = (linkedUser.email || '').trim().toLowerCase();
+        if (userEmail && adminEmails.includes(userEmail) && linkedUser.role !== 'admin') {
+          await db.run('UPDATE users SET role = $1 WHERE id = $2', ['admin', linkedUser.id]);
+          linkedUser.role = 'admin';
         }
         if (clerkImageUrl && !linkedUser.avatarUrl) {
           await db.run('UPDATE users SET "avatarUrl" = $1 WHERE id = $2', [clerkImageUrl, linkedUser.id]);
@@ -1195,6 +1202,8 @@ async function startServer() {
       const lastName = clerkUserObj.lastName || '';
       const displayName = (firstName || lastName) ? `${firstName} ${lastName}`.trim() : (normalizedEmail.split('@')[0] || 'User');
 
+      const isAutoAdmin = Boolean(normalizedEmail && adminEmails.includes(normalizedEmail));
+
       if (normalizedEmail) {
         const matches = await db.all('SELECT * FROM users WHERE LOWER(email) = $1 AND "clerkUserId" IS NULL', [normalizedEmail]);
         if (matches.length === 1) {
@@ -1202,7 +1211,8 @@ async function startServer() {
           if (existingUser.suspended) {
             return res.status(403).json({ error: 'This account is currently suspended.', user: null });
           }
-          await db.run('UPDATE users SET "clerkUserId" = $1, "avatarUrl" = COALESCE("avatarUrl", $2) WHERE id = $3', [clerkUserId, clerkImageUrl, existingUser.id]);
+          const targetRole = isAutoAdmin ? 'admin' : existingUser.role;
+          await db.run('UPDATE users SET "clerkUserId" = $1, role = $2, "avatarUrl" = COALESCE("avatarUrl", $3) WHERE id = $4', [clerkUserId, targetRole, clerkImageUrl, existingUser.id]);
           const updated = await getUserById(existingUser.id);
           return res.json({ user: formatUser(updated) });
         } else if (matches.length > 1) {
@@ -1213,11 +1223,14 @@ async function startServer() {
       // 3. Create new PostgreSQL profile for Clerk user
       const newInternalId = `user-${Date.now()}-${randomBytes(4).toString('hex')}`;
       const createdAt = new Date().toISOString();
+      const initialRole = isAutoAdmin ? 'admin' : 'pending';
+      const initialVerified = isAutoAdmin;
+
       await db.run(
         `INSERT INTO users (
           id, "clerkUserId", name, email, phone, role, verified, suspended, "createdAt", availability, "avatarUrl"
-        ) VALUES ($1, $2, $3, $4, NULL, 'pending', false, false, $5, 'available', $6)`,
-        [newInternalId, clerkUserId, displayName, normalizedEmail || null, createdAt, clerkImageUrl]
+        ) VALUES ($1, $2, $3, $4, NULL, $5, $6, false, $7, 'available', $8)`,
+        [newInternalId, clerkUserId, displayName, normalizedEmail || null, initialRole, initialVerified, createdAt, clerkImageUrl]
       );
 
       const newUser = await getUserById(newInternalId);
