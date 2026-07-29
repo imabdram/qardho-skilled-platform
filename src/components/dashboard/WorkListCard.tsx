@@ -4,6 +4,7 @@ import StatusBadge, { DisplayStatus } from './StatusBadge';
 import ContactMenu from './ContactMenu';
 import CompactProgress, { StepItem } from './CompactProgress';
 import WorkAgreementSummary from './WorkAgreementSummary';
+import Avatar from '../Avatar';
 import {
   MoreVertical, ChevronDown, ChevronUp, User as UserIcon, Briefcase,
   FileText, CheckCircle2, Star, AlertCircle, RefreshCw, Check, X, Phone, Copy, Handshake, Send
@@ -17,6 +18,7 @@ export interface WorkItemData {
   otherPartyName: string;
   otherPartyRole: 'Employer' | 'Worker' | 'Applicant';
   otherPartyId?: string;
+  otherPartyAvatarUrl?: string;
   location: string;
   rate?: string;
   workType?: string;
@@ -154,7 +156,8 @@ export default function WorkListCard({
 
         {/* SECOND ROW: Employer Name | Location | Agreed Rate / Offer | Work Type */}
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
-          <div className="flex items-center gap-1 font-semibold text-slate-800">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+            <Avatar name={item.otherPartyName} src={item.otherPartyAvatarUrl} size="sm" />
             <span className="text-slate-400">{item.otherPartyRole}:</span>
             <span>{item.otherPartyName}</span>
           </div>

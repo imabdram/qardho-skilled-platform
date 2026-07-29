@@ -59,6 +59,7 @@ export interface Job {
   title: string;
   employerId: string;
   employerName: string;
+  employerAvatarUrl?: string;
   location: string;    // Neighborhood in Qardho
   description: string;
   requirements?: string;

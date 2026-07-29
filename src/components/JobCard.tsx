@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Application, Job, JobStatus } from '../types';
 import { ArrowRight, Calendar, CheckCircle2, DollarSign, MapPin, Wrench } from 'lucide-react';
+import Avatar from './Avatar';
 
 interface JobCardProps {
   key?: string;
@@ -80,9 +81,12 @@ export default function JobCard({ job, application, onViewDetails, isOwner }: Jo
             </span>
           </div>
 
-          <p className="mt-1 text-xs font-bold text-slate-500 truncate">
-            By: <span className="text-slate-900">{job.employerName}</span>
-          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <Avatar name={job.employerName} src={job.employerAvatarUrl} size="sm" />
+            <p className="text-xs font-bold text-slate-500 truncate">
+              By: <span className="text-slate-900">{job.employerName}</span>
+            </p>
+          </div>
         </div>
 
         {/* Application status if worker applied */}

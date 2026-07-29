@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Application, Job, User } from '../types';
 import { PAGE_ROUTES } from '../routes';
+import Avatar from '../components/Avatar';
 
 interface JobDetailProps {
   job?: Job;
@@ -348,9 +349,7 @@ export default function JobDetail({
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Employer</span>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-[#2563eb] font-black text-lg">
-                    {job.employerName ? job.employerName.charAt(0).toUpperCase() : 'E'}
-                  </div>
+                  <Avatar name={job.employerName} src={job.employerAvatarUrl} size="lg" />
                   <div>
                     <h3 className="font-black text-slate-900 text-base">{job.employerName}</h3>
                     <p className="text-xs font-medium text-slate-500 flex items-center gap-1">

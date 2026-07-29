@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Application, Connection, Job, ProfileFieldKey, Review, User, VerificationMessage } from '../types';
 import { ShieldAlert, Search, Trash2, UserCheck, UserX, BadgeCheck, Briefcase, MessageSquare, Link as LinkIcon, Clock3, UsersRound, X } from 'lucide-react';
 import { buildVerificationMessageText, getMissingProfileFields, PROFILE_FIELD_LABELS } from '../validation';
+import Avatar from '../components/Avatar';
 
 interface AdminProps {
   currentUser: User | null;
@@ -218,16 +219,19 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
         {filteredUsers.map((user) => (
           <article key={user.id} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-lg font-black text-slate-950">{user.name}</h2>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-700">{user.role || 'pending'}</span>
-                  {user.verified && <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-brand-700"><BadgeCheck className="h-3 w-3" /> Verified</span>}
-                  {!user.verified && user.role !== 'admin' && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-800"><Clock3 className="h-3 w-3" /> Waiting for verification</span>}
-                  {user.suspended && <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-700"><UserX className="h-3 w-3" /> Suspended</span>}
+              <div className="flex items-start gap-3.5">
+                <Avatar name={user.name} src={user.avatarUrl} size="md" />
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-black text-slate-950">{user.name}</h2>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-700">{user.role || 'pending'}</span>
+                    {user.verified && <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-brand-700"><BadgeCheck className="h-3 w-3" /> Verified</span>}
+                    {!user.verified && user.role !== 'admin' && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-800"><Clock3 className="h-3 w-3" /> Waiting for verification</span>}
+                    {user.suspended && <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-rose-700"><UserX className="h-3 w-3" /> Suspended</span>}
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-slate-500">{user.email || 'No email'} · {user.phone}</p>
+                  <p className="mt-1 text-sm text-slate-600">{user.location || 'No location'}{user.skill ? ` · ${user.skill}` : ''}</p>
                 </div>
-                <p className="mt-2 text-sm font-medium text-slate-500">{user.email || 'No email'} · {user.phone}</p>
-                <p className="mt-1 text-sm text-slate-600">{user.location || 'No location'}{user.skill ? ` · ${user.skill}` : ''}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {user.verified ? (
@@ -274,9 +278,7 @@ export default function Admin({ currentUser, users, jobs, connections, applicati
           <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white/95 px-5 py-5 backdrop-blur sm:px-7">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-lg font-black text-white">
-                  {reviewingUser.name.charAt(0).toUpperCase()}
-                </div>
+                <Avatar name={reviewingUser.name} src={reviewingUser.avatarUrl} size="lg" />
                 <div className="min-w-0">
                   <p className="text-xs font-black uppercase tracking-wider text-amber-700">Verification review</p>
                   <h2 id="account-review-title" className="truncate text-xl font-black text-slate-950">{reviewingUser.name}</h2>

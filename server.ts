@@ -927,10 +927,18 @@ async function startServer() {
   app.get('/api/jobs', async (req, res) => {
     try {
       const jobs = await db.all('SELECT * FROM jobs ORDER BY "createdAt" DESC');
+      const employerIds = Array.from(new Set(jobs.map((j: any) => j.employerId))).filter(Boolean);
+      const employers = employerIds.length > 0
+        ? await db.all(`SELECT id, "avatarUrl" FROM users WHERE id IN (${employerIds.map((_, i) => `$${i + 1}`).join(',')})`, employerIds)
+        : [];
+      const avatarMap = new Map(employers.map((e: any) => [e.id, e.avatarUrl]));
+
       res.json(await Promise.all(jobs.map(async (job: any) => {
+        const employerAvatarUrl = avatarMap.get(job.employerId) || undefined;
+        const jobWithAvatar = { ...job, employerAvatarUrl };
         const authorized = req.authUser && (req.authUser.role === 'admin' || req.authUser.id === job.employerId || req.authUser.id === job.assignedWorkerId);
-        if (authorized) return job;
-        const { phone, ...safeJob } = job;
+        if (authorized) return jobWithAvatar;
+        const { phone, ...safeJob } = jobWithAvatar;
         return safeJob;
       })));
     } catch (err: any) {
