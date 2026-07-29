@@ -45,8 +45,20 @@ export default function Settings({
           <span className="text-xs font-bold text-slate-400">Platform Settings</span>
         </div>
 
-        <header className="mb-6 rounded-2xl bg-[#2563eb] p-6 text-white sm:p-8">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#93c5fd]">Account & Preferences</p>
+        <header className={`mb-6 rounded-2xl p-6 text-white sm:p-8 ${
+          currentUser.role === 'employer'
+            ? 'bg-emerald-600'
+            : currentUser.role === 'admin'
+            ? 'bg-amber-600'
+            : 'bg-[#2563eb]'
+        }`}>
+          <p className={`text-xs font-black uppercase tracking-[0.18em] ${
+            currentUser.role === 'employer'
+              ? 'text-emerald-200'
+              : currentUser.role === 'admin'
+              ? 'text-amber-200'
+              : 'text-[#93c5fd]'
+          }`}>Account & Preferences</p>
           <h1 className="mt-2 text-2xl font-black sm:text-3xl">Platform Settings</h1>
           <p className="mt-2 max-w-xl text-xs font-medium text-brand-50/80 sm:text-sm">
             Manage your account security, notification alerts, role preferences, and account settings.
@@ -67,8 +79,10 @@ export default function Settings({
             <div className="flex items-center gap-4 border-b border-slate-100 pb-5">
               <Avatar name={currentUser.name} src={currentUser.avatarUrl} size="lg" eager />
               <div className="min-w-0 flex-1">
-                <h3 className="truncate font-black text-slate-900 text-base">{currentUser.name}</h3>
-                <p className="text-xs font-semibold text-slate-500 capitalize">{currentUser.role} Account · {currentUser.location}</p>
+                <h3 className="font-black text-slate-900 text-base">{currentUser.name}</h3>
+                <p className="text-[10px] font-bold text-slate-500 capitalize tracking-tight mt-0.5">
+                  {currentUser.role === 'worker' ? 'worker account' : currentUser.role === 'employer' ? 'employer account' : 'account'} · {currentUser.location}
+                </p>
                 <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-600 font-mono">
                   <span>{currentUser.phone}</span>
                 </div>
@@ -131,7 +145,7 @@ export default function Settings({
 
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 shrink-0">
                   {isWorker ? <UserRound className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />}
                 </div>
                 <div>

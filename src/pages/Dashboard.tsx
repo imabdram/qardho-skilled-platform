@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Connection, Application, Job, JobStatus, User, Review, VerificationMessage } from '../types';
 import {
   Users, Briefcase, FileText, Check, X, Phone, MapPin,
-  Clock, CheckCircle2, RefreshCw, PlusCircle, Star, ArrowRight, Copy, User as UserIcon, AlertCircle, Handshake
+  Clock, CheckCircle2, RefreshCw, PlusCircle, Star, ArrowRight, Copy, User as UserIcon, AlertCircle, Handshake, Eye, Settings, ShieldCheck
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CandidateReviewModal from '../components/CandidateReviewModal';
@@ -68,8 +68,106 @@ export default function Dashboard({
 }: DashboardProps) {
   if (!currentUser) return null;
 
+  if (currentUser.role === 'admin') {
+    const totalUsersCount = users.length > 0 ? users.length : workers.length;
+    const pendingCount = users.filter(u => !u.verified && u.role !== 'admin').length;
+    const disputedCount = jobs.filter(j => j.status === 'completion_disputed').length;
+
+    return (
+      <main className="mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 pb-[calc(90px+env(safe-area-inset-bottom))]">
+        <section className="overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-amber-950 p-6 sm:p-8 text-white shadow-xl shadow-amber-950/10 mb-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-300">
+                  <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Platform Administrator</span>
+                </span>
+              </div>
+              <h1 className="mt-3 text-2xl font-black sm:text-3xl tracking-tight">Admin Dashboard & Command Center</h1>
+              <p className="mt-1.5 max-w-2xl text-xs font-medium leading-5 text-slate-300 sm:text-sm">
+                Logged in as Administrator. Oversee users, verify worker accounts, resolve job disputes, and control platform settings.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('admin')}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-500 px-6 py-3.5 text-sm font-black text-slate-950 shadow-lg hover:bg-amber-400 transition shrink-0"
+            >
+              <Settings className="h-5 w-5" />
+              <span>Open Admin Control Portal</span>
+            </button>
+          </div>
+        </section>
+
+        {/* Quick Admin Overview Grid */}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 mb-8">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">Total Platform Users</span>
+            <div className="mt-2 text-3xl font-black text-slate-900">{totalUsersCount}</div>
+            <span className="text-xs font-bold text-emerald-600 mt-1 block">Registered in database</span>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">Total Posted Jobs</span>
+            <div className="mt-2 text-3xl font-black text-slate-900">{jobs.length}</div>
+            <span className="text-xs font-bold text-blue-600 mt-1 block">Active & closed listings</span>
+          </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-2xs">
+            <span className="text-xs font-black uppercase tracking-wider text-amber-800">Pending Verification</span>
+            <div className="mt-2 text-3xl font-black text-amber-950">{pendingCount}</div>
+            <span className="text-xs font-bold text-amber-700 mt-1 block">Awaiting admin review</span>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-500">Disputed Jobs</span>
+            <div className="mt-2 text-3xl font-black text-slate-900">{disputedCount}</div>
+            <span className="text-xs font-bold text-rose-600 mt-1 block">Requires intervention</span>
+          </div>
+        </div>
+
+        {/* Admin Quick Action Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-2xs hover:shadow-xs transition">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <Users className="h-5 w-5 text-amber-600" />
+              <span>User & Verification Management</span>
+            </h3>
+            <p className="text-xs font-medium text-slate-500 mt-1 mb-5 leading-5">
+              Review registered accounts, grant verified status badges, issue verification requests, suspend violators, or manage user roles.
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigate('admin')}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition"
+            >
+              <span>Manage User Accounts</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-2xs hover:shadow-xs transition">
+            <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-amber-600" />
+              <span>Job Oversight & Dispute Resolution</span>
+            </h3>
+            <p className="text-xs font-medium text-slate-500 mt-1 mb-5 leading-5">
+              Monitor active job postings, intervene in worker-employer completion disputes, and manage platform job listings.
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigate('admin')}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 transition"
+            >
+              <span>Manage Job Listings</span>
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const isWorker = currentUser.role === 'worker';
-  const [activeTab, setActiveTab] = useState<'progress' | 'connections' | 'applications' | 'jobs' | 'completed'>(isWorker ? 'progress' : 'applications');
+  const [activeTab, setActiveTab] = useState<'progress' | 'connections' | 'applications' | 'jobs' | 'completed'>(isWorker ? 'applications' : 'applications');
   const [actionKey, setActionKey] = useState<string | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [declineModalConnection, setDeclineModalConnection] = useState<Connection | null>(null);
@@ -354,45 +452,220 @@ export default function Dashboard({
       let statusLabel = isWorker ? 'Under Review' : 'Needs Review';
       let nextStepText = isWorker ? 'Waiting for employer to review application.' : 'Review this application and make a decision.';
 
+      let primaryAction;
+      let secondaryActions: any[] = [];
+
       if (!isWorker && app.status === 'pending') {
         status = 'needs_action';
         statusLabel = 'Needs Review';
         nextStepText = 'Review this application and make a decision.';
-      } else if (app.status === 'accepted') {
-        status = 'accepted';
-        statusLabel = isWorker ? 'Accepted' : 'Candidate Hired';
-        nextStepText = isWorker ? 'Your application was accepted! Check Active Work for details.' : 'Candidate hired. Contact worker or check Active Work.';
+        primaryAction = {
+          label: 'Review Application',
+          icon: FileText,
+          variant: 'primary' as const,
+          onClick: () => setSelectedApplication(app),
+        };
+        secondaryActions = [
+          {
+            label: 'View Worker Profile',
+            icon: UserIcon,
+            onClick: () => {
+              const workerObj = getWorker(app.applicantId);
+              if (workerObj) onViewWorkerProfile(workerObj);
+            },
+          },
+          {
+            label: 'Accept & Hire Candidate',
+            icon: Check,
+            onClick: () => openConfirmation({
+              title: 'Accept & Hire this candidate?',
+              description: `This will hire ${app.applicantName}, move "${app.jobTitle}" to in progress, and notify candidate.`,
+              confirmLabel: actionKey === `accept-app-${app.id}` ? 'Accepting...' : 'Accept & Hire candidate',
+              tone: 'neutral' as const,
+              actionKey: `accept-app-${app.id}`,
+              onConfirm: () => onUpdateApplicationStatus(app.id, 'accepted')
+            }),
+          },
+          {
+            label: 'Reject Application',
+            icon: X,
+            tone: 'danger' as const,
+            onClick: () => openConfirmation({
+              title: 'Reject candidate application?',
+              description: `This will mark ${app.applicantName}'s application for "${app.jobTitle}" as rejected.`,
+              confirmLabel: 'Reject application',
+              tone: 'danger' as const,
+              actionKey: `decline-app-${app.id}`,
+              onConfirm: () => onUpdateApplicationStatus(app.id, 'declined')
+            }),
+          }
+        ];
       } else if (app.status === 'declined') {
         status = 'not_selected';
         statusLabel = isWorker ? 'Not Selected' : 'Rejected';
         nextStepText = isWorker ? 'Application was not selected by employer.' : 'Application was rejected.';
-      }
+      } else if (app.status === 'accepted') {
+        if (isWorker && job) {
+          const isActionReq = job.status === 'completion_requested_by_employer';
+          const workerReviewed = hasWorkerReviewedJob(job.id);
 
-      let primaryAction;
-      if (isWorker) {
-        if (app.status === 'accepted') {
-          primaryAction = {
-            label: 'View Active Work',
-            icon: ArrowRight,
-            variant: 'primary' as const,
-            onClick: () => setActiveTab('progress'),
-          };
-        }
-      } else {
-        if (app.status === 'pending') {
-          primaryAction = {
-            label: 'Review Application',
-            icon: FileText,
-            variant: 'primary' as const,
-            onClick: () => setSelectedApplication(app),
-          };
-        } else if (app.status === 'accepted') {
-          primaryAction = {
-            label: 'View Active Work',
-            icon: ArrowRight,
-            variant: 'primary' as const,
-            onClick: () => setActiveTab('progress'),
-          };
+          if (isActionReq) {
+            status = 'needs_action';
+            statusLabel = 'Action Required';
+            nextStepText = 'Employer requested completion. Please confirm or report issue.';
+            primaryAction = {
+              label: 'Confirm Completion',
+              icon: CheckCircle2,
+              variant: 'success' as const,
+              isLoading: actionKey === `worker-complete-${job.id}`,
+              onClick: () => openConfirmation({
+                title: 'Confirm work completed?',
+                description: `This confirms you finished "${job.title}". The employer can review after this.`,
+                confirmLabel: 'Confirm completed',
+                tone: 'neutral',
+                actionKey: `worker-complete-${job.id}`,
+                onConfirm: () => onUpdateJobStatus(job.id, 'completed'),
+              }),
+            };
+            secondaryActions.push({
+              label: 'Report Issue',
+              icon: AlertCircle,
+              tone: 'danger' as const,
+              onClick: () => openConfirmation({
+                title: 'Report a completion issue?',
+                description: 'The job will remain unresolved and the issue will be recorded.',
+                confirmLabel: 'Report issue',
+                tone: 'danger',
+                actionKey: `worker-dispute-${job.id}`,
+                onConfirm: () => onUpdateJobStatus(job.id, 'completion_disputed'),
+              }),
+            });
+          } else if (job.status === 'completion_requested_by_worker') {
+            status = 'completion_requested';
+            statusLabel = 'Completion Requested';
+            nextStepText = 'Waiting for employer to confirm job completion.';
+          } else if (job.status === 'completed' || job.status === 'closed') {
+            if (!workerReviewed) {
+              status = 'review_pending';
+              statusLabel = 'Review Pending';
+              nextStepText = 'Rate your experience with this employer to close the work.';
+              primaryAction = {
+                label: 'Rate Employer',
+                icon: Star,
+                variant: 'warning' as const,
+                onClick: () => {
+                  setSelectedEmployerReviewJob({
+                    job,
+                    sourceBadge: 'Job Application'
+                  });
+                },
+              };
+            } else {
+              status = 'completed';
+              statusLabel = 'Completed';
+              nextStepText = 'Both reviews submitted. Work engagement closed.';
+            }
+          } else {
+            status = 'active';
+            statusLabel = 'Active Work';
+            nextStepText = 'Application accepted! Keep contact details handy or request completion when finished.';
+            primaryAction = {
+              label: 'Request Completion',
+              icon: CheckCircle2,
+              variant: 'primary' as const,
+              isLoading: actionKey === `worker-request-${job.id}`,
+              onClick: () => openConfirmation({
+                title: 'Request job completion?',
+                description: `Ask employer "${job.employerName}" to confirm "${job.title}" is finished.`,
+                confirmLabel: 'Request completion',
+                tone: 'neutral',
+                actionKey: `worker-request-${job.id}`,
+                onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_worker'),
+              }),
+            };
+          }
+        } else if (!isWorker && job) {
+          const isActionReq = job.status === 'completion_requested_by_worker';
+          const employerReviewed = hasEmployerReviewedJob(job.id);
+
+          if (isActionReq) {
+            status = 'needs_action';
+            statusLabel = 'Action Required';
+            nextStepText = 'Worker requested job completion. Please confirm or report issue.';
+            primaryAction = {
+              label: 'Confirm Completion',
+              icon: CheckCircle2,
+              variant: 'success' as const,
+              isLoading: actionKey === `confirm-${job.id}`,
+              onClick: () => openConfirmation({
+                title: 'Confirm job completion?',
+                description: `Confirm "${job.title}" is finished. The worker can be rated after this.`,
+                confirmLabel: 'Confirm completion',
+                tone: 'neutral',
+                actionKey: `confirm-${job.id}`,
+                onConfirm: () => onUpdateJobStatus(job.id, 'completed'),
+              }),
+            };
+            secondaryActions.push({
+              label: 'Report Issue',
+              icon: AlertCircle,
+              tone: 'danger' as const,
+              onClick: () => openConfirmation({
+                title: 'Report a completion issue?',
+                description: 'The job will remain unresolved and marked as disputed.',
+                confirmLabel: 'Report issue',
+                tone: 'danger',
+                actionKey: `dispute-${job.id}`,
+                onConfirm: () => onUpdateJobStatus(job.id, 'completion_disputed'),
+              }),
+            });
+          } else if (job.status === 'completion_requested_by_employer') {
+            status = 'completion_requested';
+            statusLabel = 'Completion Requested';
+            nextStepText = 'Waiting for worker to confirm completion.';
+          } else if (job.status === 'completed' || job.status === 'closed') {
+            if (!employerReviewed) {
+              status = 'review_pending';
+              statusLabel = 'Review Pending';
+              nextStepText = 'Rate worker experience to close engagement.';
+              primaryAction = {
+                label: 'Rate Worker',
+                icon: Star,
+                variant: 'warning' as const,
+                onClick: () => {
+                  const reviewWorker = getWorker(app.applicantId);
+                  if (reviewWorker) onViewWorkerProfile(reviewWorker);
+                  else onNavigate('workers');
+                },
+              };
+            } else {
+              status = 'completed';
+              statusLabel = 'Completed';
+              nextStepText = 'Your review was submitted. Engagement closed.';
+            }
+          } else {
+            status = 'active';
+            statusLabel = 'Active Work';
+            nextStepText = 'Candidate hired! Request completion when work is finished.';
+            primaryAction = {
+              label: 'Request Completion',
+              icon: CheckCircle2,
+              variant: 'primary' as const,
+              isLoading: actionKey === `complete-${job.id}`,
+              onClick: () => openConfirmation({
+                title: 'Request worker completion?',
+                description: `Ask assigned worker "${app.applicantName}" to confirm "${job.title}" is finished.`,
+                confirmLabel: 'Request completion',
+                tone: 'neutral',
+                actionKey: `complete-${job.id}`,
+                onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_employer'),
+              }),
+            };
+          }
+        } else {
+          status = 'accepted';
+          statusLabel = 'Candidate Hired';
+          nextStepText = 'Candidate hired.';
         }
       }
 
@@ -413,57 +686,21 @@ export default function Dashboard({
         status,
         statusLabel,
         nextStepText,
-        phone: app.phone,
+        phone: app.phone || job?.phone,
         isContactUnlocked: app.status === 'accepted',
         workflowSteps: [
           { key: 'submitted', label: 'Submitted', isDone: true },
           { key: 'review', label: 'Under Review', isDone: true, isCurrent: app.status === 'pending' },
-          { key: 'decision', label: app.status === 'declined' ? (isWorker ? 'Not Selected' : 'Rejected') : 'Accepted', isDone: app.status !== 'pending', isCurrent: app.status === 'accepted' },
+          { key: 'decision', label: app.status === 'declined' ? (isWorker ? 'Not Selected' : 'Rejected') : 'Accepted', isDone: app.status !== 'pending' },
           { key: 'active', label: 'Active Work', isDone: app.status === 'accepted' },
         ],
         primaryAction,
-        secondaryActions: !isWorker ? [
-          {
-            label: 'View Worker Profile',
-            icon: UserIcon,
-            onClick: () => {
-              const workerObj = getWorker(app.applicantId);
-              if (workerObj) onViewWorkerProfile(workerObj);
-            },
-          },
-          ...(app.status === 'pending' ? [
-            {
-              label: 'Accept & Hire Candidate',
-              icon: Check,
-              onClick: () => openConfirmation({
-                title: 'Accept & Hire this candidate?',
-                description: `This will hire ${app.applicantName}, move "${app.jobTitle}" to in progress, and notify candidate.`,
-                confirmLabel: actionKey === `accept-app-${app.id}` ? 'Accepting...' : 'Accept & Hire candidate',
-                tone: 'neutral' as const,
-                actionKey: `accept-app-${app.id}`,
-                onConfirm: () => onUpdateApplicationStatus(app.id, 'accepted')
-              }),
-            },
-            {
-              label: 'Reject Application',
-              icon: X,
-              tone: 'danger' as const,
-              onClick: () => openConfirmation({
-                title: 'Reject candidate application?',
-                description: `This will mark ${app.applicantName}'s application for "${app.jobTitle}" as rejected.`,
-                confirmLabel: 'Reject application',
-                tone: 'danger' as const,
-                actionKey: `decline-app-${app.id}`,
-                onConfirm: () => onUpdateApplicationStatus(app.id, 'declined')
-              }),
-            }
-          ] : [])
-        ] : [],
+        secondaryActions,
         application: app,
         job,
       };
     });
-  }, [myApplications, isWorker, actionKey]);
+  }, [myApplications, isWorker, actionKey, jobs, reviews]);
 
   // Convert Direct Offers (Connections) to WorkItemData
   const directOfferCards: WorkItemData[] = useMemo(() => {
@@ -473,19 +710,148 @@ export default function Dashboard({
         : 'Jul 29';
 
       const isPending = conn.status === 'pending' || conn.status === 'pending_worker_response';
+      const connJob = jobs.find(j => j.id === conn.jobId) || {
+        id: `conn-job-${conn.id}`,
+        title: conn.jobTitle || 'Direct Work Engagement',
+        employerId: conn.fromUserId,
+        employerName: conn.fromUserName,
+        status: 'in_progress' as const,
+        location: 'Qardho',
+        createdAt: conn.createdAt
+      } as Job;
 
       let status: DisplayStatus = 'under_review';
       let statusLabel = 'Waiting';
       let nextStepText = 'Waiting for response.';
 
+      let primaryAction;
+      let secondaryActions: any[] = [];
+
       if (isPending) {
         status = isWorker ? 'needs_action' : 'under_review';
         statusLabel = isWorker ? 'Needs Response' : 'Waiting for Worker';
         nextStepText = isWorker ? 'Employer sent a direct offer. Accept to unlock contact details.' : 'Waiting for worker to accept your direct offer.';
+
+        if (isWorker) {
+          primaryAction = {
+            label: 'Accept Offer',
+            icon: Check,
+            variant: 'success' as const,
+            isLoading: actionKey === `accept-conn-${conn.id}`,
+            onClick: () => openConfirmation({
+              title: 'Accept this hire request?',
+              description: `Allowed contact information may be shared with ${conn.fromUserName}.`,
+              confirmLabel: actionKey === `accept-conn-${conn.id}` ? 'Accepting...' : 'Accept Request',
+              tone: 'neutral',
+              actionKey: `accept-conn-${conn.id}`,
+              onConfirm: () => onUpdateConnectionStatus(conn.id, 'accepted')
+            }),
+          };
+          secondaryActions.push({
+            label: 'Decline Offer',
+            icon: X,
+            tone: 'danger' as const,
+            onClick: () => {
+              setDeclineModalConnection(conn);
+              setDeclineReason('');
+            },
+          });
+        } else {
+          primaryAction = {
+            label: 'View Worker Profile',
+            icon: UserIcon,
+            variant: 'primary' as const,
+            onClick: () => {
+              const w = getWorker(conn.toUserId);
+              if (w) onViewWorkerProfile(w);
+            },
+          };
+        }
       } else if (conn.status === 'accepted') {
-        status = 'accepted';
-        statusLabel = 'Offer Accepted';
-        nextStepText = 'Offer accepted. Work agreement confirmed & contact unlocked.';
+        if (isWorker && connJob) {
+          const isActionReq = connJob.status === 'completion_requested_by_employer';
+          const workerReviewed = hasWorkerReviewedJob(connJob.id);
+
+          if (isActionReq) {
+            status = 'needs_action';
+            statusLabel = 'Action Required';
+            nextStepText = 'Employer requested completion. Please confirm or report issue.';
+            primaryAction = {
+              label: 'Confirm Completion',
+              icon: CheckCircle2,
+              variant: 'success' as const,
+              isLoading: actionKey === `worker-complete-${connJob.id}`,
+              onClick: () => openConfirmation({
+                title: 'Confirm work completed?',
+                description: `This confirms you finished "${connJob.title}". The employer can review after this.`,
+                confirmLabel: 'Confirm completed',
+                tone: 'neutral',
+                actionKey: `worker-complete-${connJob.id}`,
+                onConfirm: () => onUpdateJobStatus(connJob.id, 'completed'),
+              }),
+            };
+            secondaryActions.push({
+              label: 'Report Issue',
+              icon: AlertCircle,
+              tone: 'danger' as const,
+              onClick: () => openConfirmation({
+                title: 'Report a completion issue?',
+                description: 'The job will remain unresolved and the issue will be recorded.',
+                confirmLabel: 'Report issue',
+                tone: 'danger',
+                actionKey: `worker-dispute-${connJob.id}`,
+                onConfirm: () => onUpdateJobStatus(connJob.id, 'completion_disputed'),
+              }),
+            });
+          } else if (connJob.status === 'completion_requested_by_worker') {
+            status = 'completion_requested';
+            statusLabel = 'Completion Requested';
+            nextStepText = 'Waiting for employer to confirm job completion.';
+          } else if (connJob.status === 'completed' || connJob.status === 'closed') {
+            if (!workerReviewed) {
+              status = 'review_pending';
+              statusLabel = 'Review Pending';
+              nextStepText = 'Rate your experience with this employer to close the work.';
+              primaryAction = {
+                label: 'Rate Employer',
+                icon: Star,
+                variant: 'warning' as const,
+                onClick: () => {
+                  setSelectedEmployerReviewJob({
+                    job: connJob,
+                    sourceBadge: 'Direct Offer'
+                  });
+                },
+              };
+            } else {
+              status = 'completed';
+              statusLabel = 'Completed';
+              nextStepText = 'Both reviews submitted. Direct engagement closed.';
+            }
+          } else {
+            status = 'active';
+            statusLabel = 'Active Work';
+            nextStepText = 'Offer accepted! Contact details unlocked. Request completion when finished.';
+            primaryAction = {
+              label: 'Request Completion',
+              icon: CheckCircle2,
+              variant: 'primary' as const,
+              isLoading: actionKey === `worker-request-${connJob.id}`,
+              onClick: () => openConfirmation({
+                title: 'Request job completion?',
+                description: `Ask employer "${conn.fromUserName}" to confirm "${connJob.title}" is finished.`,
+                confirmLabel: 'Request completion',
+                tone: 'neutral',
+                actionKey: `worker-request-${connJob.id}`,
+                onConfirm: () => onUpdateJobStatus(connJob.id, 'completion_requested_by_worker'),
+              }),
+            };
+          }
+        } else {
+          status = 'accepted';
+          statusLabel = 'Offer Accepted';
+          nextStepText = 'Offer accepted. Work agreement confirmed & contact unlocked.';
+        }
       } else if (conn.status === 'declined') {
         status = 'declined';
         statusLabel = 'Offer Declined';
@@ -498,54 +864,6 @@ export default function Dashboard({
         status = 'expired';
         statusLabel = 'Expired';
         nextStepText = 'Direct offer expired.';
-      }
-
-      let primaryAction;
-      if (isWorker && isPending) {
-        primaryAction = {
-          label: 'Accept Offer',
-          icon: Check,
-          variant: 'success' as const,
-          isLoading: actionKey === `accept-conn-${conn.id}`,
-          onClick: () => openConfirmation({
-            title: 'Accept this hire request?',
-            description: `Allowed contact information may be shared with ${conn.fromUserName}.`,
-            confirmLabel: actionKey === `accept-conn-${conn.id}` ? 'Accepting...' : 'Accept Request',
-            tone: 'neutral',
-            actionKey: `accept-conn-${conn.id}`,
-            onConfirm: () => onUpdateConnectionStatus(conn.id, 'accepted')
-          }),
-        };
-      } else if (conn.status === 'accepted') {
-        primaryAction = {
-          label: isWorker ? 'View Active Work' : 'Contact Participant',
-          icon: isWorker ? ArrowRight : Phone,
-          variant: 'primary' as const,
-          onClick: () => isWorker ? setActiveTab('progress') : null,
-        };
-      } else if (!isWorker && isPending) {
-        primaryAction = {
-          label: 'View Worker Profile',
-          icon: UserIcon,
-          variant: 'primary' as const,
-          onClick: () => {
-            const w = getWorker(conn.toUserId);
-            if (w) onViewWorkerProfile(w);
-          },
-        };
-      }
-
-      const secondaryActions = [];
-      if (isWorker && isPending) {
-        secondaryActions.push({
-          label: 'Decline Offer',
-          icon: X,
-          tone: 'danger' as const,
-          onClick: () => {
-            setDeclineModalConnection(conn);
-            setDeclineReason('');
-          },
-        });
       }
 
       return {
@@ -579,7 +897,7 @@ export default function Dashboard({
         connection: conn,
       };
     });
-  }, [myConnections, isWorker, actionKey]);
+  }, [myConnections, isWorker, actionKey, jobs, reviews]);
 
   // Employer Posted Jobs & Engagements mapped to WorkItemData
   const employerJobCards: WorkItemData[] = useMemo(() => {
@@ -622,54 +940,15 @@ export default function Dashboard({
         }
       }
 
-      let primaryAction;
-      if (job.status === 'completion_requested_by_worker') {
-        primaryAction = {
-          label: 'Confirm Completion',
-          icon: CheckCircle2,
-          variant: 'success' as const,
-          onClick: () => openConfirmation({
-            title: 'Confirm job completion?',
-            description: `Confirm "${job.title}" is finished.`,
-            confirmLabel: 'Confirm completion',
-            tone: 'neutral',
-            actionKey: `confirm-${job.id}`,
-            onConfirm: () => onUpdateJobStatus(job.id, 'completed')
-          }),
-        };
-      } else if (['active', 'in_progress'].includes(job.status)) {
-        primaryAction = {
-          label: 'Request Completion',
-          icon: CheckCircle2,
-          variant: 'primary' as const,
-          onClick: () => openConfirmation({
-            title: 'Request worker completion?',
-            description: `Ask assigned worker to confirm "${job.title}" is finished.`,
-            confirmLabel: 'Request completion',
-            tone: 'neutral',
-            actionKey: `complete-${job.id}`,
-            onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_employer')
-          }),
-        };
-      } else if (job.status === 'completed' && !reviewed) {
-        primaryAction = {
-          label: 'Rate Worker',
-          icon: Star,
-          variant: 'warning' as const,
-          onClick: () => {
-            const reviewWorker = getWorker(job.assignedWorkerId || acceptedApp?.applicantId);
-            if (reviewWorker) onViewWorkerProfile(reviewWorker);
-            else onNavigate('workers');
-          },
-        };
-      } else if (job.status === 'open' && jobAppsCount > 0) {
-        primaryAction = {
-          label: 'Review Applicants',
-          icon: Users,
-          variant: 'primary' as const,
-          onClick: () => setActiveTab('applications'),
-        };
-      }
+      const primaryAction = {
+        label: 'View Job',
+        icon: Eye,
+        variant: 'primary' as const,
+        onClick: () => {
+          if (onViewJobDetails && job) onViewJobDetails(job);
+          else onNavigate('jobs');
+        },
+      };
 
       return {
         id: job.id,
@@ -706,7 +985,7 @@ export default function Dashboard({
   const currentTabItems: WorkItemData[] = useMemo(() => {
     if (activeTab === 'progress') {
       return isWorker
-        ? activeWorkCards
+        ? []
         : employerJobCards.filter(c => ['active', 'in_progress', 'completion_requested', 'needs_action'].includes(c.status));
     } else if (activeTab === 'applications') {
       return applicationCards;
@@ -716,11 +995,11 @@ export default function Dashboard({
       return employerJobCards;
     } else if (activeTab === 'completed') {
       return isWorker
-        ? activeWorkCards.filter(c => c.job?.status === 'completed' || c.status === 'completed' || c.status === 'review_pending')
+        ? [...applicationCards, ...directOfferCards].filter(c => c.status === 'completed' || c.status === 'review_pending')
         : employerJobCards.filter(c => c.job?.status === 'completed' || c.status === 'completed' || c.status === 'review_pending');
     }
     return [];
-  }, [activeTab, isWorker, activeWorkCards, applicationCards, directOfferCards, employerJobCards]);
+  }, [activeTab, isWorker, applicationCards, directOfferCards, employerJobCards]);
 
   // Needs Action Count across all active items
   const totalNeedsActionCount = useMemo(() => {
@@ -729,6 +1008,39 @@ export default function Dashboard({
       : [...employerJobCards, ...applicationCards, ...directOfferCards];
     return allCards.filter(c => c.status === 'needs_action' || c.status === 'review_pending').length;
   }, [isWorker, activeWorkCards, applicationCards, directOfferCards, employerJobCards]);
+
+  // Group Applications Received by Job Post for Employer View
+  const groupedEmployerApplications = useMemo(() => {
+    if (isWorker) return [];
+    
+    const jobGroupMap: Record<string, { job?: Job; jobTitle: string; items: WorkItemData[] }> = {};
+
+    // Group applicant cards by Job ID or Job Title
+    applicationCards.forEach(item => {
+      const jobId = item.job?.id || item.title;
+      if (!jobGroupMap[jobId]) {
+        jobGroupMap[jobId] = {
+          job: item.job,
+          jobTitle: item.job?.title || item.title,
+          items: [],
+        };
+      }
+      jobGroupMap[jobId].items.push(item);
+    });
+
+    // Also include any posted jobs that have 0 applicants so employer sees all their listings
+    myPostedJobs.forEach(job => {
+      if (!jobGroupMap[job.id]) {
+        jobGroupMap[job.id] = {
+          job,
+          jobTitle: job.title,
+          items: [],
+        };
+      }
+    });
+
+    return Object.values(jobGroupMap);
+  }, [isWorker, applicationCards, myPostedJobs]);
 
   // Filtered & Sorted items for display
   const filteredItems = useMemo(() => {
@@ -790,39 +1102,105 @@ export default function Dashboard({
     setCurrentPage(1);
   };
 
-  const NeedsAttentionCard = ({ title, detail, action, onClick, tone = 'blue' }: { title: string; detail: string; action: string; onClick: () => void; tone?: 'blue' | 'amber' | 'brand' }) => {
-    const toneClass = tone === 'amber' ? 'bg-amber-50 text-amber-800 border-amber-100' : tone === 'brand' ? 'bg-brand-50 text-brand-800 border-brand-100' : 'bg-[#93c5fd]/30 text-[#1e40af] border-[#93c5fd]/60';
+  const NeedsAttentionCard = ({
+    title,
+    detail,
+    action,
+    onClick,
+    tone = 'blue',
+    icon: Icon = Clock
+  }: {
+    title: string;
+    detail: string;
+    action: string;
+    onClick: () => void;
+    tone?: 'blue' | 'amber' | 'emerald' | 'brand';
+    icon?: any;
+  }) => {
+    const toneClass =
+      tone === 'amber'
+        ? 'bg-amber-50/90 text-amber-900 border-amber-200/80 hover:border-amber-300 hover:bg-amber-50'
+        : tone === 'emerald' || tone === 'brand'
+        ? 'bg-emerald-50/90 text-emerald-900 border-emerald-200/80 hover:border-emerald-300 hover:bg-emerald-50'
+        : 'bg-blue-50/90 text-blue-900 border-blue-200/80 hover:border-blue-300 hover:bg-blue-50';
+
+    const iconBadgeClass =
+      tone === 'amber'
+        ? 'bg-amber-100 text-amber-700'
+        : tone === 'emerald' || tone === 'brand'
+        ? 'bg-emerald-100 text-emerald-700'
+        : 'bg-blue-100 text-blue-700';
+
     return (
-      <button onClick={onClick} className={`min-h-28 rounded-xl border p-4 text-left transition hover:shadow-sm ${toneClass}`}>
-        <span className="block text-sm font-black">{title}</span>
-        <span className="mt-1 block text-xs font-semibold opacity-80">{detail}</span>
-        <span className="mt-3 inline-flex items-center gap-1 text-xs font-black">{action}<ArrowRight className="h-3.5 w-3.5" /></span>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`group flex flex-col justify-between rounded-2xl border p-4.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${toneClass}`}
+      >
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className={`inline-flex h-8 w-8 items-center justify-center rounded-xl font-bold ${iconBadgeClass}`}>
+              <Icon className="h-4 w-4" />
+            </span>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider opacity-70">Action Required</span>
+          </div>
+          <span className="block text-sm font-black leading-snug">{title}</span>
+          <span className="mt-1 block text-xs font-medium leading-relaxed opacity-85">{detail}</span>
+        </div>
+        <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-black group-hover:gap-2 transition-all">
+          <span>{action}</span>
+          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        </span>
       </button>
     );
   };
 
   return (
     <div className="mx-auto max-w-[1140px] px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 pb-[calc(90px+env(safe-area-inset-bottom))] min-w-0" id="dashboard-container">
-      {/* Header Banner */}
-      <div className="mb-8 flex flex-col gap-5 rounded-2xl bg-[#111615] p-6 text-white shadow-xl shadow-brand-950/15 sm:p-8 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="mb-1.5 flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-xl font-black sm:text-2xl">Dashboard</h1>
-            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${isWorker ? 'bg-brand-500/20 text-brand-300' : 'bg-indigo-500/20 text-indigo-300'}`}>
-              {isWorker ? 'Skilled Worker' : 'Employer'}
-            </span>
+      {/* Header Hero Banner */}
+      <div className={`mb-8 overflow-hidden rounded-3xl p-6 sm:p-8 text-white shadow-xl ${
+        currentUser.role === 'employer'
+          ? 'bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 shadow-emerald-950/10'
+          : currentUser.role === 'admin'
+          ? 'bg-gradient-to-r from-amber-600 via-amber-700 to-yellow-800 shadow-amber-950/10'
+          : 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 shadow-blue-950/10'
+      }`}>
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-black sm:text-2xl">Dashboard</h1>
+              <span className="inline-flex rounded-full bg-white/20 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-white border border-white/20">
+                {currentUser.role === 'worker' ? 'Skilled Worker' : currentUser.role === 'employer' ? 'Employer' : 'Administrator'}
+              </span>
+            </div>
+            <p className="mt-1 text-xs font-medium text-white/85 sm:text-sm">
+              {isWorker
+                ? 'Track your active work, job applications, and direct hire offers in Qardho.'
+                : 'Manage candidate applications, posted jobs, active engagements, and worker reviews.'}
+            </p>
           </div>
-          <p className="text-xs text-slate-400 sm:text-sm">
-            {isWorker ? 'Track active work, applications, and direct hire offers efficiently.' : 'Manage applicants, active jobs, completion, and worker reviews.'}
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          {!isWorker && (
-            <button onClick={() => onNavigate('post-job')} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#93c5fd] px-4 py-2.5 text-xs font-black text-[#111615] hover:bg-[#c8ff74] transition">
-              <PlusCircle className="h-4 w-4 text-[#1e40af]" />
-              Post a Job
-            </button>
-          )}
+          <div className="flex items-center gap-3 shrink-0">
+            {!isWorker && (
+              <button
+                type="button"
+                onClick={() => onNavigate('post-job')}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-xs font-black text-emerald-950 hover:bg-emerald-50 transition shadow-sm hover:shadow active:scale-98"
+              >
+                <PlusCircle className="h-4 w-4 text-emerald-600" />
+                <span>Post a Job</span>
+              </button>
+            )}
+            {isWorker && (
+              <button
+                type="button"
+                onClick={() => onNavigate('jobs')}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-xs font-black text-slate-900 hover:bg-slate-100 transition shadow-sm hover:shadow active:scale-98"
+              >
+                <Briefcase className="h-4 w-4 text-[#2563eb]" />
+                <span>Browse Available Jobs</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -838,33 +1216,80 @@ export default function Dashboard({
         </section>
       )}
 
-      {/* Next Actions Urgent Cards */}
+      {/* Urgent Next Actions Cards */}
       <section className="mb-8">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-xs font-black uppercase tracking-wider text-slate-500">Urgent Next Actions</h2>
           <span className="text-xs font-semibold text-slate-400">Items requiring your attention</span>
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-4">
           {pendingApplications > 0 && (
-            <NeedsAttentionCard title={`${pendingApplications} ${isWorker ? 'application' : 'candidate'}${pendingApplications === 1 ? '' : 's'} waiting`} detail={isWorker ? 'Waiting for employer response.' : 'Review applicants and hire one worker.'} action={isWorker ? 'View status' : 'Review candidates'} onClick={() => handleTabChange('applications')} tone="amber" />
+            <NeedsAttentionCard
+              title={`${pendingApplications} ${isWorker ? 'application' : 'candidate'}${pendingApplications === 1 ? '' : 's'} waiting`}
+              detail={isWorker ? 'Waiting for employer response.' : 'Review applicants and hire one worker.'}
+              action={isWorker ? 'View status' : 'Review candidates'}
+              onClick={() => handleTabChange('applications')}
+              tone="amber"
+              icon={FileText}
+            />
           )}
           {pendingConnections > 0 && (
-            <NeedsAttentionCard title={`${pendingConnections} hire request${pendingConnections === 1 ? '' : 's'}`} detail={isWorker ? 'Accept to reveal contact details.' : 'Waiting for worker response.'} action="Open requests" onClick={() => handleTabChange('connections')} />
+            <NeedsAttentionCard
+              title={`${pendingConnections} hire request${pendingConnections === 1 ? '' : 's'}`}
+              detail={isWorker ? 'Accept to reveal contact details.' : 'Waiting for worker response.'}
+              action="Open requests"
+              onClick={() => handleTabChange('connections')}
+              icon={Handshake}
+            />
           )}
           {completionRequests > 0 && (
-            <NeedsAttentionCard title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`} detail={isWorker ? 'The other participant requested completion.' : 'Waiting for the other participant.'} action="Open progress" onClick={() => handleTabChange(isWorker ? 'progress' : 'jobs')} tone="brand" />
+            <NeedsAttentionCard
+              title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`}
+              detail={isWorker ? 'The employer requested completion.' : 'The worker requested completion.'}
+              action={isWorker ? 'Open applications' : 'Open jobs'}
+              onClick={() => handleTabChange(isWorker ? 'applications' : 'jobs')}
+              tone="brand"
+              icon={CheckCircle2}
+            />
           )}
           {activeJobsCount > 0 && (
-            <NeedsAttentionCard title={`${activeJobsCount} active job${activeJobsCount === 1 ? '' : 's'}`} detail={isWorker ? 'Keep contact details handy.' : 'Request completion when finished.'} action="Open progress" onClick={() => handleTabChange('progress')} />
+            <NeedsAttentionCard
+              title={`${activeJobsCount} active job${activeJobsCount === 1 ? '' : 's'}`}
+              detail={isWorker ? 'Keep contact details handy.' : 'Request completion when finished.'}
+              action={isWorker ? 'Open applications' : 'Open progress'}
+              onClick={() => handleTabChange(isWorker ? 'applications' : 'progress')}
+              icon={Briefcase}
+            />
           )}
           {!isWorker && reviewReadyJobs.length > 0 && (
-            <NeedsAttentionCard title={`${reviewReadyJobs.length} review${reviewReadyJobs.length === 1 ? '' : 's'} needed`} detail="Completed jobs are waiting for feedback." action="Rate worker" onClick={() => handleTabChange('completed')} tone="brand" />
+            <NeedsAttentionCard
+              title={`${reviewReadyJobs.length} review${reviewReadyJobs.length === 1 ? '' : 's'} needed`}
+              detail="Completed jobs are waiting for feedback."
+              action="Rate worker"
+              onClick={() => handleTabChange('completed')}
+              tone="brand"
+              icon={Star}
+            />
           )}
           {missingProfileFields.length > 0 && (
-            <NeedsAttentionCard title="Profile incomplete" detail={`Missing: ${missingProfileFields.slice(0, 3).join(', ')}${missingProfileFields.length > 3 ? '...' : ''}`} action="Complete profile" onClick={() => onNavigate('profile')} tone="amber" />
+            <NeedsAttentionCard
+              title="Profile incomplete"
+              detail={`Missing: ${missingProfileFields.slice(0, 3).join(', ')}${missingProfileFields.length > 3 ? '...' : ''}`}
+              action="Complete profile"
+              onClick={() => onNavigate('profile')}
+              tone="amber"
+              icon={UserIcon}
+            />
           )}
           {pendingApplications === 0 && pendingConnections === 0 && activeJobsCount === 0 && reviewReadyJobs.length === 0 && missingProfileFields.length === 0 && (
-            <NeedsAttentionCard title="Nothing urgent" detail="Your dashboard is clear right now." action={isWorker ? 'Browse jobs' : 'Post a job'} onClick={() => onNavigate(isWorker ? 'jobs' : 'post-job')} tone="brand" />
+            <NeedsAttentionCard
+              title="Nothing urgent"
+              detail="Your dashboard is all clear right now."
+              action={isWorker ? 'Browse jobs' : 'Post a job'}
+              onClick={() => onNavigate(isWorker ? 'jobs' : 'post-job')}
+              tone="brand"
+              icon={CheckCircle2}
+            />
           )}
         </div>
       </section>
@@ -893,17 +1318,66 @@ export default function Dashboard({
         </section>
       )}
 
-      {/* Metrics Row */}
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {/* Metrics Row (KPI Overview Cards) */}
+      <div className="mb-8 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         {[
-          { label: isWorker ? 'Active Work' : 'Active Work', value: isWorker ? activeJobsCount : activeJobsCount },
-          { label: isWorker ? 'Applications Sent' : 'Applications Received', value: pendingApplications },
-          { label: isWorker ? 'Pending Direct Offers' : 'Direct Offers Sent', value: pendingConnections },
-          { label: 'Completed Work', value: isWorker ? allWorkerProgressItems.filter(item => item.job.status === 'completed').length : completedJobs },
+          ...(isWorker ? [{
+            label: 'Active Work',
+            value: activeJobsCount,
+            icon: Briefcase,
+            bgColor: 'bg-blue-50 border-blue-100',
+            textColor: 'text-blue-600',
+            subtext: 'Ongoing engagements',
+          }] : []),
+          {
+            label: isWorker ? 'Applications Sent' : 'Applications Received',
+            value: pendingApplications,
+            icon: FileText,
+            bgColor: 'bg-indigo-50 border-indigo-100',
+            textColor: 'text-indigo-600',
+            subtext: 'Pending responses',
+          },
+          ...(!isWorker ? [{
+            label: 'Posted Jobs',
+            value: myPostedJobs.length,
+            icon: Briefcase,
+            bgColor: 'bg-teal-50 border-teal-100',
+            textColor: 'text-teal-600',
+            subtext: 'Active & closed listings',
+          }] : []),
+          {
+            label: isWorker ? 'Direct Offers' : 'Direct Offers Sent',
+            value: pendingConnections,
+            icon: Handshake,
+            bgColor: 'bg-emerald-50 border-emerald-100',
+            textColor: 'text-emerald-600',
+            subtext: 'Direct hire requests',
+          },
+          {
+            label: 'Completed Work',
+            value: isWorker
+              ? allWorkerProgressItems.filter(item => item.job.status === 'completed' || item.job.status === 'closed').length
+              : completedJobs,
+            icon: CheckCircle2,
+            bgColor: 'bg-amber-50 border-amber-100',
+            textColor: 'text-amber-600',
+            subtext: 'Finished engagements',
+          },
         ].map(metric => (
-          <div key={metric.label} className="p-3.5">
-            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">{metric.label}</span>
-            <span className="mt-1 block text-2xl font-black text-slate-900">{metric.value}</span>
+          <div
+            key={metric.label}
+            className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-2xs hover:shadow-xs transition duration-200"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">{metric.label}</span>
+              <span className={`inline-flex h-8 w-8 items-center justify-center rounded-xl ${metric.bgColor} ${metric.textColor}`}>
+                <metric.icon className="h-4 w-4" />
+              </span>
+            </div>
+            <div className="mt-3">
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{metric.value}</span>
+              <span className="block text-[11px] font-bold text-slate-400 mt-0.5">{metric.subtext}</span>
+            </div>
           </div>
         ))}
       </div>
@@ -911,10 +1385,9 @@ export default function Dashboard({
       {/* COMPACT DASHBOARD TAB BUTTONS WITH COUNTS */}
       <div className="sticky top-[104px] z-30 mb-6 flex items-center gap-2 overflow-x-auto border-b border-slate-200 bg-[#f6fbf8]/95 pb-3 backdrop-blur sm:static sm:bg-transparent">
         {[
-          { key: 'progress' as const, label: 'Active Work' },
           { key: 'applications' as const, label: isWorker ? 'Applications' : 'Applications Received' },
-          { key: 'connections' as const, label: isWorker ? 'Direct Offers' : 'Direct Offers Sent' },
           ...(!isWorker ? [{ key: 'jobs' as const, label: 'Posted Jobs' }] : []),
+          { key: 'connections' as const, label: isWorker ? 'Direct Offers' : 'Direct Offers Sent' },
           { key: 'completed' as const, label: 'Completed' },
         ].map(tab => {
           const isActive = activeTab === tab.key;
@@ -926,8 +1399,8 @@ export default function Dashboard({
               aria-selected={isActive}
               className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition sm:text-sm ${
                 isActive
-                  ? 'border-blue-600 bg-blue-600 text-white shadow-xs'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-blue-700'
+                  ? (isWorker ? 'border-blue-600 bg-blue-600 text-white shadow-xs' : 'border-emerald-600 bg-emerald-600 text-white shadow-xs')
+                  : (isWorker ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-emerald-700')
               }`}
             >
               <span>{tab.label}</span>
@@ -963,40 +1436,139 @@ export default function Dashboard({
       />
 
       {/* COMPACT CARDS LIST CONTAINER */}
-      <div className="space-y-3">
-        {paginatedItems.length > 0 ? (
-          paginatedItems.map(item => (
-            <WorkListCard
-              key={item.id}
-              item={item}
-              currentUser={currentUser}
-              onViewProfile={(userId, fallbackName, phone) => {
-                const targetUser = getEmployerUser(userId, fallbackName, phone);
-                onViewWorkerProfile(targetUser);
-              }}
-              onViewJobDetails={(jobId) => {
-                onNavigate('jobs');
-              }}
-              actionKey={actionKey}
+      {!isWorker && activeTab === 'applications' ? (
+        <div className="space-y-6">
+          {groupedEmployerApplications.map(group => (
+            <section key={group.job?.id || group.jobTitle} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xs">
+              {/* Job Post Header */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-xl bg-emerald-100 p-2 text-emerald-800 shrink-0">
+                    <Briefcase className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-black text-slate-950">{group.jobTitle}</h3>
+                      {group.job && (
+                        <span className="rounded-full bg-white px-2.5 py-0.5 text-[10px] font-black uppercase text-slate-700 border border-slate-200">
+                          {group.job.status}
+                        </span>
+                      )}
+                    </div>
+                    {group.job && (
+                      <p className="mt-0.5 text-xs font-medium text-slate-500">
+                        {group.job.location || 'Qardho'} · {group.job.rate || 'Rate not specified'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200/70 shrink-0">
+                  <Users className="h-3.5 w-3.5" />
+                  <span>{group.items.length} {group.items.length === 1 ? 'Candidate Applicant' : 'Candidate Applicants'}</span>
+                </span>
+              </div>
+
+              {/* Candidate Applicant Cards List */}
+              <div className="p-4 space-y-3">
+                {group.items.length > 0 ? (
+                  group.items.map(item => (
+                    <WorkListCard
+                      key={item.id}
+                      item={item}
+                      currentUser={currentUser}
+                      onViewProfile={(userId, fallbackName, phone) => {
+                        const targetUser = getEmployerUser(userId, fallbackName, phone);
+                        onViewWorkerProfile(targetUser);
+                      }}
+                      onViewJobDetails={() => onNavigate('jobs')}
+                      actionKey={actionKey}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center">
+                    <FileText className="mx-auto h-6 w-6 text-slate-300" />
+                    <p className="mt-2 text-xs font-bold text-slate-600">No candidate applications received for this job post yet.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          ))}
+
+          {groupedEmployerApplications.length === 0 && (
+            <EmptyState
+              type="applications"
+              isWorker={false}
+              onAction={() => onNavigate('post-job')}
             />
-          ))
-        ) : (
-          <EmptyState
-            type={searchQuery || statusFilter !== 'all' || sourceFilter !== 'all' ? 'filtered' : activeTab}
-            isWorker={isWorker}
-            onAction={() => {
-              if (searchQuery || statusFilter !== 'all' || sourceFilter !== 'all') {
-                setSearchQuery('');
-                setStatusFilter('all');
-                setSourceFilter('all');
-                setCurrentPage(1);
-              } else {
-                onNavigate(isWorker ? 'jobs' : 'post-job');
-              }
-            }}
-          />
-        )}
-      </div>
+          )}
+        </div>
+      ) : !isWorker && activeTab === 'jobs' ? (
+        <div className="space-y-3">
+          {myPostedJobs.length > 0 ? (
+            myPostedJobs.map(job => (
+              <div key={job.id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4.5 shadow-2xs hover:shadow-xs transition">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-700 shrink-0">
+                    <Briefcase className="h-5 w-5" />
+                  </div>
+                  <h3 className="text-sm font-black text-slate-900 truncate">
+                    {job.title}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('jobs')}
+                  className="inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white hover:bg-emerald-700 transition shadow-2xs shrink-0"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>View Job Post</span>
+                </button>
+              </div>
+            ))
+          ) : (
+            <EmptyState
+              type="jobs"
+              isWorker={false}
+              onAction={() => onNavigate('post-job')}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {paginatedItems.length > 0 ? (
+            paginatedItems.map(item => (
+              <WorkListCard
+                key={item.id}
+                item={item}
+                currentUser={currentUser}
+                onViewProfile={(userId, fallbackName, phone) => {
+                  const targetUser = getEmployerUser(userId, fallbackName, phone);
+                  onViewWorkerProfile(targetUser);
+                }}
+                onViewJobDetails={(jobId) => {
+                  onNavigate('jobs');
+                }}
+                actionKey={actionKey}
+              />
+            ))
+          ) : (
+            <EmptyState
+              type={searchQuery || statusFilter !== 'all' || sourceFilter !== 'all' ? 'filtered' : activeTab}
+              isWorker={isWorker}
+              onAction={() => {
+                if (searchQuery || statusFilter !== 'all' || sourceFilter !== 'all') {
+                  setSearchQuery('');
+                  setStatusFilter('all');
+                  setSourceFilter('all');
+                  setCurrentPage(1);
+                } else {
+                  onNavigate(isWorker ? 'jobs' : 'post-job');
+                }
+              }}
+            />
+          )}
+        </div>
+      )}
 
       {/* PAGINATION BAR */}
       <PaginationBar

@@ -105,20 +105,24 @@ export default function WorkListCard({
 
   const SourceIcon = isDirectOffer ? Handshake : FileText;
 
+  const isEmployerUser = item.otherPartyRole === 'Worker';
+
   const primaryBtnClass = item.primaryAction?.variant === 'success'
     ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
     : item.primaryAction?.variant === 'warning'
     ? 'bg-amber-600 hover:bg-amber-700 text-white'
     : item.primaryAction?.variant === 'danger'
     ? 'bg-rose-600 hover:bg-rose-700 text-white'
-    : 'bg-brand-600 hover:bg-brand-700 text-white';
+    : isEmployerUser
+    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+    : 'bg-[#2563eb] hover:bg-[#1d4ed8] text-white';
 
   const moreMenuActions = (item.secondaryActions || []).filter(a => a.isMoreMenuOnly);
   const visibleSecondaryActions = (item.secondaryActions || []).filter(a => !a.isMoreMenuOnly);
 
   return (
     <article
-      className={`group overflow-hidden rounded-2xl border bg-white transition-all duration-200 shadow-2xs hover:shadow-md ${cardBorderLeft} ${
+      className={`group rounded-2xl border bg-white transition-all duration-200 shadow-2xs hover:shadow-md ${cardBorderLeft} ${
         isExpanded ? 'border-blue-300 ring-2 ring-blue-50' : 'border-slate-200/90 hover:border-slate-300'
       }`}
     >
@@ -253,7 +257,10 @@ export default function WorkListCard({
             <div className="relative inline-block text-left" ref={moreRef}>
               <button
                 type="button"
-                onClick={() => setIsMoreOpen(!isMoreOpen)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMoreOpen(!isMoreOpen);
+                }}
                 className="inline-flex h-[40px] w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition"
                 title="More actions"
                 aria-label="More actions"

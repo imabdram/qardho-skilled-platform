@@ -292,6 +292,7 @@ export default function App() {
     else if (currentUser?.role === 'pending' && path !== '/onboarding' && (protectedPath || ['/', '/workers', '/jobs', '/about-contact'].includes(path) || /^\/jobs\//.test(path))) target = '/onboarding';
     else if (currentUser && path === '/onboarding' && currentUser.role !== 'pending') target = getDefaultRouteForUser(currentUser);
     else if (currentUser && path === '/admin' && currentUser.role !== 'admin') target = '/unauthorized';
+    else if (currentUser && currentUser.role === 'admin' && (path === '/dashboard' || path === '/employer/dashboard' || path === '/worker/dashboard')) target = '/admin';
     else if (currentUser && (path === '/post-job' || path === '/employer/dashboard') && currentUser.role !== 'employer') target = currentUser.role === 'pending' ? '/onboarding' : '/unauthorized';
     else if (currentUser && path === '/worker/dashboard' && currentUser.role !== 'worker') target = currentUser.role === 'pending' ? '/onboarding' : '/unauthorized';
     else if (currentUser && (path === '/profile' || path === '/profile/edit' || path === '/settings') && currentUser.role === 'pending') target = '/onboarding';
@@ -985,6 +986,30 @@ export default function App() {
               });
               if (!res.ok) throw new Error(await getApiError(res, 'Could not update role.'));
             }}
+            onUpdateJobStatus={async (jobId: string, status: string) => {
+              const res = await fetch(`/api/admin/jobs/${jobId}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+              });
+              if (!res.ok) throw new Error(await getApiError(res, 'Could not update job status.'));
+            }}
+            onDeleteJob={async (jobId: string) => {
+              const res = await fetch(`/api/admin/jobs/${jobId}/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+              });
+              if (!res.ok) throw new Error(await getApiError(res, 'Could not delete job.'));
+            }}
+            onDeleteReview={async (reviewId: string) => {
+              const res = await fetch(`/api/admin/reviews/${reviewId}/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+              });
+              if (!res.ok) throw new Error(await getApiError(res, 'Could not delete review.'));
+            }}
           />
         );
       case 'onboarding':
@@ -1135,28 +1160,86 @@ export default function App() {
       )}
 
       {showRoleSwitchModal && currentUser && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
-              <div className="rounded-xl bg-blue-50 p-2 text-blue-700">
-                <RefreshCw className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Role switch confirmation</p>
-                <h3 className="mt-0.5 text-base font-black text-slate-950">Switch to {roleSwitchTargetName} mode?</h3>
-                <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                  Your dashboard, main actions, and public profile will change to match the {roleSwitchTargetName.toLowerCase()} role.
-                </p>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 bg-slate-50/80 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#2563eb]">
+                  <RefreshCw className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Switch Account Role</p>
+                  <h3 className="text-base font-black text-slate-900">Switch to {roleSwitchTargetName} Mode?</h3>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => { setShowRoleSwitchModal(false); setRoleSwitchConfirmation(''); }}
                 disabled={isSwitchingRole}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-60 transition"
                 aria-label="Close role switch confirmation"
               >
                 <X className="h-4 w-4" />
               </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4">
+              <p className="text-xs leading-relaxed font-semibold text-slate-600">
+                You are currently operating in <span className="capitalize font-bold text-slate-900">{currentUser.role} mode</span>. Switching to <span className="font-bold text-[#2563eb]">{roleSwitchTargetName} mode</span> will customize your dashboard, navigation, and available actions.
+              </p>
+
+              {roleSwitchProfileCheck.warnings.length > 0 && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200/80 p-3 text-xs font-bold text-amber-800 space-y-1">
+                  {roleSwitchProfileCheck.warnings.map((w, idx) => (
+                    <p key={idx}>• {w}</p>
+                  ))}
+                </div>
+              )}
+
+              {roleSwitchProfileCheck.blocking.length > 0 && (
+                <div className="rounded-xl bg-rose-50 border border-rose-200/80 p-3 text-xs font-bold text-rose-800 space-y-1">
+                  <p className="font-black uppercase text-[10px] tracking-wider text-rose-600 mb-1">Required Profile Updates:</p>
+                  {roleSwitchProfileCheck.blocking.map((b, idx) => (
+                    <p key={idx}>• {b}</p>
+                  ))}
+                </div>
+              )}
+
+              {canConfirmRoleSwitch && (
+                <div className="pt-1">
+                  <label className="mb-1.5 block text-xs font-bold text-slate-700">
+                    To confirm, type <span className="font-black text-slate-900 uppercase">CONFIRM</span> below:
+                  </label>
+                  <input
+                    type="text"
+                    value={roleSwitchConfirmation}
+                    onChange={(e) => setRoleSwitchConfirmation(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && hasTypedRoleSwitchConfirmation && !isSwitchingRole) {
+                        confirmSwitchRole();
+                      }
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-xs font-black text-slate-900 outline-none transition focus:border-[#2563eb] focus:bg-white focus:ring-4 focus:ring-blue-500/10 placeholder:font-normal placeholder:text-slate-400"
+                    placeholder="Type CONFIRM"
+                    autoFocus
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/50 p-4">
+              <button
+                type="button"
+                onClick={() => { setShowRoleSwitchModal(false); setRoleSwitchConfirmation(''); }}
+                disabled={isSwitchingRole}
+                className="flex-1 min-h-[44px] rounded-xl border border-slate-200 bg-white text-xs font-black text-slate-700 hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+
               {!canConfirmRoleSwitch ? (
                 <button
                   type="button"
@@ -1164,19 +1247,25 @@ export default function App() {
                     setShowRoleSwitchModal(false);
                     handleNavigate('profile');
                   }}
-                  className="flex-1 rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-black text-white hover:bg-amber-700"
+                  className="flex-1 min-h-[44px] rounded-xl bg-amber-600 text-xs font-black text-white hover:bg-amber-700 transition"
                 >
-                  Complete profile
+                  Complete Profile
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={confirmSwitchRole}
                   disabled={isSwitchingRole || !hasTypedRoleSwitchConfirmation}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                  className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#2563eb] text-xs font-black text-white hover:bg-[#1d4ed8] shadow-xs transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 ${isSwitchingRole ? 'animate-spin' : ''}`} />
-                  {isSwitchingRole ? 'Switching...' : hasTypedRoleSwitchConfirmation ? `Confirm ${roleSwitchTargetName} mode` : 'Type CONFIRM first'}
+                  <RefreshCw className={`h-4 w-4 ${isSwitchingRole ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isSwitchingRole
+                      ? 'Switching...'
+                      : hasTypedRoleSwitchConfirmation
+                      ? `Confirm ${roleSwitchTargetName}`
+                      : 'Type CONFIRM first'}
+                  </span>
                 </button>
               )}
             </div>

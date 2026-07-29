@@ -27,13 +27,18 @@ export default function BottomNav({
   const location = useLocation();
   if (!currentUser || isHidden) return null;
 
+  const isAdmin = currentUser.role === 'admin';
   const isEmployer = currentUser.role === 'employer';
-  const mainTab: NavTabItem = isEmployer
-    ? { route: PAGE_ROUTES.workers, label: 'Workers', icon: Users }
-    : { route: PAGE_ROUTES.jobs, label: 'Jobs', icon: BriefcaseBusiness };
 
-  const tabs: NavTabItem[] = [
-    mainTab,
+  const tabs: NavTabItem[] = isAdmin ? [
+    { route: PAGE_ROUTES.workers, label: 'Workers', icon: Users },
+    { route: PAGE_ROUTES.jobs, label: 'Jobs', icon: BriefcaseBusiness },
+    { route: PAGE_ROUTES.admin, label: 'Admin', icon: LayoutDashboard },
+    { route: PAGE_ROUTES.profile, label: 'Profile', icon: UserRound },
+  ] : [
+    isEmployer
+      ? { route: PAGE_ROUTES.workers, label: 'Workers', icon: Users }
+      : { route: PAGE_ROUTES.jobs, label: 'Jobs', icon: BriefcaseBusiness },
     { route: PAGE_ROUTES.dashboard, label: 'Dashboard', icon: LayoutDashboard },
     { route: 'notifications', label: 'Notifications', icon: Bell, isNotification: true },
     { route: PAGE_ROUTES.profile, label: 'Profile', icon: UserRound },

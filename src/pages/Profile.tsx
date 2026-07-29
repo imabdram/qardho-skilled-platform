@@ -167,8 +167,14 @@ export default function Profile({
           </button>
         )}
 
-        {/* 1. Profile Header (Branded Blue Card, No Tall Blue Cover) */}
-        <div className="overflow-hidden rounded-3xl border border-brand-950/10 bg-[#2563eb] p-6 text-white shadow-lg sm:p-8">
+        {/* 1. Profile Header (Branded Card with Role Specific Colors) */}
+        <div className={`overflow-hidden rounded-3xl border border-brand-950/10 p-6 text-white shadow-lg sm:p-8 ${
+          targetUser.role === 'employer'
+            ? 'bg-emerald-600'
+            : targetUser.role === 'admin'
+            ? 'bg-amber-600'
+            : 'bg-[#2563eb]'
+        }`}>
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col sm:flex-row sm:items-center gap-5">
               {/* Profile Photo */}
@@ -185,27 +191,39 @@ export default function Profile({
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-black text-white sm:text-3xl">{targetUser.name}</h1>
                   {targetUser.verified && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/20 px-2.5 py-0.5 text-xs font-bold text-blue-300 border border-blue-500/30">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${
+                      targetUser.role === 'employer'
+                        ? 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30'
+                        : targetUser.role === 'admin'
+                        ? 'bg-amber-500/20 text-amber-200 border-amber-500/30'
+                        : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                    }`}>
                       <ShieldCheck className="h-3.5 w-3.5" />
                       Verified
                     </span>
                   )}
                 </div>
 
-                <p className="mt-1 text-sm font-semibold text-[#93c5fd] flex items-center gap-2">
-                  <span>{isWorker ? targetUser.skill || 'Skilled Worker' : 'Employer'}</span>
+                <p className={`mt-1 text-sm font-semibold flex items-center gap-2 ${
+                  targetUser.role === 'employer'
+                    ? 'text-emerald-100'
+                    : targetUser.role === 'admin'
+                    ? 'text-amber-100'
+                    : 'text-[#93c5fd]'
+                }`}>
+                  <span>{isWorker ? targetUser.skill || 'Skilled Worker' : targetUser.role === 'admin' ? 'Administrator' : 'Employer'}</span>
                   <span>·</span>
                   <span className="capitalize">{targetUser.role} Account</span>
                 </p>
 
-                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-brand-50/80">
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/90">
                   <span className="inline-flex items-center gap-1.5 font-medium">
-                    <MapPin className="h-3.5 w-3.5 text-blue-300" />
+                    <MapPin className="h-3.5 w-3.5 opacity-80" />
                     {targetUser.location || 'Qardho'}
                   </span>
                   <span>·</span>
                   <span className="inline-flex items-center gap-1.5 font-medium">
-                    <span className={`h-2 w-2 rounded-full ${targetUser.availability === 'busy' ? 'bg-amber-400' : 'bg-blue-300'}`} />
+                    <span className={`h-2 w-2 rounded-full ${targetUser.availability === 'busy' ? 'bg-amber-300' : 'bg-emerald-300'}`} />
                     {targetUser.availability === 'busy' ? 'Currently busy' : 'Available for work'}
                   </span>
                 </div>

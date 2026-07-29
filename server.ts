@@ -229,11 +229,36 @@ async function startServer() {
   await mkdir(uploadDir, { recursive: true });
   app.use('/uploads', express.static(uploadDir, { maxAge: isProduction ? '30d' : 0, immutable: isProduction }));
 
+  if (isProduction && !process.env.CLERK_SECRET_KEY) {
+    throw new Error('CLERK_SECRET_KEY environment variable is required in production.');
+  }
+
+  const allowedOrigins = [
+    'https://suuqaxirfadaha.app',
+    'https://www.suuqaxirfadaha.app',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    process.env.APP_URL
+  ].filter(Boolean);
+
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    }
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is required. Set it to your Neon PostgreSQL connection string.');
   }
 
-  // Initialize PostgreSQL database
   const db = createPostgresDb(process.env.DATABASE_URL);
 
   // Create tables
@@ -244,9 +269,6 @@ async function startServer() {
       email TEXT,
       phone TEXT NOT NULL,
       role TEXT,
-      suspended BOOLEAN DEFAULT false,
-      skill TEXT,
-      location TEXT,
       bio TEXT,
       rate TEXT,
       "createdAt" TEXT,
@@ -406,28 +428,31 @@ async function startServer() {
     ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;
   `);
   await db.exec(`
-    CREATE UNIQUE INDEX IF NOT EXISTS users_clerk_user_id_unique ON users ("clerkUserId") WHERE "clerkUserId" IS NOT NULL;
-    DO $migration$
-    BEGIN
-      CREATE UNIQUE INDEX IF NOT EXISTS applications_job_applicant_unique ON applications ("jobId", "applicantId");
-      CREATE UNIQUE INDEX IF NOT EXISTS reviews_job_reviewer_unique ON reviews ("jobId", "reviewerRole") WHERE "jobId" IS NOT NULL;
-    EXCEPTION WHEN unique_violation THEN
-      RAISE NOTICE 'Skipped unique index because legacy duplicate rows exist.';
-    END
-    $migration$;
-    CREATE INDEX IF NOT EXISTS users_clerk_user_id_idx ON users ("clerkUserId");
-    CREATE INDEX IF NOT EXISTS users_email_idx ON users (LOWER(email));
-    CREATE INDEX IF NOT EXISTS jobs_employer_idx ON jobs ("employerId");
-    CREATE INDEX IF NOT EXISTS jobs_status_idx ON jobs (status);
-    CREATE INDEX IF NOT EXISTS applications_job_idx ON applications ("jobId");
-    CREATE INDEX IF NOT EXISTS applications_applicant_idx ON applications ("applicantId");
-    CREATE INDEX IF NOT EXISTS connections_from_user_idx ON connections ("fromUserId");
-    CREATE INDEX IF NOT EXISTS connections_to_user_idx ON connections ("toUserId");
-    CREATE INDEX IF NOT EXISTS reviews_worker_idx ON reviews ("workerId");
-    CREATE INDEX IF NOT EXISTS reviews_employer_idx ON reviews ("employerId");
-    CREATE INDEX IF NOT EXISTS notifications_user_created_idx ON notifications ("userId", "createdAt" DESC);
-    CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions ("expiresAt");
-    CREATE INDEX IF NOT EXISTS reset_tokens_expires_idx ON password_reset_tokens ("expiresAt");
+    CREATE TABLE IF NOT EXISTS user_auth_identities (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      clerk_user_id TEXT NOT NULL UNIQUE,
+      environment TEXT NOT NULL CHECK (environment IN ('development', 'production')),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP::text,
+      CONSTRAINT uai_user_env_unique UNIQUE (user_id, environment)
+    );
+    CREATE INDEX IF NOT EXISTS idx_uai_clerk_user_id ON user_auth_identities(clerk_user_id);
+    CREATE INDEX IF NOT EXISTS idx_uai_user_id ON user_auth_identities(user_id);
+    CREATE INDEX IF NOT EXISTS idx_uai_environment ON user_auth_identities(environment);
+    CREATE INDEX IF NOT EXISTS idx_uai_user_id_environment ON user_auth_identities(user_id, environment);
+
+    INSERT INTO user_auth_identities (id, user_id, clerk_user_id, environment, created_at, updated_at)
+    SELECT 
+      'identity-' || id,
+      id,
+      "clerkUserId",
+      'development',
+      COALESCE("createdAt", CURRENT_TIMESTAMP::text),
+      CURRENT_TIMESTAMP::text
+    FROM users
+    WHERE "clerkUserId" IS NOT NULL AND TRIM("clerkUserId") != ''
+    ON CONFLICT (clerk_user_id) DO NOTHING;
   `);
 
   await db.run("UPDATE jobs SET status = 'open' WHERE status IS NULL OR status = ''");
@@ -526,14 +551,39 @@ async function startServer() {
     next();
   };
 
+  const getClerkEnvironment = () => {
+    const env = (process.env.CLERK_ENVIRONMENT || 'development').toLowerCase().trim();
+    if (env !== 'development' && env !== 'production') {
+      throw new Error('Invalid CLERK_ENVIRONMENT configuration. Must be development or production.');
+    }
+    return env as 'development' | 'production';
+  };
+
   const loadPlatformUser = async (req: any, res: any, next: any) => {
     try {
+      let clerkEnv: 'development' | 'production';
+      try {
+        clerkEnv = getClerkEnvironment();
+      } catch (err: any) {
+        return res.status(400).json({ error: err.message, code: 'INVALID_CLERK_ENVIRONMENT' });
+      }
+
       const auth = getAuth(req);
       if (!auth?.userId) {
         return res.status(401).json({ error: 'Please sign in to continue.', code: 'AUTH_REQUIRED' });
       }
 
-      const platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [auth.userId]);
+      let platformUser = await db.get(
+        `SELECT u.* FROM users u
+         JOIN user_auth_identities uai ON u.id = uai.user_id
+         WHERE uai.clerk_user_id = $1 AND uai.environment = $2`,
+        [auth.userId, clerkEnv]
+      );
+
+      if (!platformUser) {
+        platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [auth.userId]);
+      }
+
       if (!platformUser) {
         return res.status(401).json({ error: 'Platform profile not synchronized.', code: 'PROFILE_NOT_SYNCED' });
       }
@@ -552,7 +602,20 @@ async function startServer() {
     try {
       const auth = getAuth(req);
       if (auth?.userId) {
-        const platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [auth.userId]);
+        let clerkEnv = 'development';
+        try { clerkEnv = getClerkEnvironment(); } catch {}
+
+        let platformUser = await db.get(
+          `SELECT u.* FROM users u
+           JOIN user_auth_identities uai ON u.id = uai.user_id
+           WHERE uai.clerk_user_id = $1 AND uai.environment = $2`,
+          [auth.userId, clerkEnv]
+        );
+
+        if (!platformUser) {
+          platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [auth.userId]);
+        }
+
         if (platformUser && !platformUser.suspended) {
           req.authUser = platformUser;
         }
@@ -1172,77 +1235,149 @@ async function startServer() {
 
   app.get('/api/auth/me', requireClerkAuth, async (req: any, res: any) => {
     try {
+      let clerkEnv: 'development' | 'production';
+      try {
+        clerkEnv = getClerkEnvironment();
+      } catch (err: any) {
+        return res.status(400).json({ error: err.message, code: 'INVALID_CLERK_ENVIRONMENT' });
+      }
+
       const auth = getAuth(req);
-      const clerkUserId = auth.userId;
+      const clerkUserId = auth?.userId;
       if (!clerkUserId) {
         return res.status(401).json({ user: null });
       }
 
-      // Fetch Clerk details via clerkClient
-      const clerkUserObj = await clerkClient.users.getUser(clerkUserId);
-      const clerkImageUrl = clerkUserObj.imageUrl || null;
+      // 1. Search user_auth_identities by clerk_user_id & environment
+      const existingIdentity = await db.get(
+        'SELECT uai.*, u.suspended FROM user_auth_identities uai JOIN users u ON uai.user_id = u.id WHERE uai.clerk_user_id = $1 AND uai.environment = $2',
+        [clerkUserId, clerkEnv]
+      );
 
-      const adminEmails = (process.env.ADMIN_EMAILS || 'admin@qardho.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-
-      // 1. Look for existing linked account
-      const linkedUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [clerkUserId]);
-      if (linkedUser) {
-        if (linkedUser.suspended) {
-          return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+      if (existingIdentity) {
+        const linkedUser = await db.get('SELECT * FROM users WHERE id = $1', [existingIdentity.user_id]);
+        if (linkedUser) {
+          if (linkedUser.suspended) {
+            return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+          }
+          const adminEmails = (process.env.ADMIN_EMAILS || 'admin@qardho.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+          const userEmail = (linkedUser.email || '').trim().toLowerCase();
+          if (userEmail && adminEmails.includes(userEmail) && linkedUser.role !== 'admin') {
+            await db.run('UPDATE users SET role = $1 WHERE id = $2', ['admin', linkedUser.id]);
+            linkedUser.role = 'admin';
+          }
+          return res.json({ user: formatUser(linkedUser) });
         }
-        const userEmail = (linkedUser.email || '').trim().toLowerCase();
-        if (userEmail && adminEmails.includes(userEmail) && linkedUser.role !== 'admin') {
-          await db.run('UPDATE users SET role = $1 WHERE id = $2', ['admin', linkedUser.id]);
-          linkedUser.role = 'admin';
-        }
-        if (clerkImageUrl && !linkedUser.avatarUrl) {
-          await db.run('UPDATE users SET "avatarUrl" = $1 WHERE id = $2', [clerkImageUrl, linkedUser.id]);
-          linkedUser.avatarUrl = clerkImageUrl;
-        }
-        return res.json({ user: formatUser(linkedUser) });
       }
 
-      const primaryEmailObj = clerkUserObj.emailAddresses?.find(e => e.id === clerkUserObj.primaryEmailAddressId) || clerkUserObj.emailAddresses?.[0];
+      // Fallback: Check legacy users.clerkUserId
+      const legacyUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [clerkUserId]);
+      if (legacyUser) {
+        if (legacyUser.suspended) {
+          return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+        }
+        const identityId = `identity-${Date.now()}-${randomBytes(4).toString('hex')}`;
+        await db.run(
+          `INSERT INTO user_auth_identities (id, user_id, clerk_user_id, environment, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $5)
+           ON CONFLICT (clerk_user_id) DO NOTHING`,
+          [identityId, legacyUser.id, clerkUserId, clerkEnv, new Date().toISOString()]
+        );
+        return res.json({ user: formatUser(legacyUser) });
+      }
+
+      // Fetch Clerk details via BAPI
+      let clerkUserObj: any;
+      try {
+        clerkUserObj = await clerkClient.users.getUser(clerkUserId);
+      } catch (err: any) {
+        console.error('Error fetching Clerk user details:', err);
+        return res.status(500).json({ error: 'Could not fetch user details from Clerk.' });
+      }
+
+      const clerkImageUrl = clerkUserObj.imageUrl || null;
+      const adminEmails = (process.env.ADMIN_EMAILS || 'admin@qardho.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+
+      const primaryEmailObj = clerkUserObj.emailAddresses?.find((e: any) => e.id === clerkUserObj.primaryEmailAddressId) || clerkUserObj.emailAddresses?.[0];
       const rawEmail = primaryEmailObj?.emailAddress || '';
       const normalizedEmail = rawEmail.trim().toLowerCase();
+      const isEmailVerified = Boolean(
+        primaryEmailObj && (primaryEmailObj.verification?.status === 'verified' || primaryEmailObj.verified === true)
+      );
 
       const firstName = clerkUserObj.firstName || '';
       const lastName = clerkUserObj.lastName || '';
       const displayName = (firstName || lastName) ? `${firstName} ${lastName}`.trim() : (normalizedEmail.split('@')[0] || 'User');
-
       const isAutoAdmin = Boolean(normalizedEmail && adminEmails.includes(normalizedEmail));
 
-      if (normalizedEmail) {
-        const matches = await db.all('SELECT * FROM users WHERE LOWER(email) = $1 AND "clerkUserId" IS NULL', [normalizedEmail]);
+      // Attempt linking by verified email
+      if (normalizedEmail && isEmailVerified) {
+        const matches = await db.all(
+          `SELECT u.* FROM users u 
+           LEFT JOIN user_auth_identities uai ON u.id = uai.user_id AND uai.environment = $1
+           WHERE LOWER(u.email) = $2 AND uai.id IS NULL`,
+          [clerkEnv, normalizedEmail]
+        );
+
         if (matches.length === 1) {
           const existingUser = matches[0];
           if (existingUser.suspended) {
             return res.status(403).json({ error: 'This account is currently suspended.', user: null });
           }
+
           const targetRole = isAutoAdmin ? 'admin' : existingUser.role;
-          await db.run('UPDATE users SET "clerkUserId" = $1, role = $2, "avatarUrl" = COALESCE("avatarUrl", $3) WHERE id = $4', [clerkUserId, targetRole, clerkImageUrl, existingUser.id]);
-          const updated = await getUserById(existingUser.id);
-          return res.json({ user: formatUser(updated) });
+
+          return await db.transaction(async (tx: any) => {
+            await tx.run(
+              'UPDATE users SET "clerkUserId" = COALESCE("clerkUserId", $1), role = $2, "avatarUrl" = COALESCE("avatarUrl", $3) WHERE id = $4',
+              [clerkUserId, targetRole, clerkImageUrl, existingUser.id]
+            );
+
+            const identityId = `identity-${Date.now()}-${randomBytes(4).toString('hex')}`;
+            await tx.run(
+              `INSERT INTO user_auth_identities (id, user_id, clerk_user_id, environment, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $5)
+               ON CONFLICT (clerk_user_id) DO NOTHING`,
+              [identityId, existingUser.id, clerkUserId, clerkEnv, new Date().toISOString()]
+            );
+
+            const updated = await tx.get('SELECT * FROM users WHERE id = $1', [existingUser.id]);
+            return res.json({ user: formatUser(updated) });
+          });
         } else if (matches.length > 1) {
-          return res.status(409).json({ error: 'Multiple accounts match this email address. Please contact an administrator.', user: null });
+          return res.status(409).json({
+            error: 'Multiple accounts match this email address. Please contact an administrator.',
+            code: 'MULTIPLE_ACCOUNTS_MATCH',
+            user: null
+          });
         }
       }
 
-      // 3. Create new PostgreSQL profile for Clerk user
+      // Create new user record with role = 'pending' (or 'admin' if auto admin email)
       const newInternalId = `user-${Date.now()}-${randomBytes(4).toString('hex')}`;
       const createdAt = new Date().toISOString();
       const initialRole = isAutoAdmin ? 'admin' : 'pending';
       const initialVerified = isAutoAdmin;
 
-      await db.run(
-        `INSERT INTO users (
-          id, "clerkUserId", name, email, phone, role, verified, suspended, "createdAt", availability, "avatarUrl"
-        ) VALUES ($1, $2, $3, $4, NULL, $5, $6, false, $7, 'available', $8)`,
-        [newInternalId, clerkUserId, displayName, normalizedEmail || null, initialRole, initialVerified, createdAt, clerkImageUrl]
-      );
+      return await db.transaction(async (tx: any) => {
+        await tx.run(
+          `INSERT INTO users (
+            id, "clerkUserId", name, email, phone, role, verified, suspended, "createdAt", availability, "avatarUrl"
+          ) VALUES ($1, $2, $3, $4, NULL, $5, $6, false, $7, 'available', $8)`,
+          [newInternalId, clerkUserId, displayName, normalizedEmail || null, initialRole, initialVerified, createdAt, clerkImageUrl]
+        );
 
-      const newUser = await getUserById(newInternalId);
-      res.json({ user: formatUser(newUser) });
+        const identityId = `identity-${Date.now()}-${randomBytes(4).toString('hex')}`;
+        await tx.run(
+          `INSERT INTO user_auth_identities (id, user_id, clerk_user_id, environment, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $5)
+           ON CONFLICT (clerk_user_id) DO NOTHING`,
+          [identityId, newInternalId, clerkUserId, clerkEnv, createdAt]
+        );
+
+        const newUser = await tx.get('SELECT * FROM users WHERE id = $1', [newInternalId]);
+        return res.json({ user: formatUser(newUser) });
+      });
     } catch (err: any) {
       console.error('Error in /api/auth/me sync:', err);
       res.status(500).json({ error: err.message });
@@ -1412,6 +1547,43 @@ async function startServer() {
       if (!user) return res.status(404).json({ error: 'User not found.' });
       if (user.role === 'admin' && actor.role !== 'admin') return res.status(403).json({ error: 'Admin cannot be removed by non-admins.' });
       await db.transaction((tx: any) => deleteUserCascade(id, tx));
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/admin/jobs/:id/status', async (req, res) => {
+    try {
+      const actor = req.authUser?.role === 'admin' ? req.authUser : null;
+      if (!actor) return res.status(403).json({ error: 'Admin access required.' });
+      const { id } = req.params;
+      const { status } = req.body;
+      const job = await db.get('SELECT * FROM jobs WHERE id = $1', [id]);
+      if (!job) return res.status(404).json({ error: 'Job not found.' });
+      await db.run('UPDATE jobs SET status = $1 WHERE id = $2', [status, id]);
+      res.json({ success: true, job: await db.get('SELECT * FROM jobs WHERE id = $1', [id]) });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/admin/jobs/:id/delete', async (req, res) => {
+    try {
+      const actor = req.authUser?.role === 'admin' ? req.authUser : null;
+      if (!actor) return res.status(403).json({ error: 'Admin access required.' });
+      const { id } = req.params;
+      const job = await db.get('SELECT * FROM jobs WHERE id = $1', [id]);
+      if (!job) return res.status(404).json({ error: 'Job not found.' });
+      await db.run('DELETE FROM jobs WHERE id = $1', [id]);
+      res.json({ success: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post('/api/admin/reviews/:id/delete', async (req, res) => {
+    try {
+      const actor = req.authUser?.role === 'admin' ? req.authUser : null;
+      if (!actor) return res.status(403).json({ error: 'Admin access required.' });
+      const { id } = req.params;
+      const review = await db.get('SELECT * FROM reviews WHERE id = $1', [id]);
+      if (!review) return res.status(404).json({ error: 'Review not found.' });
+      await db.run('DELETE FROM reviews WHERE id = $1', [id]);
       res.json({ success: true });
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });

@@ -3,6 +3,7 @@ import { ArrowLeft, CheckCircle2, DollarSign, FileText, MapPin, Phone, Save, Upl
 import { PricingType, User } from '../types';
 import { QARDHO_NEIGHBORHOODS } from '../constants';
 import Avatar from '../components/Avatar';
+import SkillSelector from '../components/SkillSelector';
 import { useClerk } from '@clerk/react';
 
 interface ProfileEditProps {
@@ -124,8 +125,20 @@ export default function ProfileEdit({
           <span className="text-xs font-bold text-slate-400">Editing Profile</span>
         </div>
 
-        <header className="mb-6 rounded-2xl bg-[#2563eb] p-6 text-white sm:p-8">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-[#93c5fd]">Profile Setup</p>
+        <header className={`mb-6 rounded-2xl p-6 text-white sm:p-8 ${
+          currentUser.role === 'employer'
+            ? 'bg-emerald-600'
+            : currentUser.role === 'admin'
+            ? 'bg-amber-600'
+            : 'bg-[#2563eb]'
+        }`}>
+          <p className={`text-xs font-black uppercase tracking-[0.18em] ${
+            currentUser.role === 'employer'
+              ? 'text-emerald-200'
+              : currentUser.role === 'admin'
+              ? 'text-amber-200'
+              : 'text-[#93c5fd]'
+          }`}>Profile Setup</p>
           <h1 className="mt-2 text-2xl font-black sm:text-3xl">Edit Your Profile Information</h1>
           <p className="mt-2 max-w-xl text-xs font-medium text-brand-50/80 sm:text-sm">
             Keep your details up to date so employers and workers can easily discover and connect with you.
@@ -256,20 +269,10 @@ export default function ProfileEdit({
 
             <div className="mt-4 space-y-4">
               {isWorker && (
-                <div>
-                  <label className="mb-1.5 block text-xs font-black uppercase text-slate-600">
-                    Primary Skill / Occupation *
-                  </label>
-                  <div className="relative">
-                    <Wrench className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
-                    <input
-                      value={skill}
-                      onChange={(e) => setSkill(e.target.value)}
-                      className={`${inputClass} pl-11`}
-                      placeholder="e.g. Solar technician, mason, electrician..."
-                    />
-                  </div>
-                </div>
+                <SkillSelector
+                  value={skill}
+                  onChange={setSkill}
+                />
               )}
 
               <div>
