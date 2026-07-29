@@ -2,12 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertCircle, Bell, BriefcaseBusiness, CheckCircle2, ChevronDown, Edit3, Globe2,
-  LayoutDashboard, Loader2, LogOut, Menu, Monitor, Moon, Settings, Sun, UserRound,
-  Users, X,
+  LayoutDashboard, Loader2, LogOut, Menu, Settings, UserRound, Users, X,
 } from 'lucide-react';
 import { Application, Connection, Job, Notification, Review, User } from '../types';
 import { PAGE_ROUTES } from '../routes';
 import Avatar from './Avatar';
+import BottomNav from './BottomNav';
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react';
 import { useApi } from '../useApi';
 
@@ -24,6 +24,8 @@ interface NavbarProps {
   applications?: Application[];
   jobs?: Job[];
   reviews?: Review[];
+  isModalOpen?: boolean;
+  realtimeNotification?: Notification | null;
 }
 
 const focusRing = 'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2';
@@ -41,11 +43,16 @@ export default function Navbar({
   applications = [],
   jobs = [],
   reviews = [],
+  isModalOpen = false,
+  realtimeNotification,
 }: NavbarProps) {
   const fetchAuth = useApi();
   const fetch = fetchAuth;
   const navigate = useNavigate();
   const shellRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -54,16 +61,31 @@ export default function Navbar({
   const [notificationState, setNotificationState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [language, setLanguage] = useState(() => localStorage.getItem('qardho-language') || 'EN');
 
+  useEffect(() => {
+    if (realtimeNotification) {
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === realtimeNotification.id)) return prev;
+        return [realtimeNotification, ...prev];
+      });
+    }
+  }, [realtimeNotification]);
+
   const closeMenus = () => {
-    setMobileOpen(false);
+    if (mobileOpen) {
+      setMobileOpen(false);
+      setTimeout(() => menuButtonRef.current?.focus(), 50);
+    }
     setMoreOpen(false);
     setProfileOpen(false);
     setNotificationsOpen(false);
   };
 
+  // Close menus on click outside or Escape key
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
-      if (shellRef.current && !shellRef.current.contains(event.target as Node)) closeMenus();
+      if (shellRef.current && !shellRef.current.contains(event.target as Node) && !drawerRef.current?.contains(event.target as Node)) {
+        closeMenus();
+      }
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeMenus();
@@ -74,17 +96,49 @@ export default function Navbar({
       document.removeEventListener('mousedown', onPointerDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, []);
+  }, [mobileOpen]);
 
+  // Lock body scroll when mobile drawer is open
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
 
+  // Focus trap for mobile drawer
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const drawerEl = drawerRef.current;
+    if (!drawerEl) return;
+
+    const focusables = drawerEl.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusables.length > 0) {
+      focusables[0].focus();
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab' && focusables.length > 0) {
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = 'light';
     document.documentElement.style.colorScheme = 'light';
-    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', '#f6fbf8');
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute('content', '#f8fafc');
   }, []);
 
   useEffect(() => {
@@ -127,32 +181,49 @@ export default function Navbar({
     if (notification.href) navigate(notification.href);
   };
 
-  const mainLink = currentUser?.role === 'employer' ? { page: 'workers', label: 'Workers', icon: Users, count: workersCount } : { page: 'jobs', label: 'Jobs', icon: BriefcaseBusiness, count: jobsCount };
+  const isEmployer = currentUser?.role === 'employer';
+  const mainLink = isEmployer
+    ? { page: 'workers', label: 'Workers', icon: Users, count: workersCount }
+    : { page: 'jobs', label: 'Jobs', icon: BriefcaseBusiness, count: jobsCount };
+
+  const secondaryLink = isEmployer
+    ? { page: 'jobs', label: 'Jobs', icon: BriefcaseBusiness, count: jobsCount }
+    : { page: 'workers', label: 'Workers', icon: Users, count: workersCount };
+
   const unreadCount = notifications.filter((item) => !item.readAt).length;
-  const firstName = currentUser?.name?.trim().split(/\s+/)[0] || 'Profile';
 
   const NavLink = ({ page, label, count, Icon }: { page: string; label: string; count?: number; Icon?: React.ComponentType<{ className?: string }> }) => (
     <Link
       to={page === 'workers' ? PAGE_ROUTES.workers : page === 'jobs' ? PAGE_ROUTES.jobs : PAGE_ROUTES.dashboard}
       onClick={closeMenus}
-      className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-black transition ${focusRing} ${currentPage === page ? 'bg-[#2563eb] text-white' : 'text-slate-700 hover:bg-blue-50 hover:text-[#2563eb]'}`}
+      className={`inline-flex min-h-[48px] md:min-h-11 items-center gap-2 rounded-xl md:rounded-full px-4 text-sm font-black transition ${focusRing} ${
+        currentPage === page ? 'bg-[#2563eb] text-white' : 'text-slate-700 hover:bg-blue-50 hover:text-[#2563eb]'
+      }`}
     >
-      {Icon && <Icon className="h-4 w-4" />}
+      {Icon && <Icon className="h-4 w-4 shrink-0" />}
       <span>{label}</span>
-      {typeof count === 'number' && <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${currentPage === page ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-900'}`}>{count}</span>}
+      {typeof count === 'number' && (
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${currentPage === page ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-900'}`}>
+          {count}
+        </span>
+      )}
     </Link>
   );
 
-  const LanguageControls = () => (
+  const SegmentedLanguageControl = () => (
     <div className="p-2">
-      <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">Language</p>
-      <div className="grid grid-cols-3 gap-1">
+      <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">Language</p>
+      <div className="grid grid-cols-3 gap-1 bg-slate-100/90 p-1 rounded-xl">
         {['SO', 'EN', 'AR'].map((value) => (
           <button
             key={value}
+            type="button"
             onClick={() => setLanguage(value)}
-            className={`min-h-11 rounded-xl text-xs font-black ${language === value ? 'bg-[#2563eb] text-white' : 'hover:bg-slate-50'}`}
+            className={`min-h-[40px] rounded-lg text-xs font-black transition-all ${
+              language === value ? 'bg-[#2563eb] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
             aria-pressed={language === value}
+            aria-label={`Switch language to ${value}`}
           >
             {value}
           </button>
@@ -163,22 +234,70 @@ export default function Navbar({
 
   const NotificationButton = () => currentUser ? (
     <div className="relative">
-      <button onClick={openNotifications} className={`relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 ${focusRing}`} aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'} aria-expanded={notificationsOpen}>
-        <Bell className="h-5 w-5" />
-        {unreadCount > 0 && <span className="absolute right-0 top-0 min-w-5 rounded-full bg-rose-600 px-1 text-center text-[10px] font-black leading-5 text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+      <button
+        onClick={openNotifications}
+        className={`relative inline-flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 ${focusRing}`}
+        aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+        aria-expanded={notificationsOpen}
+      >
+        <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-rose-600 px-1 text-center text-[10px] font-black leading-4 text-white">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
       </button>
       {notificationsOpen && (
-        <section className="fixed left-3 right-3 top-[76px] z-[70] max-h-[min(70vh,32rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl md:absolute md:left-auto md:right-0 md:top-12 md:w-[24rem]" aria-label="Notifications">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><div><h2 className="font-black text-slate-950">Notifications</h2><p className="text-xs font-semibold text-slate-500">{unreadCount ? `${unreadCount} unread` : 'You are up to date'}</p></div><button onClick={loadNotifications} className="min-h-10 rounded-full px-3 text-xs font-black text-[#2563eb] hover:bg-blue-50">Refresh</button></div>
+        <section
+          className="fixed inset-x-3 top-[70px] z-[70] max-h-[min(70vh,32rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl md:absolute md:left-auto md:right-0 md:top-12 md:w-[24rem]"
+          aria-label="Notifications"
+        >
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <div>
+              <h2 className="font-black text-slate-950 text-sm sm:text-base">Notifications</h2>
+              <p className="text-xs font-semibold text-slate-500">{unreadCount ? `${unreadCount} unread` : 'You are up to date'}</p>
+            </div>
+            <button onClick={loadNotifications} className="min-h-[36px] rounded-full px-3 text-xs font-black text-[#2563eb] hover:bg-blue-50">
+              Refresh
+            </button>
+          </div>
           <div className="max-h-[calc(min(70vh,32rem)-4.5rem)] overflow-y-auto overscroll-contain">
-            {notificationState === 'loading' ? <div className="flex items-center justify-center gap-2 p-8 text-sm font-bold text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />Loading notifications...</div>
-              : notificationState === 'error' ? <div className="p-6 text-center"><AlertCircle className="mx-auto h-6 w-6 text-rose-500" /><p className="mt-2 text-sm font-bold text-slate-700">Notifications could not be loaded.</p><button onClick={loadNotifications} className="mt-3 min-h-11 rounded-full bg-slate-900 px-4 text-xs font-black text-white">Try again</button></div>
-              : notifications.length === 0 ? <div className="p-8 text-center"><CheckCircle2 className="mx-auto h-7 w-7 text-blue-600" /><p className="mt-2 font-black text-slate-800">No notifications yet</p><p className="mt-1 text-xs font-medium text-slate-500">Applications, hiring requests, and completion updates will appear here.</p></div>
-              : notifications.map((notification) => (
-                <button key={notification.id} onClick={() => openNotification(notification)} className={`block w-full border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-blue-50/60 ${!notification.readAt ? 'bg-blue-50/40' : 'bg-white'}`}>
-                  <span className="flex items-start gap-3"><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.readAt ? 'bg-slate-200' : 'bg-[#2563eb]'}`} /><span className="min-w-0"><span className="block text-sm font-black text-slate-900">{notification.title}</span><span className="mt-1 block whitespace-normal break-words text-xs font-medium leading-5 text-slate-600">{notification.message}</span><span className="mt-1 block text-[10px] font-bold text-slate-400">{new Date(notification.createdAt).toLocaleString()}</span></span></span>
+            {notificationState === 'loading' ? (
+              <div className="flex items-center justify-center gap-2 p-8 text-sm font-bold text-slate-500">
+                <Loader2 className="h-5 w-5 animate-spin" />Loading notifications...
+              </div>
+            ) : notificationState === 'error' ? (
+              <div className="p-6 text-center">
+                <AlertCircle className="mx-auto h-6 w-6 text-rose-500" />
+                <p className="mt-2 text-sm font-bold text-slate-700">Notifications could not be loaded.</p>
+                <button onClick={loadNotifications} className="mt-3 min-h-[40px] rounded-full bg-slate-900 px-4 text-xs font-black text-white">
+                  Try again
                 </button>
-              ))}
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="p-8 text-center">
+                <CheckCircle2 className="mx-auto h-7 w-7 text-blue-600" />
+                <p className="mt-2 font-black text-slate-800">No notifications yet</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">Applications, hiring requests, and completion updates will appear here.</p>
+              </div>
+            ) : (
+              notifications.map((notification) => (
+                <button
+                  key={notification.id}
+                  onClick={() => openNotification(notification)}
+                  className={`block w-full border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-blue-50/60 ${!notification.readAt ? 'bg-blue-50/40' : 'bg-white'}`}
+                >
+                  <span className="flex items-start gap-3">
+                    <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.readAt ? 'bg-slate-200' : 'bg-[#2563eb]'}`} />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-black text-slate-900">{notification.title}</span>
+                      <span className="mt-1 block whitespace-normal break-words text-xs font-medium leading-5 text-slate-600">{notification.message}</span>
+                      <span className="mt-1 block text-[10px] font-bold text-slate-400">{new Date(notification.createdAt).toLocaleString()}</span>
+                    </span>
+                  </span>
+                </button>
+              ))
+            )}
           </div>
         </section>
       )}
@@ -186,102 +305,290 @@ export default function Navbar({
   ) : null;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md" id="main-navbar">
-      <nav ref={shellRef} className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
-        <div className="flex h-[64px] items-center justify-between gap-3">
-          {/* Logo & Desktop Nav Links */}
-          <div className="flex items-center gap-4">
-            <Link to={PAGE_ROUTES.home} onClick={closeMenus} className={`inline-flex min-h-11 items-center rounded-full px-1 ${focusRing}`}>
-              <img src="/assets/suuqa-Xirfadaha-logo.png" alt="Suuqa Xirfadaha Logo" className="h-10 w-[7.2rem] object-contain object-left sm:w-[8.5rem]" width="1536" height="1024" decoding="async" />
-            </Link>
-            <div className="hidden items-center gap-1.5 md:flex">
-              {currentUser ? <><NavLink {...mainLink} /><NavLink page="dashboard" label="Dashboard" Icon={LayoutDashboard} /></> : <><NavLink page="workers" label="Workers" count={workersCount} /><NavLink page="jobs" label="Jobs" count={jobsCount} /></>}
+    <>
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md" id="main-navbar">
+        <nav ref={shellRef} className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
+          <div className="flex h-[60px] sm:h-[64px] items-center justify-between gap-3">
+            {/* Logo & Desktop Nav Links */}
+            <div className="flex items-center gap-4">
+              <Link to={PAGE_ROUTES.home} onClick={closeMenus} className={`inline-flex min-h-11 items-center rounded-full px-1 ${focusRing}`}>
+                <img
+                  src="/assets/suuqa-Xirfadaha-logo.png"
+                  alt="Suuqa Xirfadaha Logo"
+                  className="h-9 sm:h-10 w-[6.8rem] sm:w-[8.5rem] object-contain object-left"
+                  width="1536"
+                  height="1024"
+                  decoding="async"
+                />
+              </Link>
+              <div className="hidden items-center gap-1.5 md:flex">
+                {currentUser ? (
+                  <>
+                    <NavLink {...mainLink} />
+                    <NavLink page="dashboard" label="Dashboard" Icon={LayoutDashboard} />
+                  </>
+                ) : (
+                  <>
+                    <NavLink page="workers" label="Workers" count={workersCount} />
+                    <NavLink page="jobs" label="Jobs" count={jobsCount} />
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Desktop Right Actions */}
+            <div className="hidden items-center gap-2 md:flex">
+              <Show when="signed-out">
+                <SignInButton mode="modal">
+                  <button className={`inline-flex min-h-11 items-center gap-2 rounded-full bg-[#2563eb] px-5 text-sm font-black text-white hover:bg-[#1d4ed8] transition ${focusRing}`}>
+                    <UserRound className="h-4 w-4" />Sign In
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:bg-slate-50 transition ${focusRing}`}>
+                    Sign Up
+                  </button>
+                </SignUpButton>
+              </Show>
+              <Show when="signed-in">
+                <UserButton showName appearance={{ elements: { userButtonBox: 'flex-row-reverse gap-2 font-black text-slate-800' } }}>
+                  <UserButton.MenuItems>
+                    <UserButton.Action
+                      label="View Profile"
+                      labelIcon={<UserRound className="h-4 w-4" />}
+                      onClick={() => navigate(PAGE_ROUTES.profile)}
+                    />
+                    <UserButton.Action
+                      label="Edit Profile"
+                      labelIcon={<Edit3 className="h-4 w-4" />}
+                      onClick={() => navigate(PAGE_ROUTES['profile-edit'])}
+                    />
+                    <UserButton.Action
+                      label="Platform Settings"
+                      labelIcon={<Settings className="h-4 w-4" />}
+                      onClick={() => navigate(PAGE_ROUTES.settings)}
+                    />
+                  </UserButton.MenuItems>
+                </UserButton>
+              </Show>
+              {currentUser && (
+                <>
+                  <NotificationButton />
+                  <span
+                    title={currentUser.role === 'worker' ? 'Worker account' : currentUser.role === 'employer' ? 'Employer account' : 'Administrator account'}
+                    aria-label={currentUser.role ? `${currentUser.role} account` : 'Account role'}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-[#2563eb]"
+                  >
+                    {currentUser.role === 'employer' ? <BriefcaseBusiness className="h-5 w-5" /> : <UserRound className="h-5 w-5" />}
+                  </span>
+                </>
+              )}
+              {!currentUser && (
+                <div className="relative">
+                  <button
+                    onClick={() => setMoreOpen((open) => !open)}
+                    className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:bg-slate-50 ${focusRing}`}
+                    aria-expanded={moreOpen}
+                  >
+                    More<ChevronDown className="h-4 w-4" />
+                  </button>
+                  {moreOpen && (
+                    <div className="absolute right-0 top-12 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl z-50">
+                      <SegmentedLanguageControl />
+                      <Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-black hover:bg-slate-50">
+                        <Globe2 className="h-4 w-4" />About & Contact
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Mobile Header Right Actions */}
+            <div className="flex items-center gap-2 md:hidden">
+              <Show when="signed-out">
+                <SignInButton mode="modal">
+                  <button className={`inline-flex min-h-[38px] items-center gap-1.5 rounded-full bg-[#2563eb] px-3.5 text-xs font-black text-white hover:bg-[#1d4ed8] ${focusRing}`}>
+                    <UserRound className="h-3.5 w-3.5" />Sign In
+                  </button>
+                </SignInButton>
+              </Show>
+              <Show when="signed-in">
+                <NotificationButton />
+              </Show>
+              <button
+                ref={menuButtonRef}
+                type="button"
+                onClick={() => setMobileOpen((open) => !open)}
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 ${focusRing}`}
+                aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                aria-expanded={mobileOpen}
+              >
+                {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
             </div>
           </div>
+        </nav>
+      </header>
 
-          {/* Desktop Right Actions */}
-          <div className="hidden items-center gap-2 md:flex">
-            <Show when="signed-out">
-              <SignInButton mode="modal">
-                <button className={`inline-flex min-h-11 items-center gap-2 rounded-full bg-[#2563eb] px-5 text-sm font-black text-white hover:bg-[#1d4ed8] transition ${focusRing}`}>
-                  <UserRound className="h-4 w-4" />Sign In
-                </button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:bg-slate-50 transition ${focusRing}`}>
-                  Sign Up
-                </button>
-              </SignUpButton>
-            </Show>
-            <Show when="signed-in">
-              <UserButton showName appearance={{ elements: { userButtonBox: 'flex-row-reverse gap-2 font-black text-slate-800' } }}>
-                <UserButton.MenuItems>
-                  <UserButton.Action
-                    label="View Profile"
-                    labelIcon={<UserRound className="h-4 w-4" />}
-                    onClick={() => navigate(PAGE_ROUTES.profile)}
-                  />
-                  <UserButton.Action
-                    label="Edit Profile"
-                    labelIcon={<Edit3 className="h-4 w-4" />}
-                    onClick={() => navigate(PAGE_ROUTES['profile-edit'])}
-                  />
-                  <UserButton.Action
-                    label="Platform Settings"
-                    labelIcon={<Settings className="h-4 w-4" />}
-                    onClick={() => navigate(PAGE_ROUTES.settings)}
-                  />
-                </UserButton.MenuItems>
-              </UserButton>
-            </Show>
-            {currentUser && (
-              <>
-                <NotificationButton />
-                <span title={currentUser.role === 'worker' ? 'Worker account' : currentUser.role === 'employer' ? 'Employer account' : 'Administrator account'} aria-label={currentUser.role ? `${currentUser.role} account` : 'Account role'} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-[#2563eb]">{currentUser.role === 'employer' ? <BriefcaseBusiness className="h-5 w-5" /> : <UserRound className="h-5 w-5" />}</span>
-              </>
-            )}
-            {!currentUser && (
-              <>
-                <div className="relative">
-                  <button onClick={() => setMoreOpen((open) => !open)} className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:bg-slate-50 ${focusRing}`} aria-expanded={moreOpen}>More<ChevronDown className="h-4 w-4" /></button>
-                  {moreOpen && <div className="absolute right-0 top-12 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl z-50"><LanguageControls /><Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-black hover:bg-slate-50"><Globe2 className="h-4 w-4" />About & Contact</Link></div>}
+      {/* Side Drawer Modal Backdrop & Sliding Drawer */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-50 flex bg-slate-950/60 backdrop-blur-xs md:hidden transition-opacity"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeMenus();
+          }}
+          aria-modal="true"
+          role="dialog"
+          aria-label="Navigation drawer"
+        >
+          <div
+            ref={drawerRef}
+            style={{ width: 'min(88vw, 390px)' }}
+            className={`flex h-full flex-col overflow-y-auto bg-white p-5 shadow-2xl transition-transform duration-300 ease-in-out ${
+              language === 'AR' ? 'mr-auto border-r border-slate-200' : 'ml-auto border-l border-slate-200'
+            }`}
+          >
+            {/* Drawer Close Button */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <span className="text-xs font-black uppercase tracking-wider text-slate-400">Menu</span>
+              <button
+                type="button"
+                onClick={closeMenus}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Signed-in Mobile Drawer Content */}
+            {currentUser ? (
+              <div className="flex flex-col flex-1 min-h-0 pt-3">
+                {/* 1. Profile summary */}
+                <div className="mb-4 flex items-center gap-3 rounded-2xl bg-slate-50 p-3 border border-slate-100">
+                  <Avatar name={currentUser.name} src={currentUser.avatarUrl} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-slate-950">{currentUser.name}</p>
+                    <p className="text-xs font-bold capitalize text-[#2563eb]">
+                      {currentUser.role ? `${currentUser.role} account` : 'Account'}
+                    </p>
+                  </div>
                 </div>
-              </>
-            )}
-          </div>
 
-          {/* Mobile Right Bar Actions */}
-          <div className="flex items-center gap-2 md:hidden">
-            <Show when="signed-out">
-              <SignInButton mode="modal">
-                <button className={`inline-flex min-h-10 items-center gap-1.5 rounded-full bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] ${focusRing}`}>
-                  <UserRound className="h-3.5 w-3.5" />Sign In
-                </button>
-              </SignInButton>
-            </Show>
-            <Show when="signed-in">
-              <NotificationButton />
-            </Show>
-            <button type="button" onClick={() => setMobileOpen((open) => !open)} className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 ${focusRing}`} aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={mobileOpen}>{mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}</button>
+                {/* Main Links */}
+                <div className="space-y-1">
+                  <NavLink {...mainLink} />
+                  <NavLink page="dashboard" label="Dashboard" Icon={LayoutDashboard} />
+                  <Link
+                    to={PAGE_ROUTES.profile}
+                    onClick={closeMenus}
+                    className="flex min-h-[48px] items-center gap-3 rounded-xl px-4 text-sm font-black text-slate-800 hover:bg-slate-50 transition"
+                  >
+                    <UserRound className="h-4 w-4 text-[#2563eb]" />
+                    <span>View profile</span>
+                  </Link>
+                  <Link
+                    to={PAGE_ROUTES['profile-edit']}
+                    onClick={closeMenus}
+                    className="flex min-h-[48px] items-center gap-3 rounded-xl px-4 text-sm font-black text-slate-800 hover:bg-slate-50 transition"
+                  >
+                    <Edit3 className="h-4 w-4 text-[#2563eb]" />
+                    <span>Edit profile</span>
+                  </Link>
+                  <Link
+                    to={PAGE_ROUTES.settings}
+                    onClick={closeMenus}
+                    className="flex min-h-[48px] items-center gap-3 rounded-xl px-4 text-sm font-black text-slate-800 hover:bg-slate-50 transition"
+                  >
+                    <Settings className="h-4 w-4 text-[#2563eb]" />
+                    <span>Settings</span>
+                  </Link>
+                  <Link
+                    to={PAGE_ROUTES.about}
+                    onClick={closeMenus}
+                    className="flex min-h-[48px] items-center gap-3 rounded-xl px-4 text-sm font-black text-slate-800 hover:bg-slate-50 transition"
+                  >
+                    <Globe2 className="h-4 w-4 text-[#2563eb]" />
+                    <span>About & Contact</span>
+                  </Link>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/50">
+                  <SegmentedLanguageControl />
+                </div>
+
+                {/* Sign Out Button visually separated near bottom */}
+                <div className="mt-auto pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMenus();
+                      onLogout();
+                    }}
+                    className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50/60 px-4 text-sm font-black text-rose-700 hover:bg-rose-100/80 transition"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign out</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Signed-out Mobile Drawer Content */
+              <div className="flex flex-col flex-1 pt-3 space-y-4">
+                {/* Sign In & Create Account buttons */}
+                <div className="space-y-2">
+                  <Show when="signed-out">
+                    <SignInButton mode="modal">
+                      <button
+                        onClick={closeMenus}
+                        className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 text-sm font-black text-white hover:bg-[#1d4ed8] shadow-xs transition"
+                      >
+                        <UserRound className="h-4 w-4" />
+                        <span>Sign In</span>
+                      </button>
+                    </SignInButton>
+                    <SignUpButton mode="modal">
+                      <button
+                        onClick={closeMenus}
+                        className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-black text-slate-800 hover:bg-slate-50 transition"
+                      >
+                        <span>Create Account</span>
+                      </button>
+                    </SignUpButton>
+                  </Show>
+                </div>
+
+                {/* Navigation Links */}
+                <div className="space-y-1 pt-2 border-t border-slate-100">
+                  <NavLink page="workers" label="Workers" count={workersCount} />
+                  <NavLink page="jobs" label="Jobs" count={jobsCount} />
+                  <Link
+                    to={PAGE_ROUTES.about}
+                    onClick={closeMenus}
+                    className="flex min-h-[48px] items-center gap-3 rounded-xl px-4 text-sm font-black text-slate-800 hover:bg-slate-50 transition"
+                  >
+                    <Globe2 className="h-4 w-4 text-[#2563eb]" />
+                    <span>About & Contact</span>
+                  </Link>
+                </div>
+
+                <div className="mt-auto rounded-2xl border border-slate-100 bg-slate-50/50">
+                  <SegmentedLanguageControl />
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      )}
 
-        {mobileOpen && (
-          <div className="fixed inset-x-0 top-[64px] z-50 h-[calc(100dvh-64px)] bg-slate-950/40 md:hidden" onClick={(event) => { if (event.target === event.currentTarget) closeMenus(); }}>
-            <div className="ml-auto flex h-full w-[min(90vw,22rem)] flex-col overflow-y-auto border-l border-slate-200 bg-white p-5 shadow-2xl">
-              {currentUser && <div className="mb-4 flex items-center gap-3 rounded-2xl bg-slate-50 p-3 border border-slate-100"><Avatar name={currentUser.name} src={currentUser.avatarUrl} /><div className="min-w-0"><p className="truncate font-black text-slate-950">{currentUser.name}</p><p className="text-xs font-bold capitalize text-[#2563eb]">{currentUser.role} account</p></div></div>}
-              <div className="space-y-1.5">
-                {currentUser ? <><NavLink {...mainLink} /><NavLink page="dashboard" label="Dashboard" Icon={LayoutDashboard} /><Link to={PAGE_ROUTES.profile} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-slate-50"><UserRound className="h-4 w-4" />View profile</Link><Link to={PAGE_ROUTES['profile-edit']} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-slate-50"><Edit3 className="h-4 w-4" />Edit profile</Link><Link to={PAGE_ROUTES.settings} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-slate-50"><Settings className="h-4 w-4" />Settings</Link></> : <><NavLink page="workers" label="Workers" count={workersCount} /><NavLink page="jobs" label="Jobs" count={jobsCount} /><Show when="signed-out"><SignUpButton mode="modal"><button onClick={closeMenus} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-800 hover:bg-slate-50">Sign Up</button></SignUpButton></Show></>}
-                <Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 rounded-xl px-4 text-sm font-black hover:bg-slate-50"><Globe2 className="h-4 w-4" />About & Contact</Link>
-              </div>
-              <div className="mt-4 rounded-2xl border border-slate-100"><LanguageControls /></div>
-              {currentUser && <button onClick={onLogout} className="mt-auto flex min-h-12 items-center justify-center gap-2 rounded-full border border-rose-200 text-sm font-black text-rose-700 hover:bg-rose-50"><LogOut className="h-4 w-4" />Sign out</button>}
-            </div>
-          </div>
-        )}
-      </nav>
-    </header>
+      {/* Fixed Mobile Bottom Navigation for Signed-In Users */}
+      <BottomNav
+        currentUser={currentUser}
+        unreadCount={unreadCount}
+        onOpenNotifications={openNotifications}
+        isHidden={mobileOpen || notificationsOpen || isModalOpen}
+      />
+    </>
   );
 }
-
-

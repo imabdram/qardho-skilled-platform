@@ -17,7 +17,7 @@ import ApplyModal from './components/ApplyModal';
 import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 import AboutContact from './pages/AboutContact';
-import { User, Job, JobStatus, Connection, Application, Review, ProfileFieldKey, VerificationMessage, PricingType } from './types';
+import { User, Job, JobStatus, Connection, Application, Review, ProfileFieldKey, VerificationMessage, PricingType, Notification } from './types';
 import { MapPin, AlertCircle, RefreshCw, CheckCircle2, X } from 'lucide-react';
 import ConfirmDialog from './components/ConfirmDialog';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -49,6 +49,7 @@ export default function App() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [verificationMessage, setVerificationMessage] = useState<VerificationMessage | null>(null);
+  const [realtimeNotification, setRealtimeNotification] = useState<Notification | null>(null);
 
   // Active Modals states
   const [selectedWorkerForConnect, setSelectedWorkerForConnect] = useState<User | null>(null);
@@ -99,9 +100,9 @@ export default function App() {
   }, [location.pathname]);
 
   // Load and refresh all data from the PostgreSQL database
-  const refreshAllData = async (authenticatedUser: User | null = currentUser) => {
+  const refreshAllData = async (authenticatedUser: User | null = currentUser, silent = false) => {
     try {
-      setIsLoadingData(true);
+      if (!silent) setIsLoadingData(true);
       setAppError(null);
       const [usersRes, workersRes, jobsRes, connectionsRes, applicationsRes, reviewsRes] = await Promise.all([
         authenticatedUser?.role === 'admin' ? fetchJson<User[]>('/api/users', 'Could not load users.') : Promise.resolve([]),
@@ -128,24 +129,144 @@ export default function App() {
 
     } catch (e) {
       console.error("Failed to fetch fresh database states", e);
-      showAppError(e instanceof Error ? e.message : 'Could not load platform data. Check that the local server is running.');
+      if (!silent) {
+        showAppError(e instanceof Error ? e.message : 'Could not load platform data. Check that the local server is running.');
+      }
     } finally {
-      setIsLoadingData(false);
+      if (!silent) setIsLoadingData(false);
     }
   };
+
+  // Soft audio chime for real-time notifications
+  const playNotificationChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, now); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
+
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.3);
+    } catch {
+      // Audio policy fallback
+    }
+  };
+
+  // Real-time Server-Sent Events (SSE) notification listener
+  useEffect(() => {
+    if (!currentUser || !isSignedIn) return;
+
+    let active = true;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+    let reconnectTimeout: any = null;
+
+    const connectSseStream = async () => {
+      try {
+        const response = await fetchAuth('/api/notifications/stream');
+        if (!response.ok || !response.body) return;
+
+        reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (active) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const chunks = buffer.split('\n\n');
+          buffer = chunks.pop() || '';
+
+          for (const chunk of chunks) {
+            const dataLine = chunk.split('\n').find((line) => line.startsWith('data: '));
+            if (dataLine) {
+              try {
+                const eventData = JSON.parse(dataLine.slice(6));
+                if (eventData.type === 'notification' && eventData.notification) {
+                  const notice: Notification = eventData.notification;
+                  setRealtimeNotification(notice);
+                  playNotificationChime();
+                  showAppNotice(`${notice.title}: ${notice.message}`);
+                  refreshAllData(currentUser, true);
+                }
+              } catch (parseErr) {
+                console.error('SSE JSON parse error', parseErr);
+              }
+            }
+          }
+        }
+      } catch {
+        if (active) {
+          reconnectTimeout = setTimeout(connectSseStream, 3000);
+        }
+      }
+    };
+
+    connectSseStream();
+
+    return () => {
+      active = false;
+      if (reader) reader.cancel().catch(() => undefined);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, [currentUser?.id, isSignedIn]);
+
+  // Periodic polling fallback (every 12 seconds)
+  useEffect(() => {
+    if (!currentUser) return;
+    const interval = setInterval(() => {
+      refreshAllData(currentUser, true);
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [currentUser?.id]);
+
+  // Tab visibility change sync
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && currentUser) {
+        refreshAllData(currentUser, true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     let active = true;
     if (!isClerkLoaded) return;
 
     const bootstrap = async () => {
+      setSessionLoading(true);
       let sessionUser: User | null = null;
       if (isSignedIn) {
-        try {
-          const response = await fetch('/api/auth/me');
-          if (response.ok) sessionUser = (await response.json()).user || null;
-        } catch {
-          sessionUser = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const response = await fetchAuth('/api/auth/me');
+            if (response.ok) {
+              const data = await response.json();
+              sessionUser = data.user || null;
+              if (sessionUser) break;
+            } else if (response.status === 403) {
+              const data = await response.json().catch(() => ({}));
+              showAppError(data.error || 'This account is currently suspended.');
+              break;
+            }
+          } catch (e) {
+            console.error('Error fetching /api/auth/me', e);
+          }
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 300));
         }
       }
       if (sessionUser && clerkUser?.imageUrl) {
@@ -160,21 +281,23 @@ export default function App() {
   }, [isClerkLoaded, isSignedIn, clerkUser?.id]);
 
   useEffect(() => {
-    if (sessionLoading) return;
+    if (!isClerkLoaded || sessionLoading) return;
     const path = location.pathname;
     const guestOnly = ['/login', '/auth', '/register', '/forgot-password', '/reset-password'].includes(path);
     const protectedPath = ['/profile', '/profile/edit', '/settings', '/dashboard', '/worker/dashboard', '/employer/dashboard', '/post-job', '/admin', '/onboarding'].includes(path);
     let target: string | null = null;
+
     if (guestOnly && currentUser) target = getDefaultRouteForUser(currentUser);
-    else if (!currentUser && protectedPath) target = '/login';
+    else if (!isSignedIn && protectedPath) target = '/login';
     else if (currentUser?.role === 'pending' && path !== '/onboarding' && (protectedPath || ['/', '/workers', '/jobs', '/about-contact'].includes(path) || /^\/jobs\//.test(path))) target = '/onboarding';
     else if (currentUser && path === '/onboarding' && currentUser.role !== 'pending') target = getDefaultRouteForUser(currentUser);
     else if (currentUser && path === '/admin' && currentUser.role !== 'admin') target = '/unauthorized';
     else if (currentUser && (path === '/post-job' || path === '/employer/dashboard') && currentUser.role !== 'employer') target = currentUser.role === 'pending' ? '/onboarding' : '/unauthorized';
     else if (currentUser && path === '/worker/dashboard' && currentUser.role !== 'worker') target = currentUser.role === 'pending' ? '/onboarding' : '/unauthorized';
     else if (currentUser && (path === '/profile' || path === '/profile/edit' || path === '/settings') && currentUser.role === 'pending') target = '/onboarding';
+
     if (target && target !== path) navigate(target, { replace: true });
-  }, [sessionLoading, currentUser?.id, currentUser?.role, location.pathname, navigate]);
+  }, [isClerkLoaded, sessionLoading, isSignedIn, currentUser, location.pathname, navigate]);
 
   const loadVerificationMessage = async (user: User | null) => {
     if (!user || user.role === 'admin' || user.verified) {
@@ -226,7 +349,6 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         setCurrentUser(data.user);
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
         navigateTo('dashboard');
         showAppNotice('Logged in successfully.');
         return { success: true, message: 'Logged in successfully.' };
@@ -489,16 +611,16 @@ export default function App() {
   };
 
   // Update Status Handlers (Dashboard)
-  const updateConnectionStatus = async (id: string, status: 'accepted' | 'declined') => {
+  const updateConnectionStatus = async (id: string, status: 'accepted' | 'declined', reason?: string) => {
     try {
       const res = await fetch(`/api/connections/${id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status, reason })
       });
       if (res.ok) {
         await refreshAllData();
-        showAppNotice('Connection updated.');
+        showAppNotice(status === 'accepted' ? 'Hire request accepted. Permitted contact details unlocked.' : 'Hire request declined.');
       } else {
         showAppError(await getApiError(res, 'Could not update connection status.'));
       }
@@ -618,6 +740,37 @@ export default function App() {
     return false;
   };
 
+  // Add Worker-to-Employer Review Handler
+  const handleAddEmployerReview = async (reviewData: {
+    jobId: string;
+    employerId: string;
+    overallRating: number;
+    communicationRating: number;
+    fairnessRating: number;
+    paymentReliabilityRating: number;
+    jobAccuracyRating: number;
+    comment: string;
+  }) => {
+    try {
+      const res = await fetch('/api/reviews/employer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reviewData)
+      });
+      if (res.ok) {
+        await refreshAllData();
+        showAppNotice('Employer review published.');
+        return true;
+      } else {
+        showAppError(await getApiError(res, 'Could not submit review.'));
+      }
+    } catch (e) {
+      console.error(e);
+      showAppError('Could not submit review.');
+    }
+    return false;
+  };
+
 
   const handleNavigate = (page: string) => {
     setViewingProfileUser(null);
@@ -720,6 +873,8 @@ export default function App() {
               navigateTo('workers');
             } : undefined}
             onConnect={triggerConnect}
+            onUpdateApplicationStatus={updateApplicationStatus}
+            onUpdateConnectionStatus={updateConnectionStatus}
             onRequestDeleteAccount={requestDeleteAccount}
             onAvatarUpdated={(user) => {
               setCurrentUser(user);
@@ -752,6 +907,7 @@ export default function App() {
           <Dashboard
             currentUser={currentUser}
             workers={workers}
+            users={users}
             connections={connections}
             applications={applications}
             jobs={jobs}
@@ -761,6 +917,7 @@ export default function App() {
             onUpdateJobStatus={updateJobStatus}
             onNavigate={handleNavigate}
             onViewWorkerProfile={handleViewWorkerProfile}
+            onAddEmployerReview={handleAddEmployerReview}
             onSwitchRole={handleSwitchRole}
             isSwitchingRole={isSwitchingRole}
             isLoading={isLoadingData}
@@ -830,6 +987,22 @@ export default function App() {
             }}
           />
         );
+      case 'onboarding':
+        if (!currentUser) {
+          return (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563eb] border-t-transparent mb-4" />
+              <p className="text-sm font-bold text-slate-700">Synchronizing your profile...</p>
+            </div>
+          );
+        }
+        return (
+          <Onboarding
+            currentUser={currentUser}
+            jobs={jobs}
+            onCompleteOnboarding={handleCompleteOnboarding}
+          />
+        );
       case 'post-job':
         return <PostJob currentUser={currentUser} onPostJob={postNewJob} onNavigate={handleNavigate} />;
       case 'about':
@@ -853,6 +1026,8 @@ export default function App() {
   const roleSwitchProfileCheck = getRoleSwitchProfileCheck();
   const hasTypedRoleSwitchConfirmation = roleSwitchConfirmation.trim().toUpperCase() === 'CONFIRM';
   const canConfirmRoleSwitch = roleSwitchProfileCheck.blocking.length === 0 && !!currentUser;
+  const isAnyModalOpen = !!selectedWorkerForConnect || !!selectedJobForApply || showDeleteAccountModal || showRoleSwitchModal;
+
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col text-slate-800 antialiased font-sans" id="app-root-layout">
       {/* Main Navigation Component */}
@@ -869,6 +1044,8 @@ export default function App() {
         applications={applications}
         jobs={jobs}
         reviews={reviews}
+        isModalOpen={isAnyModalOpen}
+        realtimeNotification={realtimeNotification}
       />
 
       {(isLoadingData || appError) && (
@@ -980,70 +1157,6 @@ export default function App() {
               >
                 <X className="h-4 w-4" />
               </button>
-            </div>
-
-            <div className="space-y-4 px-5 py-4">
-              <div className="rounded-xl border border-slate-100 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-sm font-black text-slate-900">Profile check</h4>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">Basic public profile fields are required before switching.</p>
-                  </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${canConfirmRoleSwitch ? 'bg-brand-50 text-brand-700' : 'bg-amber-50 text-amber-700'}`}>
-                    {canConfirmRoleSwitch ? 'Ready' : 'Incomplete'}
-                  </span>
-                </div>
-
-                {roleSwitchProfileCheck.blocking.length > 0 ? (
-                  <ul className="mt-3 space-y-2">
-                    {roleSwitchProfileCheck.blocking.map(item => (
-                      <li key={item} className="flex items-start gap-2 text-xs font-semibold text-amber-800">
-                        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 text-xs font-semibold text-brand-700">Your basic profile is ready for role switching.</p>
-                )}
-
-                {canConfirmRoleSwitch && (
-                  <div className="mt-4">
-                    <label className="block text-xs font-black uppercase tracking-wider text-slate-500">Type CONFIRM to continue</label>
-                    <input
-                      type="text"
-                      value={roleSwitchConfirmation}
-                      onChange={(e) => setRoleSwitchConfirmation(e.target.value)}
-                      placeholder="CONFIRM"
-                      className="mt-1 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                      autoComplete="off"
-                    />
-                    <p className="mt-1 text-[11px] font-semibold text-slate-400">This prevents accidental role changes.</p>
-                  </div>
-                )}
-
-                {roleSwitchProfileCheck.warnings.length > 0 && (
-                  <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
-                    <p className="text-[11px] font-black uppercase tracking-wider text-blue-700">After switching</p>
-                    <ul className="mt-2 space-y-1.5">
-                      {roleSwitchProfileCheck.warnings.map(item => (
-                        <li key={item} className="text-xs font-semibold text-blue-800">{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => { setShowRoleSwitchModal(false); setRoleSwitchConfirmation(''); }}
-                disabled={isSwitchingRole}
-                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Cancel
-              </button>
               {!canConfirmRoleSwitch ? (
                 <button
                   type="button"
@@ -1079,5 +1192,3 @@ export default function App() {
     </div>
   );
 }
-
-

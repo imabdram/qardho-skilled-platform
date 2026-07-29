@@ -32,8 +32,8 @@ export default function Settings({
   const isWorker = currentUser.role === 'worker';
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] pb-24 sm:pb-12">
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+    <div className="min-h-screen bg-[#f8fafc] pb-[calc(90px+env(safe-area-inset-bottom))]">
+      <div className="mx-auto max-w-3xl px-3.5 sm:px-6 py-4 sm:py-8 min-w-0">
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() => onNavigate('profile')}

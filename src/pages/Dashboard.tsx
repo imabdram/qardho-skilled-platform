@@ -1,25 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Connection, Application, Job, JobStatus, User, Review, VerificationMessage } from '../types';
 import {
   Users, Briefcase, FileText, Check, X, Phone, MapPin,
-  Clock, CheckCircle2, RefreshCw, PlusCircle, Star, ArrowRight, Copy
+  Clock, CheckCircle2, RefreshCw, PlusCircle, Star, ArrowRight, Copy, User as UserIcon, AlertCircle, Handshake
 } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CandidateReviewModal from '../components/CandidateReviewModal';
+import Avatar from '../components/Avatar';
 import { getMissingProfileFields, PROFILE_FIELD_LABELS } from '../validation';
+
+import EmployerReviewModal from '../components/EmployerReviewModal';
+import WorkListCard, { WorkItemData } from '../components/dashboard/WorkListCard';
+import StatusBadge, { DisplayStatus } from '../components/dashboard/StatusBadge';
+import FiltersBar, { StatusFilterValue, SourceFilterValue, SortOrderValue } from '../components/dashboard/FiltersBar';
+import PaginationBar from '../components/dashboard/PaginationBar';
+import EmptyState from '../components/dashboard/EmptyState';
 
 interface DashboardProps {
   currentUser: User | null;
   workers: User[];
+  users?: User[];
   connections: Connection[];
   applications: Application[];
   jobs: Job[];
   reviews: Review[];
-  onUpdateConnectionStatus: (id: string, status: 'accepted' | 'declined') => void | Promise<void>;
+  onUpdateConnectionStatus: (id: string, status: 'accepted' | 'declined', reason?: string) => void | Promise<void>;
   onUpdateApplicationStatus: (id: string, status: 'accepted' | 'declined') => void | Promise<void>;
   onUpdateJobStatus: (id: string, status: JobStatus) => void | Promise<void>;
   onNavigate: (page: string) => void;
   onViewWorkerProfile: (worker: User) => void;
+  onAddEmployerReview?: (data: {
+    jobId: string;
+    employerId: string;
+    overallRating: number;
+    communicationRating: number;
+    fairnessRating: number;
+    paymentReliabilityRating: number;
+    jobAccuracyRating: number;
+    comment: string;
+  }) => Promise<boolean>;
   onSwitchRole: () => void;
   isSwitchingRole?: boolean;
   isLoading?: boolean;
@@ -30,6 +49,7 @@ interface DashboardProps {
 export default function Dashboard({
   currentUser,
   workers,
+  users = [],
   connections,
   applications,
   jobs,
@@ -39,16 +59,30 @@ export default function Dashboard({
   onUpdateJobStatus,
   onNavigate,
   onViewWorkerProfile,
+  onAddEmployerReview,
   onSwitchRole,
   isSwitchingRole = false,
   isLoading = false,
   verificationMessage = null,
   onReadVerificationMessage
 }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'progress' | 'connections' | 'applications' | 'jobs'>('applications');
+  if (!currentUser) return null;
+
+  const isWorker = currentUser.role === 'worker';
+  const [activeTab, setActiveTab] = useState<'progress' | 'connections' | 'applications' | 'jobs' | 'completed'>(isWorker ? 'progress' : 'applications');
   const [actionKey, setActionKey] = useState<string | null>(null);
-  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [declineModalConnection, setDeclineModalConnection] = useState<Connection | null>(null);
+  const [declineReason, setDeclineReason] = useState<string>('');
+
+  // Filtering & Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>('all');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilterValue>('all');
+  const [sortOrder, setSortOrder] = useState<SortOrderValue>('newest');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
   const [pendingAction, setPendingAction] = useState<{
     title: string;
     description: string;
@@ -58,31 +92,47 @@ export default function Dashboard({
     onConfirm: () => void | Promise<void>;
   } | null>(null);
 
-  if (!currentUser) return null;
+  const [selectedEmployerReviewJob, setSelectedEmployerReviewJob] = useState<{ job: Job; sourceBadge?: 'Job Application' | 'Direct Offer' } | null>(null);
 
-  const isWorker = currentUser.role === 'worker';
+  const hasWorkerReviewedJob = (jobId: string) => reviews.some(r => r.jobId === jobId && r.reviewerRole === 'worker');
+  const hasEmployerReviewedJob = (jobId: string) => reviews.some(r => r.jobId === jobId && (r.reviewerRole === 'employer' || !r.reviewerRole));
+
+  // Raw filtered datasets by role
   const myConnections = isWorker
     ? connections.filter(c => c.toUserId === currentUser.id)
     : connections.filter(c => c.fromUserId === currentUser.id);
+
   const myApplications = isWorker
     ? applications.filter(a => a.applicantId === currentUser.id)
     : applications.filter(a => a.employerId === currentUser.id);
+
   const myPostedJobs = jobs.filter(j => j.employerId === currentUser.id);
-  const pendingConnections = myConnections.filter(c => c.status === 'pending').length;
+  const pendingConnections = myConnections.filter(c => c.status === 'pending' || c.status === 'pending_worker_response').length;
   const pendingApplications = myApplications.filter(a => a.status === 'pending').length;
   const openJobs = myPostedJobs.filter(j => j.status === 'open').length;
   const completedJobs = myPostedJobs.filter(j => j.status === 'completed').length;
   const acceptedApplications = myApplications.filter(a => a.status === 'accepted');
 
-  const getAcceptedApplicationForJob = (job: Job) => applications.find(app => app.jobId === job.id && app.status === 'accepted');
   const getJobForApplication = (app: Application) => jobs.find(job => job.id === app.jobId);
   const isJobReviewed = (job: Job) => reviews.some(review => review.jobId === job.id && review.employerId === currentUser.id);
 
-  const workerProgressItems = acceptedApplications
-    .map(app => ({ application: app, job: getJobForApplication(app) }))
-    .filter((item): item is { application: Application; job: Job } => !!item.job && item.job.status !== 'closed');
-
-  const employerProgressJobs = myPostedJobs.filter(job => job.status !== 'closed');
+  const allWorkerProgressItems = [
+    ...acceptedApplications.map(app => ({ application: app, connection: null, job: getJobForApplication(app), source: 'applications' as const })),
+    ...myConnections.filter(c => c.status === 'accepted').map(conn => ({
+      application: null,
+      connection: conn,
+      job: jobs.find(j => j.id === conn.jobId) || {
+        id: `conn-job-${conn.id}`,
+        title: conn.jobTitle || 'Direct Work Engagement',
+        employerId: conn.fromUserId,
+        employerName: conn.fromUserName,
+        status: 'in_progress' as const,
+        location: 'Qardho',
+        createdAt: conn.createdAt
+      } as Job,
+      source: 'direct_offers' as const
+    }))
+  ].filter((item): item is { application: Application | null; connection: Connection | null; job: Job; source: 'applications' | 'direct_offers' } => !!item.job && item.job.status !== 'closed');
 
   const openConfirmation = (action: {
     title: string;
@@ -104,233 +154,636 @@ export default function Dashboard({
   };
 
   const getWorker = (id?: string) => workers.find(worker => worker.id === id);
+  const getEmployerUser = (userId?: string, fallbackName?: string, phone?: string): User => {
+    const found = users?.find(u => u.id === userId) || workers.find(w => w.id === userId);
+    if (found) return found;
+    return {
+      id: userId || 'emp-user',
+      name: fallbackName || 'Employer',
+      phone: phone || '',
+      role: 'employer',
+    };
+  };
+
   const reviewReadyJobs = myPostedJobs.filter(job => job.status === 'completed' && !isJobReviewed(job));
   const completionRequests = isWorker
-    ? workerProgressItems.filter(item => item.job.status === 'completion_requested_by_employer').length
-    : employerProgressJobs.filter(job => job.status === 'completion_requested_by_worker').length;
+    ? allWorkerProgressItems.filter(item => item.job.status === 'completion_requested_by_employer').length
+    : myPostedJobs.filter(job => job.status === 'completion_requested_by_worker').length;
   const activeJobsCount = isWorker
-    ? workerProgressItems.filter(item => ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer'].includes(item.job.status)).length
-    : employerProgressJobs.filter(job => ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer'].includes(job.status)).length;
+    ? allWorkerProgressItems.filter(item => ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer'].includes(item.job.status)).length
+    : myPostedJobs.filter(job => ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer'].includes(job.status)).length;
 
   const missingProfileFields = getMissingProfileFields(currentUser);
 
-  const copyPhone = async (phone: string) => {
-    await navigator.clipboard?.writeText(phone);
-    setCopiedPhone(phone);
-    setTimeout(() => setCopiedPhone(null), 1800);
-  };
-
-  const cleanPhoneHref = (phone: string) => `tel:${phone.replace(/[^+\d]/g, '')}`;
-
-  const formatPhoneDisplay = (phoneStr?: string) => {
-    if (!phoneStr) return '';
-    const digits = phoneStr.replace(/\D/g, '');
-    if (digits.startsWith('252')) {
-      return `+252 ${digits.slice(3)}`;
-    }
-    return phoneStr;
-  };
-
-  const ContactActions = ({ phone, label = 'Phone', whatsappMessage }: { phone?: string; label?: string; whatsappMessage?: string }) => {
-    if (!phone) return <span className="text-[11px] italic text-slate-400">Phone not shared</span>;
-    return (
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-800 mr-2">
-          <Phone className="h-3.5 w-3.5 text-[#2563eb]" />
-          <span className="text-slate-500">{label}:</span>
-          <span className="font-mono text-slate-950 select-all">{formatPhoneDisplay(phone)}</span>
-        </span>
-        <a href={cleanPhoneHref(phone)} className="inline-flex h-9 w-24 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-xs font-black text-white hover:bg-slate-800 transition">Call</a>
-        {whatsappMessage && <a href={`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`} target="_blank" rel="noreferrer" className="inline-flex h-9 w-24 shrink-0 items-center justify-center rounded-lg bg-[#25D366] text-xs font-black text-slate-950 hover:bg-[#20bd5a] transition">WhatsApp</a>}
-        <button onClick={() => copyPhone(phone)} className="inline-flex h-9 w-20 shrink-0 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white text-xs font-black text-slate-700 hover:bg-slate-50 transition">
-          <Copy className="h-3 w-3" />
-          {copiedPhone === phone ? 'Copied' : 'Copy'}
-        </button>
-      </div>
-    );
-  };
-
-  const getReadableStatus = (status: 'pending' | 'accepted' | 'declined') => {
-    if (isWorker) return status === 'pending' ? 'Waiting for employer response' : status === 'accepted' ? 'Accepted / active job' : 'Not selected';
-    return status === 'pending' ? 'Needs review' : status === 'accepted' ? 'Hired' : 'Not selected';
-  };
-
-  const getStatusBadge = (status: 'pending' | 'accepted' | 'declined') => {
-    const styles = {
-      pending: 'bg-amber-50 text-amber-700 border-amber-100',
-      accepted: 'bg-brand-50 text-brand-700 border-brand-100',
-      declined: 'bg-rose-50 text-rose-700 border-rose-100',
-    }[status];
-    const Icon = status === 'accepted' ? CheckCircle2 : status === 'declined' ? X : Clock;
-    return (
-      <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold ${styles}`}>
-        <Icon className="h-3 w-3" />
-        <span>{getReadableStatus(status)}</span>
-      </span>
-    );
-  };
-
-  const getJobStatusBadge = (status: JobStatus) => {
-    const styles = {
-      open: 'bg-brand-50 text-brand-700 border-brand-100',
-      in_progress: 'bg-[#93c5fd]/35 text-[#1e40af] border-[#93c5fd]/70',
-      active: 'bg-[#93c5fd]/35 text-[#1e40af] border-[#93c5fd]/70',
-      completion_requested_by_worker: 'bg-amber-50 text-amber-700 border-amber-100',
-      completion_requested_by_employer: 'bg-amber-50 text-amber-700 border-amber-100',
-      completed: 'bg-slate-100 text-slate-700 border-slate-200',
-      completion_disputed: 'bg-rose-50 text-rose-700 border-rose-100',
-      cancelled: 'bg-slate-100 text-slate-600 border-slate-200',
-      closed: 'bg-rose-50 text-rose-700 border-rose-100',
-    }[status];
-    return (
-      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${styles}`}>
-        {status.replace('_', ' ')}
-      </span>
-    );
-  };
-
-  const getTimelineSteps = (job: Job, hasApplication: boolean, hasAccepted: boolean, reviewed = false) => [
-    { label: 'Posted', done: true },
-    { label: 'Applications received', done: hasApplication },
-    { label: 'Worker accepted', done: hasAccepted },
-    { label: 'In progress', done: ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer', 'completed'].includes(job.status) },
-    { label: 'Completed', done: job.status === 'completed' },
-    { label: 'Reviewed', done: reviewed },
-  ];
-
-  const getApplicationTimelineSteps = (app: Application) => {
-    const job = getJobForApplication(app);
-    const reviewed = job ? reviews.some(review => review.jobId === job.id) : false;
-    const decided = app.status === 'accepted' || app.status === 'declined';
-    return [
-      { label: 'Applied', done: true },
-      { label: 'Reviewed', done: decided },
-      { label: app.status === 'declined' ? 'Declined' : 'Accepted', done: decided },
-      { label: 'Active job', done: app.status === 'accepted' && !!job && ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer', 'completed'].includes(job.status) },
-      { label: 'Completed', done: job?.status === 'completed' },
-      { label: 'Reviewed', done: reviewed },
-    ];
-  };
-
-  const Timeline = ({ steps }: { steps: Array<{ label: string; done: boolean }> }) => (
-    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-      {steps.map(step => (
-        <div key={step.label} className={`rounded-lg border px-2 py-2 text-center text-[10px] font-black uppercase ${
-          step.done ? 'border-brand-100 bg-brand-50 text-brand-700' : 'border-slate-100 bg-slate-50 text-slate-400'
-        }`}>
-          {step.label}
-        </div>
-      ))}
-    </div>
-  );
-
-  const renderEmployerProgressCard = (job: Job) => {
-    const accepted = getAcceptedApplicationForJob(job);
-    const reviewed = isJobReviewed(job);
-    const workerName = job.assignedWorkerName || accepted?.applicantName;
-    const hasApplications = applications.some(app => app.jobId === job.id);
-
-    return (
-      <article key={job.id} className="rounded-xl border border-brand-950/10 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h3 className="line-clamp-2 text-base font-black text-slate-900">{job.title}</h3><p className="mt-1 text-xs font-semibold text-slate-500">{job.category || "Local work"} · {job.location} · Posted {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date(job.createdAt))}</p>
-            <p className="mt-1 text-xs font-medium text-slate-500">{workerName ? `Worker: ${workerName}` : 'No worker accepted yet'}</p>
-          </div>
-          {getJobStatusBadge(job.status)}
-        </div>
-        <Timeline steps={getTimelineSteps(job, hasApplications, !!accepted || !!job.assignedWorkerId, reviewed)} />
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <div className="job-next-step"><span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Next step</span><span className="mt-1 block text-sm font-black text-slate-800">{job.status === 'open' ? (hasApplications ? `Review ${applications.filter(app => app.jobId === job.id).length} applicants` : 'Wait for applications') : job.status === 'completed' && !reviewed ? 'Leave a review' : job.status === 'completion_requested_by_worker' ? 'Confirm job completion' : ['active', 'in_progress'].includes(job.status) ? 'Wait for the worker to finish' : 'Review job details'}</span></div>
-          {['active', 'in_progress'].includes(job.status) && (
-            <button
-              onClick={() => openConfirmation({
-                title: 'Request worker completion?',
-                description: `This asks the assigned worker to confirm the work for "${job.title}" is finished. Reviews unlock after the worker confirms.`,
-                confirmLabel: actionKey === `complete-${job.id}` ? 'Requesting...' : 'Request completion',
-                tone: 'neutral',
-                actionKey: `complete-${job.id}`,
-                onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_employer'),
-              })}
-              disabled={actionKey === `complete-${job.id}`} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#3b82f6] px-3 text-xs font-black text-white hover:bg-[#1e40af] disabled:cursor-not-allowed disabled:bg-brand-300"
-            >
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              {actionKey === `complete-${job.id}` ? 'Requesting...' : 'Request completion'}
-            </button>
-          )}
-          {job.status === 'completion_requested_by_employer' && <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">Waiting for the worker</span>}
-          {job.status === 'completion_requested_by_worker' && <><button onClick={() => openConfirmation({ title: 'Confirm job completion?', description: `Confirm that "${job.title}" is finished.`, confirmLabel: 'Confirm completion', tone: 'neutral', actionKey: `confirm-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completed') })} className="min-h-10 rounded-full bg-brand-600 px-3 text-xs font-black text-white">Confirm completion</button><button onClick={() => openConfirmation({ title: 'Report a completion issue?', description: 'The job will remain unresolved and the dispute will be recorded.', confirmLabel: 'Report issue', tone: 'danger', actionKey: `dispute-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_disputed') })} className="min-h-10 rounded-full border border-rose-200 px-3 text-xs font-black text-rose-700">Report issue</button></>}
-          {job.status === 'completed' && !reviewed && (
-            <button onClick={() => { const reviewWorker = getWorker(job.assignedWorkerId || accepted?.applicantId); if (reviewWorker) onViewWorkerProfile(reviewWorker); else onNavigate('workers'); }} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-600 px-3 text-xs font-black text-white hover:bg-brand-700">
-              <Star className="h-3.5 w-3.5" />
-              Leave review
-            </button>
-          )}
-          {job.status === 'completed' && reviewed && (
-            <span className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-50 px-3 text-xs font-black text-brand-700">
-              <Star className="h-3.5 w-3.5" />
-              Reviewed
-            </span>
-          )}
-          {job.status === 'open' && (
-            <button
-              onClick={() => openConfirmation({
-                title: 'Close this open job?',
-                description: `This stops new applications for "${job.title}".`,
-                confirmLabel: actionKey === `close-${job.id}` ? 'Closing...' : 'Close job',
-                tone: 'danger',
-                actionKey: `close-${job.id}`,
-                onConfirm: () => onUpdateJobStatus(job.id, 'closed'),
-              })}
-              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 hover:bg-slate-50"
-            >
-              {actionKey === `close-${job.id}` ? 'Closing...' : 'Close job'}
-            </button>
-          )}
-          <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-brand-700 px-3 text-xs font-black text-brand-800 hover:bg-brand-50">View details</button>
-          {hasApplications && job.status === 'open' && <button onClick={() => setActiveTab('applications')} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-brand-600 px-3 text-xs font-black text-white hover:bg-brand-700">View candidates</button>}
-        </div>
-      </article>
-    );
-  };
-
-  const renderWorkerProgressCard = ({ application, job }: { application: Application; job: Job }) => (
-    <article key={application.id} className="rounded-xl border border-brand-950/10 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="text-sm font-black text-slate-900">{job.title}</h3>
-          <p className="mt-1 text-xs font-medium text-slate-500">Employer: {job.employerName}</p>
-        </div>
-        {getJobStatusBadge(job.status)}
-      </div>
-      <Timeline steps={getTimelineSteps(job, true, true, reviews.some(review => review.jobId === job.id))} />
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {['active', 'in_progress'].includes(job.status) && <><span className="rounded-lg bg-[#93c5fd]/35 px-3 py-2 text-xs font-bold text-[#1e40af]">Active job</span><button onClick={() => openConfirmation({ title: 'Request job completion?', description: `Ask the employer to confirm that "${job.title}" is finished.`, confirmLabel: 'Request completion', tone: 'neutral', actionKey: `worker-request-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_worker') })} className="min-h-10 rounded-full bg-[#3b82f6] px-3 text-xs font-black text-white">Request completion</button></>}
-        {job.status === 'completed' && <span className="rounded-lg bg-brand-50 px-3 py-2 text-xs font-bold text-brand-700">Completed</span>}
-        <ContactActions phone={job.phone} label="Employer" whatsappMessage={`Hello, my name is ${currentUser.name}. I am contacting you through Qardho Skilled Platform regarding the job "${job.title}". My application has been accepted, and I would like to discuss the next steps.`} />
-        {job.status === 'completion_requested_by_employer' && (
-          <button
-            onClick={() => openConfirmation({ title: 'Confirm work completed?', description: `This confirms you finished "${job.title}". The employer can review the job after this.`, confirmLabel: actionKey === `worker-complete-${job.id}` ? 'Confirming...' : 'Confirm completed', tone: 'neutral', actionKey: `worker-complete-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completed') })}
-            disabled={actionKey === `worker-complete-${job.id}`}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-brand-600 px-3 text-xs font-black text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:bg-brand-300"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            {actionKey === `worker-complete-${job.id}` ? 'Confirming...' : 'Confirm completed'}
-          </button>
-        )}
-        {job.status === 'completion_requested_by_employer' && <button onClick={() => openConfirmation({ title: 'Report a completion issue?', description: 'The job will remain unresolved and the issue will be recorded.', confirmLabel: 'Report issue', tone: 'danger', actionKey: `worker-dispute-${job.id}`, onConfirm: () => onUpdateJobStatus(job.id, 'completion_disputed') })} className="min-h-10 rounded-full border border-rose-200 px-3 text-xs font-black text-rose-700">Report issue</button>}
-        {job.status === 'completion_requested_by_worker' && <span className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-bold text-amber-700">Waiting for the employer</span>}
-        <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 hover:bg-slate-50">View related job</button>
-      </div>
-    </article>
-  );
-
-
+  // Tab counts
   const tabCounts = {
-    progress: isWorker ? workerProgressItems.length : employerProgressJobs.length,
-    connections: myConnections.length,
+    progress: isWorker
+      ? allWorkerProgressItems.length
+      : myPostedJobs.filter(j => ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer'].includes(j.status)).length,
     applications: myApplications.length,
+    connections: myConnections.length,
     jobs: myPostedJobs.length,
+    completed: isWorker
+      ? allWorkerProgressItems.filter(item => item.job.status === 'completed' || item.job.status === 'closed').length
+      : myPostedJobs.filter(j => j.status === 'completed' || j.status === 'closed').length,
+  };
+
+  // Convert Worker Active Work items to WorkItemData
+  const activeWorkCards: WorkItemData[] = useMemo(() => {
+    if (!isWorker) return [];
+    return allWorkerProgressItems.map(item => {
+      const job = item.job;
+      const app = item.application;
+      const conn = item.connection;
+      const isActionReq = job.status === 'completion_requested_by_employer';
+      const workerReviewed = hasWorkerReviewedJob(job.id);
+      const employerReviewed = hasEmployerReviewedJob(job.id);
+
+      let status: DisplayStatus = 'active';
+      let statusLabel = 'Active Work';
+      let nextStepText = 'Finish the work or request completion.';
+
+      if (isActionReq) {
+        status = 'needs_action';
+        statusLabel = 'Action Required';
+        nextStepText = 'Employer requested completion. Please confirm or report issue.';
+      } else if (job.status === 'completion_requested_by_worker') {
+        status = 'completion_requested';
+        statusLabel = 'Completion Requested';
+        nextStepText = 'Waiting for employer to confirm job completion.';
+      } else if (job.status === 'completed' || job.status === 'closed') {
+        if (!workerReviewed && !employerReviewed) {
+          status = 'review_pending';
+          statusLabel = 'Review Pending';
+          nextStepText = 'Rate your experience with this employer to close the work.';
+        } else if (workerReviewed && !employerReviewed) {
+          status = 'review_pending';
+          statusLabel = 'Review Pending';
+          nextStepText = 'Your review was submitted. Waiting for employer review.';
+        } else if (!workerReviewed && employerReviewed) {
+          status = 'review_pending';
+          statusLabel = 'Review Pending';
+          nextStepText = 'Rate your experience with this employer to close the work.';
+        } else {
+          status = 'closed';
+          statusLabel = 'Closed';
+          nextStepText = 'Both reviews were submitted. Work engagement closed.';
+        }
+      } else if (job.status === 'completion_disputed') {
+        status = 'disputed';
+        statusLabel = 'Completion Disputed';
+        nextStepText = 'Work completion is currently under dispute.';
+      }
+
+      // Primary Action
+      let primaryAction;
+      if (job.status === 'active' || job.status === 'in_progress') {
+        primaryAction = {
+          label: 'Request Completion',
+          icon: CheckCircle2,
+          variant: 'primary' as const,
+          isLoading: actionKey === `worker-request-${job.id}`,
+          onClick: () => openConfirmation({
+            title: 'Request job completion?',
+            description: `Ask employer "${job.employerName}" to confirm "${job.title}" is finished.`,
+            confirmLabel: 'Request completion',
+            tone: 'neutral',
+            actionKey: `worker-request-${job.id}`,
+            onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_worker'),
+          }),
+        };
+      } else if (isActionReq) {
+        primaryAction = {
+          label: 'Confirm Completion',
+          icon: CheckCircle2,
+          variant: 'success' as const,
+          isLoading: actionKey === `worker-complete-${job.id}`,
+          onClick: () => openConfirmation({
+            title: 'Confirm work completed?',
+            description: `This confirms you finished "${job.title}". The employer can review after this.`,
+            confirmLabel: 'Confirm completed',
+            tone: 'neutral',
+            actionKey: `worker-complete-${job.id}`,
+            onConfirm: () => onUpdateJobStatus(job.id, 'completed'),
+          }),
+        };
+      } else if ((job.status === 'completed' || job.status === 'closed') && !workerReviewed) {
+        primaryAction = {
+          label: 'Rate Employer',
+          icon: Star,
+          variant: 'warning' as const,
+          onClick: () => {
+            setSelectedEmployerReviewJob({
+              job,
+              sourceBadge: item.source === 'direct_offers' ? 'Direct Offer' : 'Job Application'
+            });
+          },
+        };
+      }
+
+      // Secondary actions
+      const secondaryActions = [];
+      if (isActionReq) {
+        secondaryActions.push({
+          label: 'Report Issue',
+          icon: AlertCircle,
+          tone: 'danger' as const,
+          isMoreMenuOnly: true,
+          onClick: () => openConfirmation({
+            title: 'Report a completion issue?',
+            description: 'The job will remain unresolved and the issue will be recorded.',
+            confirmLabel: 'Report issue',
+            tone: 'danger',
+            actionKey: `worker-dispute-${job.id}`,
+            onConfirm: () => onUpdateJobStatus(job.id, 'completion_disputed'),
+          }),
+        });
+      }
+
+      const formattedDate = job.createdAt
+        ? new Date(job.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : 'Jul 29';
+
+      return {
+        id: job.id,
+        type: 'active_work',
+        title: job.title,
+        sourceBadge: item.source === 'direct_offers' ? 'Direct Offer' : 'Job Application',
+        otherPartyName: job.employerName,
+        otherPartyRole: 'Employer',
+        otherPartyId: job.employerId,
+        location: job.location || 'Qardho',
+        rate: job.rate,
+        workType: item.source === 'direct_offers' ? 'Direct Work' : 'Contract',
+        message: conn?.message || app?.message || job.description,
+        dateStr: `Started ${formattedDate}`,
+        status,
+        statusLabel,
+        nextStepText,
+        phone: job.phone || conn?.phone || app?.phone,
+        isContactUnlocked: true,
+        agreedAmount: conn?.agreedAmount || job.rate,
+        expectedTimeline: conn?.expectedTimeline || job.expectedDuration,
+        isAgreementConfirmed: true,
+        workflowSteps: [
+          { key: 'posted', label: 'Posted', isDone: true },
+          { key: 'accepted', label: 'Accepted', isDone: true },
+          { key: 'active', label: 'Active Work', isDone: ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer', 'completed'].includes(job.status), isCurrent: ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer'].includes(job.status) },
+          { key: 'completed', label: 'Completed', isDone: job.status === 'completed' || job.status === 'closed', isCurrent: (job.status === 'completed' || job.status === 'closed') && !workerReviewed },
+          { key: 'reviewed', label: 'Reviewed', isDone: workerReviewed },
+        ],
+        primaryAction,
+        secondaryActions,
+        job,
+        application: app || undefined,
+        connection: conn || undefined,
+      };
+    });
+  }, [allWorkerProgressItems, isWorker, actionKey, reviews]);
+
+  // Convert Applications to WorkItemData (Worker & Employer)
+  const applicationCards: WorkItemData[] = useMemo(() => {
+    return myApplications.map(app => {
+      const job = getJobForApplication(app);
+      const formattedDate = app.createdAt
+        ? new Date(app.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : 'Jul 29';
+
+      let status: DisplayStatus = 'under_review';
+      let statusLabel = isWorker ? 'Under Review' : 'Needs Review';
+      let nextStepText = isWorker ? 'Waiting for employer to review application.' : 'Review this application and make a decision.';
+
+      if (!isWorker && app.status === 'pending') {
+        status = 'needs_action';
+        statusLabel = 'Needs Review';
+        nextStepText = 'Review this application and make a decision.';
+      } else if (app.status === 'accepted') {
+        status = 'accepted';
+        statusLabel = isWorker ? 'Accepted' : 'Candidate Hired';
+        nextStepText = isWorker ? 'Your application was accepted! Check Active Work for details.' : 'Candidate hired. Contact worker or check Active Work.';
+      } else if (app.status === 'declined') {
+        status = 'not_selected';
+        statusLabel = isWorker ? 'Not Selected' : 'Rejected';
+        nextStepText = isWorker ? 'Application was not selected by employer.' : 'Application was rejected.';
+      }
+
+      let primaryAction;
+      if (isWorker) {
+        if (app.status === 'accepted') {
+          primaryAction = {
+            label: 'View Active Work',
+            icon: ArrowRight,
+            variant: 'primary' as const,
+            onClick: () => setActiveTab('progress'),
+          };
+        }
+      } else {
+        if (app.status === 'pending') {
+          primaryAction = {
+            label: 'Review Application',
+            icon: FileText,
+            variant: 'primary' as const,
+            onClick: () => setSelectedApplication(app),
+          };
+        } else if (app.status === 'accepted') {
+          primaryAction = {
+            label: 'View Active Work',
+            icon: ArrowRight,
+            variant: 'primary' as const,
+            onClick: () => setActiveTab('progress'),
+          };
+        }
+      }
+
+      return {
+        id: app.id,
+        type: 'application',
+        title: app.jobTitle,
+        sourceBadge: 'Job Application',
+        otherPartyName: isWorker ? (job?.employerName || 'Employer') : app.applicantName,
+        otherPartyRole: isWorker ? 'Employer' : 'Worker',
+        otherPartyId: isWorker ? app.employerId : app.applicantId,
+        location: app.location || 'Qardho',
+        rate: app.proposedAmount ? `$${app.proposedAmount}/${app.proposedPricingType || 'project'}` : job?.rate,
+        workType: isWorker ? 'Contract' : (app.applicantSkill || 'Skilled Worker'),
+        message: app.message,
+        dateStr: `Submitted ${formattedDate}`,
+        status,
+        statusLabel,
+        nextStepText,
+        phone: app.phone,
+        isContactUnlocked: app.status === 'accepted',
+        workflowSteps: [
+          { key: 'submitted', label: 'Submitted', isDone: true },
+          { key: 'review', label: 'Under Review', isDone: true, isCurrent: app.status === 'pending' },
+          { key: 'decision', label: app.status === 'declined' ? (isWorker ? 'Not Selected' : 'Rejected') : 'Accepted', isDone: app.status !== 'pending', isCurrent: app.status === 'accepted' },
+          { key: 'active', label: 'Active Work', isDone: app.status === 'accepted' },
+        ],
+        primaryAction,
+        secondaryActions: !isWorker ? [
+          {
+            label: 'View Worker Profile',
+            icon: UserIcon,
+            onClick: () => {
+              const workerObj = getWorker(app.applicantId);
+              if (workerObj) onViewWorkerProfile(workerObj);
+            },
+          },
+          ...(app.status === 'pending' ? [
+            {
+              label: 'Accept & Hire Candidate',
+              icon: Check,
+              onClick: () => openConfirmation({
+                title: 'Accept & Hire this candidate?',
+                description: `This will hire ${app.applicantName}, move "${app.jobTitle}" to in progress, and notify candidate.`,
+                confirmLabel: actionKey === `accept-app-${app.id}` ? 'Accepting...' : 'Accept & Hire candidate',
+                tone: 'neutral' as const,
+                actionKey: `accept-app-${app.id}`,
+                onConfirm: () => onUpdateApplicationStatus(app.id, 'accepted')
+              }),
+            },
+            {
+              label: 'Reject Application',
+              icon: X,
+              tone: 'danger' as const,
+              onClick: () => openConfirmation({
+                title: 'Reject candidate application?',
+                description: `This will mark ${app.applicantName}'s application for "${app.jobTitle}" as rejected.`,
+                confirmLabel: 'Reject application',
+                tone: 'danger' as const,
+                actionKey: `decline-app-${app.id}`,
+                onConfirm: () => onUpdateApplicationStatus(app.id, 'declined')
+              }),
+            }
+          ] : [])
+        ] : [],
+        application: app,
+        job,
+      };
+    });
+  }, [myApplications, isWorker, actionKey]);
+
+  // Convert Direct Offers (Connections) to WorkItemData
+  const directOfferCards: WorkItemData[] = useMemo(() => {
+    return myConnections.map(conn => {
+      const formattedDate = conn.createdAt
+        ? new Date(conn.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : 'Jul 29';
+
+      const isPending = conn.status === 'pending' || conn.status === 'pending_worker_response';
+
+      let status: DisplayStatus = 'under_review';
+      let statusLabel = 'Waiting';
+      let nextStepText = 'Waiting for response.';
+
+      if (isPending) {
+        status = isWorker ? 'needs_action' : 'under_review';
+        statusLabel = isWorker ? 'Needs Response' : 'Waiting for Worker';
+        nextStepText = isWorker ? 'Employer sent a direct offer. Accept to unlock contact details.' : 'Waiting for worker to accept your direct offer.';
+      } else if (conn.status === 'accepted') {
+        status = 'accepted';
+        statusLabel = 'Offer Accepted';
+        nextStepText = 'Offer accepted. Work agreement confirmed & contact unlocked.';
+      } else if (conn.status === 'declined') {
+        status = 'declined';
+        statusLabel = 'Offer Declined';
+        nextStepText = isWorker ? 'You declined this direct offer.' : 'Worker declined this direct offer.';
+      } else if (conn.status === 'cancelled_by_employer') {
+        status = 'cancelled';
+        statusLabel = 'Cancelled';
+        nextStepText = isWorker ? 'Offer was cancelled by employer.' : 'You cancelled this direct offer.';
+      } else if (conn.status === 'expired') {
+        status = 'expired';
+        statusLabel = 'Expired';
+        nextStepText = 'Direct offer expired.';
+      }
+
+      let primaryAction;
+      if (isWorker && isPending) {
+        primaryAction = {
+          label: 'Accept Offer',
+          icon: Check,
+          variant: 'success' as const,
+          isLoading: actionKey === `accept-conn-${conn.id}`,
+          onClick: () => openConfirmation({
+            title: 'Accept this hire request?',
+            description: `Allowed contact information may be shared with ${conn.fromUserName}.`,
+            confirmLabel: actionKey === `accept-conn-${conn.id}` ? 'Accepting...' : 'Accept Request',
+            tone: 'neutral',
+            actionKey: `accept-conn-${conn.id}`,
+            onConfirm: () => onUpdateConnectionStatus(conn.id, 'accepted')
+          }),
+        };
+      } else if (conn.status === 'accepted') {
+        primaryAction = {
+          label: isWorker ? 'View Active Work' : 'Contact Participant',
+          icon: isWorker ? ArrowRight : Phone,
+          variant: 'primary' as const,
+          onClick: () => isWorker ? setActiveTab('progress') : null,
+        };
+      } else if (!isWorker && isPending) {
+        primaryAction = {
+          label: 'View Worker Profile',
+          icon: UserIcon,
+          variant: 'primary' as const,
+          onClick: () => {
+            const w = getWorker(conn.toUserId);
+            if (w) onViewWorkerProfile(w);
+          },
+        };
+      }
+
+      const secondaryActions = [];
+      if (isWorker && isPending) {
+        secondaryActions.push({
+          label: 'Decline Offer',
+          icon: X,
+          tone: 'danger' as const,
+          onClick: () => {
+            setDeclineModalConnection(conn);
+            setDeclineReason('');
+          },
+        });
+      }
+
+      return {
+        id: conn.id,
+        type: 'direct_offer',
+        title: conn.jobTitle || 'Direct Work Opportunity',
+        sourceBadge: 'Direct Offer',
+        otherPartyName: isWorker ? conn.fromUserName : conn.toUserName,
+        otherPartyRole: isWorker ? 'Employer' : 'Worker',
+        otherPartyId: isWorker ? conn.fromUserId : conn.toUserId,
+        location: 'Qardho',
+        agreedAmount: conn.agreedAmount,
+        expectedTimeline: conn.expectedTimeline,
+        message: conn.message,
+        dateStr: `Updated ${formattedDate}`,
+        status,
+        statusLabel,
+        nextStepText,
+        phone: conn.phone,
+        isContactUnlocked: conn.status === 'accepted',
+        isAgreementConfirmed: conn.status === 'accepted',
+        workflowSteps: [
+          { key: 'sent', label: 'Offer Sent', isDone: true },
+          { key: 'response', label: 'Worker Response', isDone: !isPending, isCurrent: isPending },
+          { key: 'contact', label: 'Contact Unlocked', isDone: conn.status === 'accepted' },
+          { key: 'active', label: 'Active Work', isDone: conn.status === 'accepted' },
+        ],
+        primaryAction,
+        secondaryActions,
+        connection: conn,
+      };
+    });
+  }, [myConnections, isWorker, actionKey]);
+
+  // Employer Posted Jobs & Engagements mapped to WorkItemData
+  const employerJobCards: WorkItemData[] = useMemo(() => {
+    if (isWorker) return [];
+    return myPostedJobs.map(job => {
+      const acceptedApp = applications.find(app => app.jobId === job.id && app.status === 'accepted');
+      const reviewed = isJobReviewed(job);
+      const workerName = job.assignedWorkerName || acceptedApp?.applicantName;
+      const jobAppsCount = applications.filter(app => app.jobId === job.id).length;
+
+      let status: DisplayStatus = 'active';
+      let statusLabel = 'Open';
+      let nextStepText = 'Review applicants or wait for applications.';
+
+      if (job.status === 'open') {
+        status = 'under_review';
+        statusLabel = 'Open';
+        nextStepText = jobAppsCount > 0 ? `Review ${jobAppsCount} applicant${jobAppsCount === 1 ? '' : 's'}` : 'Waiting for applications.';
+      } else if (job.status === 'active' || job.status === 'in_progress') {
+        status = 'active';
+        statusLabel = 'Active Work';
+        nextStepText = 'Wait for worker to finish or request completion.';
+      } else if (job.status === 'completion_requested_by_worker') {
+        status = 'needs_action';
+        statusLabel = 'Action Required';
+        nextStepText = 'Worker requested job completion. Confirm work done or report issue.';
+      } else if (job.status === 'completion_requested_by_employer') {
+        status = 'completion_requested';
+        statusLabel = 'Completion Requested';
+        nextStepText = 'Waiting for worker to confirm completion.';
+      } else if (job.status === 'completed') {
+        if (!reviewed) {
+          status = 'review_pending';
+          statusLabel = 'Review Pending';
+          nextStepText = 'Rate the worker to close this engagement.';
+        } else {
+          status = 'completed';
+          statusLabel = 'Completed';
+          nextStepText = 'Your review was submitted. Engagement closed.';
+        }
+      }
+
+      let primaryAction;
+      if (job.status === 'completion_requested_by_worker') {
+        primaryAction = {
+          label: 'Confirm Completion',
+          icon: CheckCircle2,
+          variant: 'success' as const,
+          onClick: () => openConfirmation({
+            title: 'Confirm job completion?',
+            description: `Confirm "${job.title}" is finished.`,
+            confirmLabel: 'Confirm completion',
+            tone: 'neutral',
+            actionKey: `confirm-${job.id}`,
+            onConfirm: () => onUpdateJobStatus(job.id, 'completed')
+          }),
+        };
+      } else if (['active', 'in_progress'].includes(job.status)) {
+        primaryAction = {
+          label: 'Request Completion',
+          icon: CheckCircle2,
+          variant: 'primary' as const,
+          onClick: () => openConfirmation({
+            title: 'Request worker completion?',
+            description: `Ask assigned worker to confirm "${job.title}" is finished.`,
+            confirmLabel: 'Request completion',
+            tone: 'neutral',
+            actionKey: `complete-${job.id}`,
+            onConfirm: () => onUpdateJobStatus(job.id, 'completion_requested_by_employer')
+          }),
+        };
+      } else if (job.status === 'completed' && !reviewed) {
+        primaryAction = {
+          label: 'Rate Worker',
+          icon: Star,
+          variant: 'warning' as const,
+          onClick: () => {
+            const reviewWorker = getWorker(job.assignedWorkerId || acceptedApp?.applicantId);
+            if (reviewWorker) onViewWorkerProfile(reviewWorker);
+            else onNavigate('workers');
+          },
+        };
+      } else if (job.status === 'open' && jobAppsCount > 0) {
+        primaryAction = {
+          label: 'Review Applicants',
+          icon: Users,
+          variant: 'primary' as const,
+          onClick: () => setActiveTab('applications'),
+        };
+      }
+
+      return {
+        id: job.id,
+        type: 'active_work',
+        title: job.title,
+        sourceBadge: 'Job Application',
+        otherPartyName: workerName || 'No worker accepted yet',
+        otherPartyRole: 'Worker',
+        otherPartyId: job.assignedWorkerId || acceptedApp?.applicantId,
+        location: job.location || 'Qardho',
+        rate: job.rate,
+        workType: job.category || 'Local Work',
+        message: job.description,
+        dateStr: `Posted ${new Date(job.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+        status,
+        statusLabel,
+        nextStepText,
+        phone: job.phone || acceptedApp?.phone,
+        isContactUnlocked: !!workerName,
+        workflowSteps: [
+          { key: 'posted', label: 'Posted', isDone: true },
+          { key: 'active', label: 'Active', isDone: ['active', 'in_progress', 'completion_requested_by_worker', 'completion_requested_by_employer', 'completed'].includes(job.status) },
+          { key: 'completed', label: 'Completed', isDone: job.status === 'completed' },
+          { key: 'reviewed', label: 'Reviewed', isDone: reviewed },
+        ],
+        primaryAction,
+        job,
+      };
+    });
+  }, [myPostedJobs, isWorker, applications, actionKey, reviews]);
+
+  // Current active cards dataset based on active tab
+  const currentTabItems: WorkItemData[] = useMemo(() => {
+    if (activeTab === 'progress') {
+      return isWorker
+        ? activeWorkCards
+        : employerJobCards.filter(c => ['active', 'in_progress', 'completion_requested', 'needs_action'].includes(c.status));
+    } else if (activeTab === 'applications') {
+      return applicationCards;
+    } else if (activeTab === 'connections') {
+      return directOfferCards;
+    } else if (activeTab === 'jobs') {
+      return employerJobCards;
+    } else if (activeTab === 'completed') {
+      return isWorker
+        ? activeWorkCards.filter(c => c.job?.status === 'completed' || c.status === 'completed' || c.status === 'review_pending')
+        : employerJobCards.filter(c => c.job?.status === 'completed' || c.status === 'completed' || c.status === 'review_pending');
+    }
+    return [];
+  }, [activeTab, isWorker, activeWorkCards, applicationCards, directOfferCards, employerJobCards]);
+
+  // Needs Action Count across all active items
+  const totalNeedsActionCount = useMemo(() => {
+    const allCards = isWorker
+      ? [...activeWorkCards, ...applicationCards, ...directOfferCards]
+      : [...employerJobCards, ...applicationCards, ...directOfferCards];
+    return allCards.filter(c => c.status === 'needs_action' || c.status === 'review_pending').length;
+  }, [isWorker, activeWorkCards, applicationCards, directOfferCards, employerJobCards]);
+
+  // Filtered & Sorted items for display
+  const filteredItems = useMemo(() => {
+    return currentTabItems.filter(item => {
+      // Search query match
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const titleMatch = item.title.toLowerCase().includes(q);
+        const nameMatch = item.otherPartyName.toLowerCase().includes(q);
+        const locMatch = item.location.toLowerCase().includes(q);
+        if (!titleMatch && !nameMatch && !locMatch) return false;
+      }
+
+      // Source filter match
+      if (sourceFilter === 'direct_offers' && item.sourceBadge !== 'Direct Offer') return false;
+      if (sourceFilter === 'applications' && item.sourceBadge !== 'Job Application') return false;
+
+      // Status filter match
+      if (statusFilter === 'needs_action' && item.status !== 'needs_action' && item.status !== 'review_pending') return false;
+      if (statusFilter === 'waiting' && item.status !== 'under_review' && item.status !== 'pending') return false;
+      if (statusFilter === 'active' && item.status !== 'active' && item.status !== 'in_progress') return false;
+      if (statusFilter === 'completion_requested' && item.status !== 'completion_requested') return false;
+      if (statusFilter === 'review_pending' && item.status !== 'review_pending') return false;
+      if (statusFilter === 'completed' && item.status !== 'completed') return false;
+      if (statusFilter === 'closed' && item.status !== 'closed' && item.status !== 'not_selected' && item.status !== 'declined') return false;
+
+      return true;
+    }).sort((a, b) => {
+      if (sortOrder === 'urgency') {
+        const getUrgencyRank = (status: string) => {
+          if (status === 'needs_action') return 1;
+          if (status === 'review_pending') return 2;
+          if (status === 'active' || status === 'in_progress') return 3;
+          if (status === 'under_review' || status === 'completion_requested') return 4;
+          if (status === 'completed') return 5;
+          return 6;
+        };
+        return getUrgencyRank(a.status) - getUrgencyRank(b.status);
+      }
+
+      if (sortOrder === 'oldest') {
+        return a.id.localeCompare(b.id);
+      }
+
+      // Default newest first
+      return b.id.localeCompare(a.id);
+    });
+  }, [currentTabItems, searchQuery, statusFilter, sourceFilter, sortOrder]);
+
+  // Paginated items
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, currentPage, pageSize]);
+
+  // Handle Tab Switch
+  const handleTabChange = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
   };
 
   const NeedsAttentionCard = ({ title, detail, action, onClick, tone = 'blue' }: { title: string; detail: string; action: string; onClick: () => void; tone?: 'blue' | 'amber' | 'brand' }) => {
@@ -343,23 +796,25 @@ export default function Dashboard({
       </button>
     );
   };
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" id="dashboard-container">
+    <div className="mx-auto max-w-[1140px] px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 pb-[calc(90px+env(safe-area-inset-bottom))] min-w-0" id="dashboard-container">
+      {/* Header Banner */}
       <div className="mb-8 flex flex-col gap-5 rounded-2xl bg-[#111615] p-6 text-white shadow-xl shadow-brand-950/15 sm:p-8 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
-            <h1 className="font-display text-xl font-black sm:text-2xl">My Dashboard Panel</h1>
+            <h1 className="font-display text-xl font-black sm:text-2xl">Dashboard</h1>
             <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider ${isWorker ? 'bg-brand-500/20 text-brand-300' : 'bg-indigo-500/20 text-indigo-300'}`}>
               {isWorker ? 'Skilled Worker' : 'Employer'}
             </span>
           </div>
           <p className="text-xs text-slate-400 sm:text-sm">
-            {isWorker ? 'Track applications, active jobs, and completed work.' : 'Manage applicants, active jobs, completion, and reviews.'}
+            {isWorker ? 'Track active work, applications, and direct hire offers efficiently.' : 'Manage applicants, active jobs, completion, and worker reviews.'}
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           {!isWorker && (
-            <button onClick={() => onNavigate('post-job')} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#93c5fd] px-4 py-2.5 text-xs font-black text-[#111615] hover:bg-[#c8ff74]">
+            <button onClick={() => onNavigate('post-job')} className="inline-flex items-center justify-center gap-2 rounded-full bg-[#93c5fd] px-4 py-2.5 text-xs font-black text-[#111615] hover:bg-[#c8ff74] transition">
               <PlusCircle className="h-4 w-4 text-[#1e40af]" />
               Post a Job
             </button>
@@ -379,26 +834,27 @@ export default function Dashboard({
         </section>
       )}
 
+      {/* Next Actions Urgent Cards */}
       <section className="mb-8">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-black uppercase tracking-wider text-slate-500">Next Actions</h2>
-          <span className="text-xs font-semibold text-slate-400">Your next useful actions</span>
+          <h2 className="text-xs font-black uppercase tracking-wider text-slate-500">Urgent Next Actions</h2>
+          <span className="text-xs font-semibold text-slate-400">Items requiring your attention</span>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {pendingApplications > 0 && (
-            <NeedsAttentionCard title={`${pendingApplications} ${isWorker ? 'application' : 'candidate'}${pendingApplications === 1 ? '' : 's'} waiting`} detail={isWorker ? 'Waiting for employer response.' : 'Review applicants and hire one worker.'} action={isWorker ? 'View status' : 'Review candidates'} onClick={() => setActiveTab('applications')} tone="amber" />
+            <NeedsAttentionCard title={`${pendingApplications} ${isWorker ? 'application' : 'candidate'}${pendingApplications === 1 ? '' : 's'} waiting`} detail={isWorker ? 'Waiting for employer response.' : 'Review applicants and hire one worker.'} action={isWorker ? 'View status' : 'Review candidates'} onClick={() => handleTabChange('applications')} tone="amber" />
           )}
           {pendingConnections > 0 && (
-            <NeedsAttentionCard title={`${pendingConnections} hire request${pendingConnections === 1 ? '' : 's'}`} detail={isWorker ? 'Accept to reveal contact details.' : 'Waiting for worker response.'} action="Open requests" onClick={() => setActiveTab('connections')} />
+            <NeedsAttentionCard title={`${pendingConnections} hire request${pendingConnections === 1 ? '' : 's'}`} detail={isWorker ? 'Accept to reveal contact details.' : 'Waiting for worker response.'} action="Open requests" onClick={() => handleTabChange('connections')} />
           )}
           {completionRequests > 0 && (
-            <NeedsAttentionCard title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`} detail={isWorker ? 'The other participant requested completion.' : 'Waiting for the other participant.'} action="Open progress" onClick={() => setActiveTab(isWorker ? 'progress' : 'jobs')} tone="brand" />
+            <NeedsAttentionCard title={`${completionRequests} completion confirmation${completionRequests === 1 ? '' : 's'}`} detail={isWorker ? 'The other participant requested completion.' : 'Waiting for the other participant.'} action="Open progress" onClick={() => handleTabChange(isWorker ? 'progress' : 'jobs')} tone="brand" />
           )}
           {activeJobsCount > 0 && (
-            <NeedsAttentionCard title={`${activeJobsCount} active job${activeJobsCount === 1 ? '' : 's'}`} detail={isWorker ? 'Keep contact details handy.' : 'Request completion when finished.'} action="Open progress" onClick={() => setActiveTab('progress')} />
+            <NeedsAttentionCard title={`${activeJobsCount} active job${activeJobsCount === 1 ? '' : 's'}`} detail={isWorker ? 'Keep contact details handy.' : 'Request completion when finished.'} action="Open progress" onClick={() => handleTabChange('progress')} />
           )}
           {!isWorker && reviewReadyJobs.length > 0 && (
-            <NeedsAttentionCard title={`${reviewReadyJobs.length} review${reviewReadyJobs.length === 1 ? '' : 's'} needed`} detail="Completed jobs are waiting for feedback." action="Leave review" onClick={() => setActiveTab('progress')} tone="brand" />
+            <NeedsAttentionCard title={`${reviewReadyJobs.length} review${reviewReadyJobs.length === 1 ? '' : 's'} needed`} detail="Completed jobs are waiting for feedback." action="Rate worker" onClick={() => handleTabChange('completed')} tone="brand" />
           )}
           {missingProfileFields.length > 0 && (
             <NeedsAttentionCard title="Profile incomplete" detail={`Missing: ${missingProfileFields.slice(0, 3).join(', ')}${missingProfileFields.length > 3 ? '...' : ''}`} action="Complete profile" onClick={() => onNavigate('profile')} tone="amber" />
@@ -432,163 +888,121 @@ export default function Dashboard({
           </div>
         </section>
       )}
-      {!verificationMessage && missingProfileFields.length > 0 && (
-        <section className="mb-8 rounded-xl border border-amber-100 bg-amber-50 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-sm font-black text-amber-950">Complete your profile</h2>
-              <p className="mt-1 text-xs font-semibold text-amber-800">Add {missingProfileFields.join(', ')} so people can trust your account and contact you.</p>
-            </div>
-            <button onClick={() => onNavigate('profile')} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-amber-600 px-4 text-xs font-black text-white hover:bg-amber-700">Complete profile</button>
-          </div>
-        </section>
-      )}
 
-      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {/* Metrics Row */}
+      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { label: isWorker ? 'Pending Hire Requests' : 'Pending Connections', value: pendingConnections },
-          { label: isWorker ? 'Waiting Applications' : 'Candidates Waiting', value: pendingApplications },
-          { label: isWorker ? 'Active Jobs' : 'Open Jobs', value: isWorker ? activeJobsCount : openJobs },
-          { label: 'Completed Jobs', value: isWorker ? workerProgressItems.filter(item => item.job.status === 'completed').length : completedJobs },
+          { label: isWorker ? 'Active Work' : 'Active Work', value: isWorker ? activeJobsCount : activeJobsCount },
+          { label: isWorker ? 'Applications Sent' : 'Applications Received', value: pendingApplications },
+          { label: isWorker ? 'Pending Direct Offers' : 'Direct Offers Sent', value: pendingConnections },
+          { label: 'Completed Work', value: isWorker ? allWorkerProgressItems.filter(item => item.job.status === 'completed').length : completedJobs },
         ].map(metric => (
-          <div key={metric.label} className="py-1">
-            <span className="block text-xs font-black uppercase tracking-wider text-slate-500">{metric.label}</span>
-            <span className="mt-1 block text-3xl font-black text-slate-900">{metric.value}</span>
+          <div key={metric.label} className="p-3.5">
+            <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">{metric.label}</span>
+            <span className="mt-1 block text-2xl font-black text-slate-900">{metric.value}</span>
           </div>
         ))}
       </div>
 
-      <div className="sticky top-[104px] z-30 -mx-4 mb-6 flex gap-2 overflow-x-auto border-y border-brand-950/10 bg-[#f6fbf8]/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:flex-wrap sm:border-b sm:border-t-0 sm:bg-transparent sm:px-0 sm:pb-3 sm:pt-0">
+      {/* COMPACT DASHBOARD TAB BUTTONS WITH COUNTS */}
+      <div className="sticky top-[104px] z-30 mb-6 flex items-center gap-2 overflow-x-auto border-b border-slate-200 bg-[#f6fbf8]/95 pb-3 backdrop-blur sm:static sm:bg-transparent">
         {[
-          ...(isWorker ? [{ key: 'progress' as const, label: 'Job Progress' }] : []),
-          { key: 'applications' as const, label: isWorker ? 'Applications' : 'Candidates' },
-          { key: 'connections' as const, label: isWorker ? 'Hire Requests' : 'Connections' },
+          { key: 'progress' as const, label: 'Active Work' },
+          { key: 'applications' as const, label: isWorker ? 'Applications' : 'Applications Received' },
+          { key: 'connections' as const, label: isWorker ? 'Direct Offers' : 'Direct Offers Sent' },
           ...(!isWorker ? [{ key: 'jobs' as const, label: 'Posted Jobs' }] : []),
-        ].map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)} aria-selected={activeTab === tab.key} className={`min-w-[120px] min-h-12 shrink-0 rounded-full border px-5 py-3 text-sm font-black transition sm:flex-1 ${activeTab === tab.key ? 'border-[#3b82f6] bg-[#3b82f6] text-white shadow-md shadow-brand-500/10' : 'border-brand-950/10 bg-white text-slate-700 hover:bg-brand-50 hover:text-[#1e40af]'}`}>
-            {tab.label} ({tabCounts[tab.key]})
-          </button>
-        ))}
+          { key: 'completed' as const, label: 'Completed' },
+        ].map(tab => {
+          const isActive = activeTab === tab.key;
+          const count = tabCounts[tab.key];
+          return (
+            <button
+              key={tab.key}
+              onClick={() => handleTabChange(tab.key)}
+              aria-selected={isActive}
+              className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition sm:text-sm ${
+                isActive
+                  ? 'border-blue-600 bg-blue-600 text-white shadow-xs'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-blue-700'
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-black ${
+                isActive ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {isWorker && activeTab === 'progress' && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-blue-600" />
-              <h2 className="text-base font-bold text-slate-900">Job Progress</h2>
-            </div>
-          </div>
-          {isWorker ? (
-            workerProgressItems.length > 0 ? workerProgressItems.map(renderWorkerProgressCard) : (
-              <div className="rounded-xl border border-slate-100 bg-white py-12 text-center">
-                <Briefcase className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                <p className="text-xs font-medium text-slate-500">No matching jobs yet. Accepted jobs will appear here after an employer hires you.</p>
-                <button onClick={() => onNavigate('jobs')} className="mt-2 text-xs font-semibold text-blue-600 hover:underline">Browse jobs</button>
-              </div>
-            )
-          ) : (
-            employerProgressJobs.length > 0 ? employerProgressJobs.map(renderEmployerProgressCard) : (
-              <div className="rounded-xl border border-slate-100 bg-white py-12 text-center">
-                <Briefcase className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                <p className="text-xs font-medium text-slate-500">No matching posted jobs. Post a job or adjust the filter.</p>
-                <button onClick={() => onNavigate('post-job')} className="mt-2 text-xs font-semibold text-blue-600 hover:underline">Post a job</button>
-              </div>
-            )
-          )}
-        </section>
-      )}
+      {/* SEARCH, FILTERS & SORTING BAR */}
+      <FiltersBar
+        searchQuery={searchQuery}
+        onSearchChange={(q) => { setSearchQuery(q); setCurrentPage(1); }}
+        statusFilter={statusFilter}
+        onStatusFilterChange={(s) => { setStatusFilter(s); setCurrentPage(1); }}
+        sourceFilter={sourceFilter}
+        onSourceFilterChange={(src) => { setSourceFilter(src); setCurrentPage(1); }}
+        sortOrder={sortOrder}
+        onSortOrderChange={(sort) => { setSortOrder(sort); setCurrentPage(1); }}
+        needsActionCount={totalNeedsActionCount}
+        totalCount={currentTabItems.length}
+        onResetFilters={() => {
+          setSearchQuery('');
+          setStatusFilter('all');
+          setSourceFilter('all');
+          setSortOrder('newest');
+          setCurrentPage(1);
+        }}
+      />
 
-      {activeTab === 'connections' && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-600" />
-              <h2 className="text-base font-bold text-slate-900">{isWorker ? 'Hire Requests Received' : 'Connections Initiated'}</h2>
-            </div>
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700">{myConnections.length}</span>
-          </div>
-          {myConnections.length > 0 ? myConnections.map(conn => (
-            <article key={conn.id} className="rounded-xl border border-slate-100 bg-white p-5 shadow-xs">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">{isWorker ? conn.fromUserName : `Connected with: ${conn.toUserName}`}</h3>
-                  <p className="mt-2 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs italic text-slate-600">"{conn.message || 'No message provided.'}"</p>
-                </div>
-                {getStatusBadge(conn.status)}
-              </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-50 pt-3">
-                {conn.phone && conn.status === 'accepted' ? (
-                  <ContactActions phone={conn.phone} whatsappMessage={isWorker ? `Hello, my name is ${currentUser.name}. I am contacting you through Qardho Skilled Platform${conn.jobTitle ? ` regarding the job "${conn.jobTitle}"` : ''}. I accepted your hiring request and would like to discuss the next steps.` : `Hello ${conn.toUserName}, I am ${currentUser.name}. I am contacting you through Qardho Skilled Platform${conn.jobTitle ? ` regarding the job "${conn.jobTitle}"` : ''}. I would like to discuss the work details and next steps.`} />
-                ) : (
-                  <span className="text-[11px] italic text-slate-400">{conn.status === 'pending' ? 'Accept request to reveal phone' : 'Contact hidden'}</span>
-                )}
-                {isWorker && conn.status === 'pending' && (
-                  <div className="flex gap-2">
-                    <button onClick={() => openConfirmation({ title: 'Decline this hire request?', description: `This will mark the request from ${conn.fromUserName} as declined.`, confirmLabel: actionKey === `decline-conn-${conn.id}` ? 'Declining...' : 'Decline request', tone: 'danger', actionKey: `decline-conn-${conn.id}`, onConfirm: () => onUpdateConnectionStatus(conn.id, 'declined') })} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:border-red-100 hover:bg-red-50 hover:text-red-600"><X className="h-4 w-4" /></button>
-                    <button onClick={() => openConfirmation({ title: 'Accept this hire request?', description: `This will reveal contact info for ${conn.fromUserName} and mark the request as accepted.`, confirmLabel: actionKey === `accept-conn-${conn.id}` ? 'Accepting...' : 'Accept request', tone: 'neutral', actionKey: `accept-conn-${conn.id}`, onConfirm: () => onUpdateConnectionStatus(conn.id, 'accepted') })} className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-700"><Check className="h-3.5 w-3.5" />{actionKey === `accept-conn-${conn.id}` ? 'Accepting...' : 'Accept'}</button>
-                  </div>
-                )}
-              </div>
-            </article>
-          )) : (
-            <div className="rounded-xl border border-slate-100 bg-white py-12 text-center"><Users className="mx-auto mb-2 h-8 w-8 text-slate-300" /><p className="text-xs font-medium text-slate-500">No connections yet. Accepted hire requests will show contact details here.</p><button onClick={() => onNavigate(isWorker ? 'jobs' : 'workers')} className="mt-2 text-xs font-semibold text-blue-600 hover:underline">{isWorker ? 'Browse jobs' : 'Find workers'}</button></div>
-          )}
-        </section>
-      )}
+      {/* COMPACT CARDS LIST CONTAINER */}
+      <div className="space-y-3">
+        {paginatedItems.length > 0 ? (
+          paginatedItems.map(item => (
+            <WorkListCard
+              key={item.id}
+              item={item}
+              currentUser={currentUser}
+              onViewProfile={(userId, fallbackName, phone) => {
+                const targetUser = getEmployerUser(userId, fallbackName, phone);
+                onViewWorkerProfile(targetUser);
+              }}
+              onViewJobDetails={(jobId) => {
+                onNavigate('jobs');
+              }}
+              actionKey={actionKey}
+            />
+          ))
+        ) : (
+          <EmptyState
+            type={searchQuery || statusFilter !== 'all' || sourceFilter !== 'all' ? 'filtered' : activeTab}
+            isWorker={isWorker}
+            onAction={() => {
+              if (searchQuery || statusFilter !== 'all' || sourceFilter !== 'all') {
+                setSearchQuery('');
+                setStatusFilter('all');
+                setSourceFilter('all');
+                setCurrentPage(1);
+              } else {
+                onNavigate(isWorker ? 'jobs' : 'post-job');
+              }
+            }}
+          />
+        )}
+      </div>
 
-      {activeTab === 'applications' && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /><h2 className="text-base font-bold text-slate-900">{isWorker ? 'Job Applications Submitted' : 'Applications Received'}</h2></div>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">{myApplications.length}</span>
-          </div>
-          {myApplications.length > 0 ? myApplications.map(app => (
-            <article key={app.id} className="rounded-xl border border-slate-100 bg-white p-5 shadow-xs">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">{isWorker ? app.jobTitle : `Applicant: ${app.applicantName}`}</h3>
-                  <p className="mt-1 text-[11px] font-medium text-slate-500">{isWorker && app.status === 'pending' ? 'Waiting for employer response' : `Job: ${app.jobTitle}`}</p>
-                </div>
-                {getStatusBadge(app.status)}
-              </div>
-              <p className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs italic text-slate-600">"{app.message}"</p>
-              <Timeline steps={getApplicationTimelineSteps(app)} />
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-50 pt-3">
-                <div className="space-y-1">
-                  {(isWorker || app.status === 'accepted') ? <ContactActions phone={app.phone} label={isWorker ? 'Your phone' : 'Applicant'} whatsappMessage={!isWorker && app.status === 'accepted' ? `Hello ${app.applicantName}, I am ${currentUser.name}. I am contacting you through Qardho Skilled Platform regarding the job "${app.jobTitle}". I would like to discuss the work details and next steps.` : undefined} /> : <span className="text-[11px] italic text-slate-400">Contact unlocks after accepted application or hire request.</span>}
-                  <span className="flex items-center text-[11px] text-slate-500"><MapPin className="mr-1.5 h-3 w-3 text-slate-400" />Qardho ({app.location})</span>
-                </div>
-                {!isWorker && app.status === 'pending' && (
-                  <div className="flex gap-2">
-                    <button onClick={() => setSelectedApplication(app)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">Details</button>
-                    <button onClick={() => openConfirmation({ title: 'Decline this candidate application?', description: `This will mark ${app.applicantName}'s application for "${app.jobTitle}" as declined.`, confirmLabel: actionKey === `decline-app-${app.id}` ? 'Declining...' : 'Decline application', tone: 'danger', actionKey: `decline-app-${app.id}`, onConfirm: () => onUpdateApplicationStatus(app.id, 'declined') })} className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:border-red-100 hover:bg-red-50 hover:text-red-600"><X className="h-4 w-4" /></button>
-                    <button onClick={() => openConfirmation({ title: 'Accept this candidate application?', description: `This will hire ${app.applicantName}, move the job to in progress, and mark other pending applications as not selected.`, confirmLabel: actionKey === `accept-app-${app.id}` ? 'Hiring...' : 'Hire candidate', tone: 'neutral', actionKey: `accept-app-${app.id}`, onConfirm: () => onUpdateApplicationStatus(app.id, 'accepted') })} className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-brand-700"><Check className="h-3.5 w-3.5" />{actionKey === `accept-app-${app.id}` ? 'Hiring...' : 'Hire'}</button>{getWorker(app.applicantId) && <button onClick={() => onViewWorkerProfile(getWorker(app.applicantId)!)} className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">View profile</button>}
-                  </div>
-                )}
-                {isWorker && app.status === 'accepted' && (
-                  <button onClick={() => setActiveTab('progress')} className="inline-flex items-center gap-1 rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700">View status <ArrowRight className="h-3.5 w-3.5" /></button>
-                )}
-              </div>
-            </article>
-          )) : (
-            <div className="rounded-xl border border-slate-100 bg-white py-12 text-center"><FileText className="mx-auto mb-2 h-8 w-8 text-slate-300" /><p className="text-xs font-medium text-slate-500">No matching applications. New worker applications and status updates will appear here.</p><button onClick={() => onNavigate(isWorker ? 'jobs' : 'post-job')} className="mt-2 text-xs font-semibold text-blue-600 hover:underline">{isWorker ? 'Browse jobs' : 'Post a job'}</button></div>
-          )}
-        </section>
-      )}
+      {/* PAGINATION BAR */}
+      <PaginationBar
+        currentPage={currentPage}
+        totalItems={filteredItems.length}
+        pageSize={pageSize}
+        onPageChange={(page) => setCurrentPage(page)}
+      />
 
-      {!isWorker && activeTab === 'jobs' && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2"><Briefcase className="h-5 w-5 text-blue-600" /><h2 className="text-base font-bold text-slate-900">Your Posted Jobs</h2></div>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">{myPostedJobs.length}</span>
-          </div>
-          {myPostedJobs.length > 0 ? myPostedJobs.map(renderEmployerProgressCard) : (
-            <div className="rounded-xl border border-slate-100 bg-white py-12 text-center"><Briefcase className="mx-auto mb-2 h-8 w-8 text-slate-300" /><p className="text-xs font-medium text-slate-500">You have not posted any jobs yet.</p><button onClick={() => onNavigate('post-job')} className="mt-2 text-xs font-semibold text-blue-600 hover:underline">Post a job</button></div>
-          )}
-        </section>
-      )}
-
+      {/* MODALS */}
       {selectedApplication && (
         <CandidateReviewModal
           application={selectedApplication}
@@ -614,7 +1028,7 @@ export default function Dashboard({
             setSelectedApplication(null);
             openConfirmation({
               title: 'Decline application?',
-              description: `This will mark ${app.applicantName}'s application for "${app.jobTitle}" as declined.`,
+              description: `This will mark ${app.applicantName}'s application as declined.`,
               confirmLabel: 'Decline application',
               tone: 'danger',
               actionKey: `decline-app-${appId}`,
@@ -623,6 +1037,7 @@ export default function Dashboard({
           }}
         />
       )}
+
       {pendingAction && (
         <ConfirmDialog
           title={pendingAction.title}
@@ -637,37 +1052,70 @@ export default function Dashboard({
           onCancel={() => setPendingAction(null)}
         />
       )}
+
+      {declineModalConnection && (
+        <ConfirmDialog
+          title="Decline this hire request?"
+          description="The employer will be notified. Your contact information will remain private."
+          confirmLabel={actionKey === `decline-conn-${declineModalConnection.id}` ? 'Declining...' : 'Decline Request'}
+          cancelLabel="Cancel"
+          tone="danger"
+          onCancel={() => {
+            setDeclineModalConnection(null);
+            setDeclineReason('');
+          }}
+          onConfirm={async () => {
+            const conn = declineModalConnection;
+            const reason = declineReason;
+            setDeclineModalConnection(null);
+            setDeclineReason('');
+            await runAction(`decline-conn-${conn.id}`, () => onUpdateConnectionStatus(conn.id, 'declined', reason));
+          }}
+        >
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-700">
+              Optional reason:
+            </label>
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {[
+                'Not available',
+                'Job is not suitable',
+                'Rate or terms are unclear',
+                'Other'
+              ].map(reasonOption => (
+                <button
+                  key={reasonOption}
+                  type="button"
+                  onClick={() => setDeclineReason(prev => prev === reasonOption ? '' : reasonOption)}
+                  className={`rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition ${
+                    declineReason === reasonOption
+                      ? 'border-red-300 bg-red-50 text-red-700 font-bold'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {declineReason === reasonOption ? '✓ ' : ''}{reasonOption}
+                </button>
+              ))}
+            </div>
+          </div>
+        </ConfirmDialog>
+      )}
+
+      {selectedEmployerReviewJob && (
+        <EmployerReviewModal
+          job={selectedEmployerReviewJob.job}
+          employer={getEmployerUser(selectedEmployerReviewJob.job.employerId, selectedEmployerReviewJob.job.employerName, selectedEmployerReviewJob.job.phone)}
+          currentUser={currentUser}
+          sourceBadge={selectedEmployerReviewJob.sourceBadge}
+          onClose={() => setSelectedEmployerReviewJob(null)}
+          onSubmit={async (data) => {
+            if (onAddEmployerReview) {
+              return await onAddEmployerReview(data);
+            }
+            return false;
+          }}
+        />
+      )}
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

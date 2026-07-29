@@ -111,8 +111,8 @@ export default function ProfileEdit({
   const inputClass = 'min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-[#3b82f6] focus:ring-4 focus:ring-brand-500/10';
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] pb-24 sm:pb-12">
-      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+    <div className="min-h-screen bg-[#f8fafc] pb-[calc(90px+env(safe-area-inset-bottom))]">
+      <div className="mx-auto max-w-4xl px-3.5 sm:px-6 py-4 sm:py-8 min-w-0">
         <div className="mb-6 flex items-center justify-between">
           <button
             onClick={() => onNavigate('profile')}

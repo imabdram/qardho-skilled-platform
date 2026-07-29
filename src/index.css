@@ -70,6 +70,18 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -83,9 +95,21 @@ body {
   transition: background-color 180ms ease, color 180ms ease;
 }
 
-img {
+img,
+svg {
   max-width: 100%;
   height: auto;
+}
+
+.flex-child,
+.grid-child,
+.card-content {
+  min-width: 0;
+}
+
+.overflow-wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 button,

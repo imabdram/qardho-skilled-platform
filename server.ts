@@ -396,16 +396,35 @@ async function startServer() {
     ALTER TABLE applications ADD COLUMN IF NOT EXISTS "expectedTimeline" TEXT;
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "jobId" TEXT;
     ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "jobTitle" TEXT;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "workerName" TEXT;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "reviewerRole" TEXT DEFAULT 'employer';
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "revieweeRole" TEXT DEFAULT 'worker';
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "communicationRating" INTEGER;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "fairnessRating" INTEGER;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "paymentReliabilityRating" INTEGER;
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS "jobAccuracyRating" INTEGER;
+    ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;
   `);
   await db.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS users_clerk_user_id_unique ON users ("clerkUserId") WHERE "clerkUserId" IS NOT NULL;
     DO $migration$
     BEGIN
       CREATE UNIQUE INDEX IF NOT EXISTS applications_job_applicant_unique ON applications ("jobId", "applicantId");
+      CREATE UNIQUE INDEX IF NOT EXISTS reviews_job_reviewer_unique ON reviews ("jobId", "reviewerRole") WHERE "jobId" IS NOT NULL;
     EXCEPTION WHEN unique_violation THEN
-      RAISE NOTICE 'Skipped unique application index because legacy duplicate rows exist.';
+      RAISE NOTICE 'Skipped unique index because legacy duplicate rows exist.';
     END
     $migration$;
+    CREATE INDEX IF NOT EXISTS users_clerk_user_id_idx ON users ("clerkUserId");
+    CREATE INDEX IF NOT EXISTS users_email_idx ON users (LOWER(email));
+    CREATE INDEX IF NOT EXISTS jobs_employer_idx ON jobs ("employerId");
+    CREATE INDEX IF NOT EXISTS jobs_status_idx ON jobs (status);
+    CREATE INDEX IF NOT EXISTS applications_job_idx ON applications ("jobId");
+    CREATE INDEX IF NOT EXISTS applications_applicant_idx ON applications ("applicantId");
+    CREATE INDEX IF NOT EXISTS connections_from_user_idx ON connections ("fromUserId");
+    CREATE INDEX IF NOT EXISTS connections_to_user_idx ON connections ("toUserId");
+    CREATE INDEX IF NOT EXISTS reviews_worker_idx ON reviews ("workerId");
+    CREATE INDEX IF NOT EXISTS reviews_employer_idx ON reviews ("employerId");
     CREATE INDEX IF NOT EXISTS notifications_user_created_idx ON notifications ("userId", "createdAt" DESC);
     CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions ("expiresAt");
     CREATE INDEX IF NOT EXISTS reset_tokens_expires_idx ON password_reset_tokens ("expiresAt");
@@ -472,7 +491,18 @@ async function startServer() {
     if (normalized.startsWith('252')) return /^252\d{8,9}$/.test(normalized) ? `+${normalized}` : null;
     return /^\d{8,15}$/.test(normalized) ? `+${normalized}` : null;
   };
-  const normalizeSomaliPhone = (value: any) => { const digits = String(value || "").replace(/\D/g, ""); const national = digits.startsWith("252") ? digits.slice(3) : digits; return /^\d{8,12}$/.test(national) ? "+252" + national : null; };
+  const normalizeSomaliPhone = (value: any) => {
+    if (typeof value !== 'string' && typeof value !== 'number') return null;
+    let digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return null;
+    while (digits.startsWith('252') && digits.length > 9) {
+      digits = digits.slice(3);
+    }
+    if (digits.startsWith('0')) {
+      digits = digits.slice(1);
+    }
+    return /^\d{8,9}$/.test(digits) ? `+252${digits}` : null;
+  };
   const getUserById = async (id: string) => db.get('SELECT * FROM users WHERE id = $1', [id]);
   const createSession = async (res: any, userId: string) => {
     const token = randomBytes(32).toString('base64url');
@@ -555,8 +585,49 @@ async function startServer() {
     return req.authUser;
   };
   const requireRole = (...roles: string[]) => requirePlatformRole(...roles);
-  const addNotification = async (userId: string, type: string, title: string, message: string, href?: string) => {
-    await db.run('INSERT INTO notifications (id, "userId", type, title, message, href, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)', [`notice-${Date.now()}-${randomBytes(4).toString('hex')}`, userId, type, title, message, href || null, new Date().toISOString()]);
+  // Active Server-Sent Events (SSE) connections per user
+  const activeSseClients = new Map<string, Set<any>>();
+
+  const broadcastNotificationToUser = (userId: string, notification: any, extraPayload?: any) => {
+    const clients = activeSseClients.get(userId);
+    if (clients && clients.size > 0) {
+      const data = JSON.stringify({
+        type: 'notification',
+        notification,
+        extraPayload,
+        timestamp: new Date().toISOString(),
+      });
+      for (const clientRes of Array.from(clients)) {
+        try {
+          clientRes.write(`data: ${data}\n\n`);
+        } catch {
+          // ignore broken pipe / socket write error
+        }
+      }
+    }
+  };
+
+  const addNotification = async (userId: string, type: string, title: string, message: string, href?: string, extraPayload?: any) => {
+    const notificationId = `notice-${Date.now()}-${randomBytes(4).toString('hex')}`;
+    const createdAt = new Date().toISOString();
+    await db.run(
+      'INSERT INTO notifications (id, "userId", type, title, message, href, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [notificationId, userId, type, title, message, href || null, createdAt]
+    );
+
+    const notificationObj = {
+      id: notificationId,
+      userId,
+      type,
+      title,
+      message,
+      href: href || null,
+      createdAt,
+      readAt: null,
+    };
+
+    broadcastNotificationToUser(userId, notificationObj, extraPayload);
+    return notificationObj;
   };
   const deleteUserCascade = async (userId: string, runner = db) => {
     await runner.run('DELETE FROM reviews WHERE "workerId" = $1 OR "employerId" = $1', [userId]);
@@ -1164,6 +1235,49 @@ async function startServer() {
     res.json(notifications);
   });
 
+  app.get('/api/notifications/stream', async (req, res) => {
+    const actor = authenticated(req, res);
+    if (!actor) return;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+
+    if (!activeSseClients.has(actor.id)) {
+      activeSseClients.set(actor.id, new Set());
+    }
+    const clientSet = activeSseClients.get(actor.id)!;
+    clientSet.add(res);
+
+    // Initial connection confirmation event
+    res.write(`data: ${JSON.stringify({ type: 'connected', userId: actor.id, timestamp: new Date().toISOString() })}\n\n`);
+
+    // Keep-alive heartbeat ping every 25 seconds
+    const keepAliveInterval = setInterval(() => {
+      try {
+        res.write(': ping\n\n');
+      } catch {
+        // ignore write error
+      }
+    }, 25000);
+
+    const cleanup = () => {
+      clearInterval(keepAliveInterval);
+      clientSet.delete(res);
+      if (clientSet.size === 0) {
+        activeSseClients.delete(actor.id);
+      }
+    };
+
+    req.on('close', cleanup);
+    req.on('end', cleanup);
+    res.on('finish', cleanup);
+  });
+
   app.post('/api/notifications/:id/read', async (req, res) => {
     const actor = authenticated(req, res);
     if (!actor) return;
@@ -1408,15 +1522,17 @@ async function startServer() {
   // Connection Requests
   app.post('/api/connections', requireRole('employer'), async (req, res) => {
     const { id, toUserId, message, jobId, expectedTimeline } = req.body;
+    if (!toUserId) return res.status(400).json({ error: 'Target worker ID is required.' });
+
     try {
       const fromUser = authenticated(req, res);
       if (!fromUser) return;
-      const toUser = await db.get('SELECT * FROM users WHERE id = $1', [toUserId]);
-      if (fromUser.role !== 'employer') return res.status(403).json({ error: 'Only employers can initiate hire connections.' });
-      if (!toUser || toUser.role !== 'worker') {
-        return res.status(400).json({ error: 'Connection target must be a worker.' });
+      if (fromUser.id === toUserId) {
+        return res.status(400).json({ error: 'Employers cannot send a hire request to themselves.' });
       }
-      if (fromUser.id === toUser.id) return res.status(400).json({ error: 'You cannot hire yourself.' });
+      const toUser = await db.get('SELECT * FROM users WHERE id = $1', [toUserId]);
+      if (!toUser) return res.status(404).json({ error: 'Target worker not found.' });
+
       const existing = await db.get('SELECT * FROM connections WHERE "fromUserId" = $1 AND "toUserId" = $2 AND status IN ($3, $4)', [fromUser.id, toUser.id, 'pending', 'accepted']);
       if (existing) return res.status(409).json({ error: 'An active hire request already exists for this worker.' });
       const job = jobId ? await db.get('SELECT * FROM jobs WHERE id = $1 AND "employerId" = $2', [jobId, fromUser.id]) : null;
@@ -1437,7 +1553,7 @@ async function startServer() {
 
   app.post('/api/connections/:id/status', requireRole('worker'), async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, reason } = req.body;
     if (!validRequestStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid connection status.' });
     }
@@ -1451,9 +1567,24 @@ async function startServer() {
       if (connection.toUserId !== actor.id && actor.role !== 'admin') {
         return res.status(403).json({ error: 'Only the target worker can update this request.' });
       }
-      if (connection.status !== 'pending') return res.status(409).json({ error: 'This request has already been answered.' });
+      if (connection.status !== 'pending' && connection.status !== 'pending_worker_response') {
+        return res.status(409).json({ error: 'This request has already been answered or is no longer active.' });
+      }
       await db.run('UPDATE connections SET status = $1 WHERE id = $2', [status, id]);
-      await addNotification(connection.fromUserId, `hire_request_${status}`, `Hiring request ${status}`, `${connection.toUserName} ${status} your hiring request.`, '/dashboard');
+      if (status === 'accepted' && connection.jobId) {
+        await db.run(
+          'UPDATE jobs SET status = $1, "assignedWorkerId" = $2, "assignedWorkerName" = $3 WHERE id = $4 AND status = $5',
+          ['active', connection.toUserId, connection.toUserName, connection.jobId, 'open']
+        );
+      }
+      const reasonText = reason ? ` (Reason: ${reason})` : '';
+      await addNotification(
+        connection.fromUserId,
+        `hire_request_${status}`,
+        `Hiring request ${status}`,
+        `${connection.toUserName} ${status} your hiring request.${reasonText}`,
+        '/dashboard'
+      );
       const updatedConnection = await db.get('SELECT * FROM connections WHERE id = $1', [id]);
       res.json({ success: true, connection: updatedConnection });
     } catch (err: any) {
@@ -1540,7 +1671,7 @@ async function startServer() {
       res.status(500).json({ error: err.message });
     }
   });
-  // Reviews
+  // Reviews - Employer reviewing Worker
   app.post('/api/reviews', requireRole('employer'), async (req, res) => {
     const { id, workerId, jobId, rating, comment } = req.body;
     try {
@@ -1551,35 +1682,179 @@ async function startServer() {
       }
       const worker = await db.get('SELECT * FROM users WHERE id = $1', [workerId]);
       const completedJob = await db.get(
-        'SELECT * FROM jobs WHERE id = $1 AND "employerId" = $2 AND status = $3',
-        [jobId, employer.id, 'completed']
+        'SELECT * FROM jobs WHERE id = $1 AND "employerId" = $2 AND status IN (\'completed\', \'closed\')',
+        [jobId, employer.id]
       );
       const acceptedApplication = await db.get(
         'SELECT * FROM applications WHERE "jobId" = $1 AND "employerId" = $2 AND "applicantId" = $3 AND status = $4',
         [jobId, employer.id, workerId, 'accepted']
       );
+      const acceptedConnection = await db.get(
+        'SELECT * FROM connections WHERE "jobId" = $1 AND "fromUserId" = $2 AND "toUserId" = $3 AND status = $4',
+        [jobId, employer.id, workerId, 'accepted']
+      );
+
       const existingReview = await db.get(
-        'SELECT * FROM reviews WHERE "jobId" = $1 AND "workerId" = $2 AND "employerId" = $3',
-        [jobId, workerId, employer.id]
+        'SELECT * FROM reviews WHERE "jobId" = $1 AND "reviewerRole" = $2',
+        [jobId, 'employer']
       );
       if (!worker || worker.role !== 'worker') {
         return res.status(400).json({ error: 'Reviews can only target workers.' });
       }
-      if (!completedJob || !acceptedApplication) {
-        return res.status(403).json({ error: 'Reviews require a completed job with an accepted application for this worker.' });
+      if (!completedJob || (!acceptedApplication && !acceptedConnection && completedJob.assignedWorkerId !== workerId)) {
+        return res.status(403).json({ error: 'Reviews require a completed job with an accepted engagement for this worker.' });
       }
       if (existingReview) {
-        return res.status(400).json({ error: 'This completed job has already been reviewed.' });
+        return res.status(400).json({ error: 'This completed job has already been reviewed by the employer.' });
       }
 
       const newId = id || `rev-${Date.now()}`;
       const createdAt = new Date().toISOString();
       await db.run(
-        'INSERT INTO reviews (id, "workerId", "employerId", "employerName", "jobId", "jobTitle", rating, comment, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-        [newId, workerId, employer.id, employer.name, completedJob.id, completedJob.title, rating, cleanText(comment, 1200), createdAt]
+        'INSERT INTO reviews (id, "workerId", "workerName", "employerId", "employerName", "jobId", "jobTitle", rating, "reviewerRole", "revieweeRole", comment, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)',
+        [newId, workerId, worker.name, employer.id, employer.name, completedJob.id, completedJob.title, rating, 'employer', 'worker', cleanText(comment, 1200), createdAt]
       );
       const review = await db.get('SELECT * FROM reviews WHERE id = $1', [newId]);
-      res.json({ success: true, review });
+
+      // Check if worker review also exists to close job
+      const workerReview = await db.get(
+        'SELECT * FROM reviews WHERE "jobId" = $1 AND "reviewerRole" = $2',
+        [jobId, 'worker']
+      );
+
+      let isClosed = false;
+      if (workerReview) {
+        await db.run('UPDATE jobs SET status = $1 WHERE id = $2', ['closed', jobId]);
+        isClosed = true;
+        await addNotification(workerId, 'job_closed', 'Work Engagement Closed', 'Both reviews were submitted. This work engagement is now closed.', '/dashboard');
+        await addNotification(employer.id, 'job_closed', 'Work Engagement Closed', 'Both reviews were submitted. This work engagement is now closed.', '/dashboard');
+      }
+
+      res.json({ success: true, review, isClosed });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Worker reviewing Employer
+  app.post('/api/reviews/employer', requireRole('worker'), async (req, res) => {
+    const {
+      id, jobId, employerId, overallRating, rating, communicationRating,
+      fairnessRating, paymentReliabilityRating, jobAccuracyRating, comment
+    } = req.body;
+    try {
+      const worker = authenticated(req, res);
+      if (!worker) return;
+
+      const finalOverallRating = typeof overallRating === 'number' ? overallRating : (typeof rating === 'number' ? rating : 0);
+
+      if (!jobId || finalOverallRating < 1 || finalOverallRating > 5) {
+        return res.status(400).json({ error: 'Job ID and overall rating (1-5) are required.' });
+      }
+
+      if (
+        (typeof communicationRating === 'number' && (communicationRating < 1 || communicationRating > 5)) ||
+        (typeof fairnessRating === 'number' && (fairnessRating < 1 || fairnessRating > 5)) ||
+        (typeof paymentReliabilityRating === 'number' && (paymentReliabilityRating < 1 || paymentReliabilityRating > 5)) ||
+        (typeof jobAccuracyRating === 'number' && (jobAccuracyRating < 1 || jobAccuracyRating > 5))
+      ) {
+        return res.status(400).json({ error: 'All rating criteria must be between 1 and 5 stars.' });
+      }
+
+      const completedJob = await db.get(
+        'SELECT * FROM jobs WHERE id = $1 AND status IN (\'completed\', \'closed\')',
+        [jobId]
+      );
+
+      if (!completedJob) {
+        return res.status(403).json({ error: 'Reviews require a confirmed completed work engagement.' });
+      }
+
+      // Verify worker assignment
+      const acceptedApp = await db.get(
+        'SELECT * FROM applications WHERE "jobId" = $1 AND "applicantId" = $2 AND status = $3',
+        [jobId, worker.id, 'accepted']
+      );
+      const acceptedConn = await db.get(
+        'SELECT * FROM connections WHERE "jobId" = $1 AND "toUserId" = $2 AND status = $3',
+        [jobId, worker.id, 'accepted']
+      );
+
+      const isAssignedWorker = completedJob.assignedWorkerId === worker.id || !!acceptedApp || !!acceptedConn;
+      if (!isAssignedWorker) {
+        return res.status(403).json({ error: 'Only the assigned worker can submit a review for this engagement.' });
+      }
+
+      const targetEmployerId = employerId || completedJob.employerId;
+      if (targetEmployerId !== completedJob.employerId) {
+        return res.status(400).json({ error: 'Invalid employer specified for this engagement.' });
+      }
+
+      const existingReview = await db.get(
+        'SELECT * FROM reviews WHERE "jobId" = $1 AND "reviewerRole" = $2',
+        [jobId, 'worker']
+      );
+      if (existingReview) {
+        return res.status(400).json({ error: 'You have already reviewed the employer for this engagement.' });
+      }
+
+      const newId = id || `rev-w-${Date.now()}`;
+      const createdAt = new Date().toISOString();
+
+      await db.run(
+        `INSERT INTO reviews (
+          id, "workerId", "workerName", "employerId", "employerName", "jobId", "jobTitle",
+          rating, "reviewerRole", "revieweeRole", "communicationRating", "fairnessRating",
+          "paymentReliabilityRating", "jobAccuracyRating", comment, "createdAt"
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+        [
+          newId, worker.id, worker.name, targetEmployerId, completedJob.employerName,
+          completedJob.id, completedJob.title, finalOverallRating, 'worker', 'employer',
+          communicationRating || finalOverallRating, fairnessRating || finalOverallRating,
+          paymentReliabilityRating || finalOverallRating, jobAccuracyRating || finalOverallRating,
+          cleanText(comment || '', 1000), createdAt
+        ]
+      );
+
+      const review = await db.get('SELECT * FROM reviews WHERE id = $1', [newId]);
+
+      // Notification to employer
+      await addNotification(
+        targetEmployerId,
+        'review_submitted',
+        'Verified Review Received',
+        `${worker.name} submitted a verified review for your completed work.`,
+        `/profile?userId=${targetEmployerId}`
+      );
+
+      // Check if employer review also exists
+      const employerReview = await db.get(
+        'SELECT * FROM reviews WHERE "jobId" = $1 AND "reviewerRole" = $2',
+        [jobId, 'employer']
+      );
+
+      let isClosed = false;
+      if (employerReview) {
+        await db.run('UPDATE jobs SET status = $1 WHERE id = $2', ['closed', jobId]);
+        isClosed = true;
+
+        await addNotification(
+          worker.id,
+          'job_closed',
+          'Work Engagement Closed',
+          'Both reviews were submitted. This work engagement is now closed.',
+          '/dashboard'
+        );
+        await addNotification(
+          targetEmployerId,
+          'job_closed',
+          'Work Engagement Closed',
+          'Both reviews were submitted. This work engagement is now closed.',
+          '/dashboard'
+        );
+      }
+
+      res.json({ success: true, review, isClosed });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

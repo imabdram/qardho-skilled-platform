@@ -150,9 +150,9 @@ export default function JobDetail({
   const whatsappPhone = (job.phone || '').replace(/\D/g, '');
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] pb-24 sm:pb-12">
+    <div className="min-h-screen bg-[#f8fafc] pb-[calc(90px+env(safe-area-inset-bottom))]">
       {/* Centered Container ~1120px */}
-      <div className="mx-auto max-w-[1120px] px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-[1120px] px-3.5 sm:px-6 py-4 sm:py-8 min-w-0">
         
         {/* Back Link */}
         <button

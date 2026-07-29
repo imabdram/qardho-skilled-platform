@@ -4,7 +4,7 @@ import { CheckCircle2, Mail, MapPin, MessageSquare, Send } from 'lucide-react';
 export default function AboutContact() {
   const [sent, setSent] = useState(false);
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+    <main className="mx-auto w-full max-w-6xl px-3.5 sm:px-6 py-8 sm:py-14 lg:px-8 pb-[calc(90px+env(safe-area-inset-bottom))] min-w-0">
       <section className="overflow-hidden rounded-[2rem] bg-[#2563eb] px-6 py-10 text-white sm:px-10 sm:py-14">
         <p className="text-xs font-black uppercase tracking-[0.2em] text-[#93c5fd]">Qardho Skilled Platform</p>
         <h1 className="mt-4 max-w-3xl text-4xl font-black leading-tight sm:text-5xl">Local skill, clearer opportunities, safer connections.</h1>

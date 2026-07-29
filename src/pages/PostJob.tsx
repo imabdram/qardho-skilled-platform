@@ -82,7 +82,7 @@ export default function PostJob({ currentUser, onPostJob, onNavigate }: PostJobP
   const Error = ({ field }: { field: string }) => errors[field] ? <p className="mt-1 text-xs font-bold text-rose-600">{errors[field]}</p> : null;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-5xl px-3.5 sm:px-6 lg:px-8 py-6 sm:py-8 pb-[calc(90px+env(safe-area-inset-bottom))] min-w-0">
       <button onClick={() => onNavigate('dashboard')} className="mb-5 inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-white"><ArrowLeft className="h-4 w-4" />Dashboard</button>
       <header className="rounded-3xl bg-[#2563eb] p-6 text-white sm:p-8"><p className="text-xs font-black uppercase tracking-[0.18em] text-[#93c5fd]">Employer workspace</p><h1 className="mt-3 text-3xl font-black sm:text-4xl">Post a job with clear expectations.</h1><p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-brand-50/80">Complete the scope, requirements, pricing, and duration, then review everything before publishing.</p></header>
 

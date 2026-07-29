@@ -41,12 +41,23 @@ export const isNonNegativePrice = (value: unknown) => value === undefined || val
 export const hasMinimumJobDescription = (value: unknown) => typeof value === 'string' && value.trim().length >= 100;
 export const hasMinimumJobRequirements = (value: unknown) => typeof value === 'string' && value.trim().length >= 50;
 export const normalizeInternationalPhone = (value: unknown) => {
-  const normalized = typeof value === 'string' ? value.replace(/[^\d+]/g, '') : '';
-  if (!normalized) return null;
-  const cleanDigits = normalized.startsWith('+') ? normalized.slice(1) : normalized;
-  const digits = cleanDigits.startsWith('252') ? cleanDigits.slice(3) : cleanDigits;
-  const withPrefix = `+252${digits}`;
-  return /^\+252\d{8,9}$/.test(withPrefix) ? withPrefix : null;
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  let digits = String(value).replace(/\D/g, '');
+  if (!digits) return null;
+
+  while (digits.startsWith('252') && digits.length > 9) {
+    digits = digits.slice(3);
+  }
+
+  if (digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+
+  if (/^\d{8,9}$/.test(digits)) {
+    return `+252${digits}`;
+  }
+
+  return null;
 };
 export const PROFILE_FIELD_LABELS: Record<ProfileFieldKey, string> = {
   name: 'Full name',

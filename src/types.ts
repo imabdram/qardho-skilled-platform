@@ -85,18 +85,41 @@ export interface Job {
   createdAt: string;
 }
 
+export interface WorkAgreement {
+  id: string;
+  engagementId: string;
+  jobId?: string;
+  jobTitle: string;
+  agreedAmount: string;
+  pricingType?: PricingType;
+  location: string;
+  startDate: string;
+  expectedDuration: string;
+  status: 'pending_confirmation' | 'worker_confirmed' | 'employer_confirmed' | 'confirmed';
+  workerConfirmedAt?: string;
+  employerConfirmedAt?: string;
+  createdAt: string;
+}
+
 export interface Connection {
   id: string;
   fromUserId: string;  // Usually employer initiating contact
   fromUserName: string;
   toUserId: string;    // Worker being contacted
   toUserName: string;
-  status: 'pending' | 'accepted' | 'declined';
+  status: 'pending' | 'accepted' | 'declined' | 'pending_worker_response' | 'cancelled_by_employer' | 'expired' | 'converted_to_job';
   message?: string;
   phone?: string;      // Contact info shared
   jobId?: string;
   jobTitle?: string;
   expectedTimeline?: string;
+  declineReason?: string;
+  agreedAmount?: string;
+  startDate?: string;
+  expectedDuration?: string;
+  workerConfirmedAgreement?: boolean;
+  employerConfirmedAgreement?: boolean;
+  agreementStatus?: 'none' | 'pending_confirmation' | 'confirmed';
   createdAt: string;
 }
 
@@ -136,10 +159,16 @@ export interface Review {
   workerId: string;
   employerId: string;
   employerName: string;
+  workerName?: string;
   jobId?: string;
   jobTitle?: string;
-  rating: number; // 1 to 5 stars
+  rating: number; // 1 to 5 stars (overall)
+  reviewerRole?: 'employer' | 'worker';
+  revieweeRole?: 'worker' | 'employer';
+  communicationRating?: number;
+  fairnessRating?: number;
+  paymentReliabilityRating?: number;
+  jobAccuracyRating?: number;
   comment: string;
   createdAt: string;
 }
-

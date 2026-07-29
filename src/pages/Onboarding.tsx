@@ -10,6 +10,7 @@ interface OnboardingProps {
 }
 
 export default function Onboarding({ currentUser, jobs, onCompleteOnboarding }: OnboardingProps) {
+  if (!currentUser) return null;
   const saved = (() => { try { return JSON.parse(localStorage.getItem(`onboarding-${currentUser.id}`) || '{}'); } catch { return {}; } })();
   const [step, setStep] = useState(saved.step || 1);
   const [role, setRole] = useState<'worker' | 'employer' | null>(saved.role || null);

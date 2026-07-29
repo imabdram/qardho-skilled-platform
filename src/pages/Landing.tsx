@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { SignUpButton } from '@clerk/react';
 import {
   ArrowRight,
   BookOpen,
@@ -152,13 +153,24 @@ function StepCard({ audience, accent, icon: Icon, steps, cta, to }: { audience: 
         ))}
       </ol>
       <div className="mt-auto pt-6">
-        <Link
-          to={to}
-          className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${styles.button}`}
-        >
-          {cta}
-          <ArrowRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
+        {to === PAGE_ROUTES.register ? (
+          <SignUpButton mode="modal">
+            <button
+              className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${styles.button}`}
+            >
+              {cta}
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </SignUpButton>
+        ) : (
+          <Link
+            to={to}
+            className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${styles.button}`}
+          >
+            {cta}
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -537,7 +549,13 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
           </div>
           <div className="mt-6 flex flex-wrap gap-3 md:mt-0 md:shrink-0">
             <button onClick={() => onNavigate('workers')} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#93c5fd] px-5 text-sm font-black text-[#111615] transition hover:bg-[#c8ff74] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Find Skilled Workers</button>
-            <Link to={PAGE_ROUTES.register} className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Create Worker Profile</Link>
+            {currentUser ? (
+              <button onClick={() => onNavigate('dashboard')} className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10">Open Dashboard</button>
+            ) : (
+              <SignUpButton mode="modal">
+                <button className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Create Worker Profile</button>
+              </SignUpButton>
+            )}
           </div>
         </div>
       </section>
