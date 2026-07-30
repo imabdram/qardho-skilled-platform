@@ -573,6 +573,7 @@ async function startServer() {
         return res.status(401).json({ error: 'Please sign in to continue.', code: 'AUTH_REQUIRED' });
       }
 
+      // Step 1: resolve via user_auth_identities (environment-aware)
       let platformUser = await db.get(
         `SELECT u.* FROM users u
          JOIN user_auth_identities uai ON u.id = uai.user_id
@@ -580,8 +581,23 @@ async function startServer() {
         [auth.userId, clerkEnv]
       );
 
+      // Step 2: fallback – legacy users.clerkUserId for dev records not yet backfilled
       if (!platformUser) {
-        platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [auth.userId]);
+        platformUser = await db.get(
+          `SELECT u.* FROM users u
+           WHERE u."clerkUserId" = $1`,
+          [auth.userId]
+        );
+        // Back-fill the identity row now so next request is fast
+        if (platformUser) {
+          const bfId = `identity-bf-${Date.now()}-${randomBytes(4).toString('hex')}`;
+          await db.run(
+            `INSERT INTO user_auth_identities (id, user_id, clerk_user_id, environment, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $5)
+             ON CONFLICT (clerk_user_id) DO NOTHING`,
+            [bfId, platformUser.id, auth.userId, clerkEnv, new Date().toISOString()]
+          );
+        }
       }
 
       if (!platformUser) {
@@ -602,7 +618,7 @@ async function startServer() {
     try {
       const auth = getAuth(req);
       if (auth?.userId) {
-        let clerkEnv = 'development';
+        let clerkEnv: 'development' | 'production' = 'development';
         try { clerkEnv = getClerkEnvironment(); } catch {}
 
         let platformUser = await db.get(
@@ -613,7 +629,19 @@ async function startServer() {
         );
 
         if (!platformUser) {
-          platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [auth.userId]);
+          platformUser = await db.get(
+            `SELECT u.* FROM users u WHERE u."clerkUserId" = $1`,
+            [auth.userId]
+          );
+          if (platformUser) {
+            const bfId = `identity-bf-${Date.now()}-${randomBytes(4).toString('hex')}`;
+            await db.run(
+              `INSERT INTO user_auth_identities (id, user_id, clerk_user_id, environment, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $5)
+               ON CONFLICT (clerk_user_id) DO NOTHING`,
+              [bfId, platformUser.id, auth.userId, clerkEnv, new Date().toISOString()]
+            ).catch(() => {/* safe to swallow race condition conflict */});
+          }
         }
 
         if (platformUser && !platformUser.suspended) {
@@ -1235,6 +1263,7 @@ async function startServer() {
 
   app.get('/api/auth/me', requireClerkAuth, async (req: any, res: any) => {
     try {
+      // ── Step 1: Resolve CLERK_ENVIRONMENT (trusted server-side config) ──────────
       let clerkEnv: 'development' | 'production';
       try {
         clerkEnv = getClerkEnvironment();
@@ -1242,24 +1271,28 @@ async function startServer() {
         return res.status(400).json({ error: err.message, code: 'INVALID_CLERK_ENVIRONMENT' });
       }
 
+      // ── Step 2: Read Clerk user ID from trusted server-side auth object ─────────
       const auth = getAuth(req);
       const clerkUserId = auth?.userId;
       if (!clerkUserId) {
         return res.status(401).json({ user: null });
       }
 
-      // 1. Search user_auth_identities by clerk_user_id & environment
+      // ── Step 3 & 4: Search user_auth_identities by clerk_user_id + environment ──
       const existingIdentity = await db.get(
-        'SELECT uai.*, u.suspended FROM user_auth_identities uai JOIN users u ON uai.user_id = u.id WHERE uai.clerk_user_id = $1 AND uai.environment = $2',
+        `SELECT uai.user_id FROM user_auth_identities uai
+         WHERE uai.clerk_user_id = $1 AND uai.environment = $2`,
         [clerkUserId, clerkEnv]
       );
 
+      // ── Step 5: If found – load and return the linked Neon user ─────────────────
       if (existingIdentity) {
         const linkedUser = await db.get('SELECT * FROM users WHERE id = $1', [existingIdentity.user_id]);
         if (linkedUser) {
           if (linkedUser.suspended) {
             return res.status(403).json({ error: 'This account is currently suspended.', user: null });
           }
+          // Auto-promote if email is in ADMIN_EMAILS list
           const adminEmails = (process.env.ADMIN_EMAILS || 'admin@qardho.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
           const userEmail = (linkedUser.email || '').trim().toLowerCase();
           if (userEmail && adminEmails.includes(userEmail) && linkedUser.role !== 'admin') {
@@ -1268,71 +1301,115 @@ async function startServer() {
           }
           return res.json({ user: formatUser(linkedUser) });
         }
+        // Identity row exists but user row was deleted – clean up and fall through
+        await db.run('DELETE FROM user_auth_identities WHERE clerk_user_id = $1', [clerkUserId]);
       }
 
-      // Fallback: Check legacy users.clerkUserId
+      // ── Legacy fallback: backfill users.clerkUserId into identity table ─────────
+      // Handles dev records created before the identity table existed.
       const legacyUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [clerkUserId]);
       if (legacyUser) {
         if (legacyUser.suspended) {
           return res.status(403).json({ error: 'This account is currently suspended.', user: null });
         }
-        const identityId = `identity-${Date.now()}-${randomBytes(4).toString('hex')}`;
+        const bfId = `identity-bf-${Date.now()}-${randomBytes(4).toString('hex')}`;
         await db.run(
           `INSERT INTO user_auth_identities (id, user_id, clerk_user_id, environment, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, $5)
            ON CONFLICT (clerk_user_id) DO NOTHING`,
-          [identityId, legacyUser.id, clerkUserId, clerkEnv, new Date().toISOString()]
+          [bfId, legacyUser.id, clerkUserId, clerkEnv, new Date().toISOString()]
         );
         return res.json({ user: formatUser(legacyUser) });
       }
 
-      // Fetch Clerk details via BAPI
+      // ── Step 6: Fetch Clerk user via Backend API (trusted source only) ───────────
       let clerkUserObj: any;
       try {
         clerkUserObj = await clerkClient.users.getUser(clerkUserId);
       } catch (err: any) {
-        console.error('Error fetching Clerk user details:', err);
+        console.error('[/api/auth/me] Error fetching Clerk user details');
         return res.status(500).json({ error: 'Could not fetch user details from Clerk.' });
       }
 
-      const clerkImageUrl = clerkUserObj.imageUrl || null;
-      const adminEmails = (process.env.ADMIN_EMAILS || 'admin@qardho.com').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+      // ── Step 6 (cont.): Read primary verified email from Clerk BAPI response ────
+      const primaryEmailObj = clerkUserObj.emailAddresses?.find(
+        (e: any) => e.id === clerkUserObj.primaryEmailAddressId
+      ) || clerkUserObj.emailAddresses?.[0];
 
-      const primaryEmailObj = clerkUserObj.emailAddresses?.find((e: any) => e.id === clerkUserObj.primaryEmailAddressId) || clerkUserObj.emailAddresses?.[0];
       const rawEmail = primaryEmailObj?.emailAddress || '';
+      // ── Normalize: trim + toLowerCase (never from request.body) ─────────────────
       const normalizedEmail = rawEmail.trim().toLowerCase();
       const isEmailVerified = Boolean(
-        primaryEmailObj && (primaryEmailObj.verification?.status === 'verified' || primaryEmailObj.verified === true)
+        primaryEmailObj &&
+        (primaryEmailObj.verification?.status === 'verified' || primaryEmailObj.verified === true)
       );
 
-      const firstName = clerkUserObj.firstName || '';
-      const lastName = clerkUserObj.lastName || '';
-      const displayName = (firstName || lastName) ? `${firstName} ${lastName}`.trim() : (normalizedEmail.split('@')[0] || 'User');
+      const firstName  = clerkUserObj.firstName || '';
+      const lastName   = clerkUserObj.lastName  || '';
+      const displayName = (firstName || lastName)
+        ? `${firstName} ${lastName}`.trim()
+        : (normalizedEmail.split('@')[0] || 'User');
+      const clerkImageUrl = clerkUserObj.imageUrl || null;
+
+      const adminEmails = (process.env.ADMIN_EMAILS || 'admin@qardho.com')
+        .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
       const isAutoAdmin = Boolean(normalizedEmail && adminEmails.includes(normalizedEmail));
 
-      // Attempt linking by verified email
+      // ── Step 7 & 8: Email-match existing Neon user and link ─────────────────────
+      // Only proceed if Clerk confirms this email is verified (trusted BAPI data).
       if (normalizedEmail && isEmailVerified) {
-        const matches = await db.all(
-          `SELECT u.* FROM users u 
-           LEFT JOIN user_auth_identities uai ON u.id = uai.user_id AND uai.environment = $1
-           WHERE LOWER(u.email) = $2 AND uai.id IS NULL`,
-          [clerkEnv, normalizedEmail]
-        );
+        // Find Neon users with this email that do NOT already have a production identity.
+        // We use a SELECT … FOR UPDATE inside a transaction to prevent race conditions.
+        return await db.transaction(async (tx: any) => {
+          // Advisory: lock by a hash of clerkUserId to avoid cross-request races
+          const lockKey = BigInt('0x' + createHash('sha256').update(clerkUserId).digest('hex').slice(0, 15)).toString();
+          await tx.run(`SELECT pg_advisory_xact_lock($1)`, [lockKey]);
 
-        if (matches.length === 1) {
-          const existingUser = matches[0];
-          if (existingUser.suspended) {
-            return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+          // Re-check inside transaction (another request may have just created the identity)
+          const identityCheck = await tx.get(
+            `SELECT user_id FROM user_auth_identities WHERE clerk_user_id = $1 AND environment = $2`,
+            [clerkUserId, clerkEnv]
+          );
+          if (identityCheck) {
+            const reloadedUser = await tx.get('SELECT * FROM users WHERE id = $1', [identityCheck.user_id]);
+            if (reloadedUser?.suspended) {
+              return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+            }
+            return res.json({ user: formatUser(reloadedUser) });
           }
 
-          const targetRole = isAutoAdmin ? 'admin' : existingUser.role;
+          // Find Neon users with matching email that have no identity row for this environment
+          const matches = await tx.all(
+            `SELECT u.* FROM users u
+             WHERE LOWER(TRIM(u.email)) = $1
+               AND NOT EXISTS (
+                 SELECT 1 FROM user_auth_identities uai
+                 WHERE uai.user_id = u.id AND uai.environment = $2
+               )`,
+            [normalizedEmail, clerkEnv]
+          );
 
-          return await db.transaction(async (tx: any) => {
+          if (matches.length === 1) {
+            // ── Exactly one match: link the new identity to the existing user ──
+            const existingUser = matches[0];
+            if (existingUser.suspended) {
+              return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+            }
+
+            // Preserve existing role; only override if email is in ADMIN_EMAILS
+            const targetRole = isAutoAdmin ? 'admin' : existingUser.role;
+
+            // Update legacy column + avatar (COALESCE protects existing values)
             await tx.run(
-              'UPDATE users SET "clerkUserId" = COALESCE("clerkUserId", $1), role = $2, "avatarUrl" = COALESCE("avatarUrl", $3) WHERE id = $4',
+              `UPDATE users
+               SET "clerkUserId" = COALESCE("clerkUserId", $1),
+                   role = $2,
+                   "avatarUrl" = COALESCE("avatarUrl", $3)
+               WHERE id = $4`,
               [clerkUserId, targetRole, clerkImageUrl, existingUser.id]
             );
 
+            // Insert identity linking new Clerk ID → existing Neon user
             const identityId = `identity-${Date.now()}-${randomBytes(4).toString('hex')}`;
             await tx.run(
               `INSERT INTO user_auth_identities (id, user_id, clerk_user_id, environment, created_at, updated_at)
@@ -1343,28 +1420,75 @@ async function startServer() {
 
             const updated = await tx.get('SELECT * FROM users WHERE id = $1', [existingUser.id]);
             return res.json({ user: formatUser(updated) });
-          });
-        } else if (matches.length > 1) {
-          return res.status(409).json({
-            error: 'Multiple accounts match this email address. Please contact an administrator.',
-            code: 'MULTIPLE_ACCOUNTS_MATCH',
-            user: null
-          });
-        }
+
+          } else if (matches.length > 1) {
+            // ── Step 10: Multiple Neon users share this email – STOP, do not guess ──
+            // Return a generic error that does not expose which accounts exist.
+            console.warn(`[/api/auth/me] MULTIPLE_ACCOUNTS_MATCH for clerk_user_id=${clerkUserId} env=${clerkEnv}`);
+            return res.status(409).json({
+              error: 'Account linking requires manual review. Please contact support.',
+              code: 'MULTIPLE_ACCOUNTS_MATCH',
+              user: null
+            });
+          }
+
+          // ── Step 9: No matching Neon user – create new pending platform user ────
+          const newInternalId = `user-${Date.now()}-${randomBytes(4).toString('hex')}`;
+          const createdAt = new Date().toISOString();
+          const initialRole     = isAutoAdmin ? 'admin' : 'pending';
+          const initialVerified = isAutoAdmin;
+
+          await tx.run(
+            `INSERT INTO users (
+              id, "clerkUserId", name, email, phone, role, verified, suspended, "createdAt", availability, "avatarUrl"
+            ) VALUES ($1, $2, $3, $4, NULL, $5, $6, false, $7, 'available', $8)`,
+            [newInternalId, clerkUserId, displayName, normalizedEmail || null,
+             initialRole, initialVerified, createdAt, clerkImageUrl]
+          );
+
+          const identityId = `identity-${Date.now()}-${randomBytes(4).toString('hex')}`;
+          await tx.run(
+            `INSERT INTO user_auth_identities (id, user_id, clerk_user_id, environment, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $5)
+             ON CONFLICT (clerk_user_id) DO NOTHING`,
+            [identityId, newInternalId, clerkUserId, clerkEnv, createdAt]
+          );
+
+          const newUser = await tx.get('SELECT * FROM users WHERE id = $1', [newInternalId]);
+          return res.json({ user: formatUser(newUser) });
+        }); // end transaction
       }
 
-      // Create new user record with role = 'pending' (or 'admin' if auto admin email)
-      const newInternalId = `user-${Date.now()}-${randomBytes(4).toString('hex')}`;
-      const createdAt = new Date().toISOString();
-      const initialRole = isAutoAdmin ? 'admin' : 'pending';
-      const initialVerified = isAutoAdmin;
-
+      // ── Email unverified or missing: create pending user without email ────────────
+      // We do NOT link by email if it is unverified; this prevents account hijacking.
       return await db.transaction(async (tx: any) => {
+        const lockKey = BigInt('0x' + createHash('sha256').update(clerkUserId).digest('hex').slice(0, 15)).toString();
+        await tx.run(`SELECT pg_advisory_xact_lock($1)`, [lockKey]);
+
+        // Race-condition guard
+        const identityCheck = await tx.get(
+          `SELECT user_id FROM user_auth_identities WHERE clerk_user_id = $1 AND environment = $2`,
+          [clerkUserId, clerkEnv]
+        );
+        if (identityCheck) {
+          const reloadedUser = await tx.get('SELECT * FROM users WHERE id = $1', [identityCheck.user_id]);
+          if (reloadedUser?.suspended) {
+            return res.status(403).json({ error: 'This account is currently suspended.', user: null });
+          }
+          return res.json({ user: formatUser(reloadedUser) });
+        }
+
+        const newInternalId = `user-${Date.now()}-${randomBytes(4).toString('hex')}`;
+        const createdAt = new Date().toISOString();
+        const initialRole     = isAutoAdmin ? 'admin' : 'pending';
+        const initialVerified = isAutoAdmin;
+
         await tx.run(
           `INSERT INTO users (
             id, "clerkUserId", name, email, phone, role, verified, suspended, "createdAt", availability, "avatarUrl"
           ) VALUES ($1, $2, $3, $4, NULL, $5, $6, false, $7, 'available', $8)`,
-          [newInternalId, clerkUserId, displayName, normalizedEmail || null, initialRole, initialVerified, createdAt, clerkImageUrl]
+          [newInternalId, clerkUserId, displayName, normalizedEmail || null,
+           initialRole, initialVerified, createdAt, clerkImageUrl]
         );
 
         const identityId = `identity-${Date.now()}-${randomBytes(4).toString('hex')}`;
@@ -1379,8 +1503,8 @@ async function startServer() {
         return res.json({ user: formatUser(newUser) });
       });
     } catch (err: any) {
-      console.error('Error in /api/auth/me sync:', err);
-      res.status(500).json({ error: err.message });
+      console.error('[/api/auth/me] Unhandled error in identity sync:', err?.message);
+      res.status(500).json({ error: 'Internal server error during account sync.' });
     }
   });
 
@@ -1596,7 +1720,19 @@ async function startServer() {
 
       if (req.body?.confirmation !== 'I confirm') return res.status(400).json({ error: 'Type I confirm exactly to delete your account.' });
 
-      const platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [clerkUserId]);
+      let clerkEnv: 'development' | 'production' = 'development';
+      try { clerkEnv = getClerkEnvironment(); } catch {}
+
+      // Resolve platform user via identity table first, then legacy fallback
+      let platformUser = await db.get(
+        `SELECT u.* FROM users u
+         JOIN user_auth_identities uai ON u.id = uai.user_id
+         WHERE uai.clerk_user_id = $1 AND uai.environment = $2`,
+        [clerkUserId, clerkEnv]
+      );
+      if (!platformUser) {
+        platformUser = await db.get('SELECT * FROM users WHERE "clerkUserId" = $1', [clerkUserId]);
+      }
       if (!platformUser) return res.status(404).json({ error: 'Platform account not found.' });
 
       if (platformUser.role === 'admin') {
