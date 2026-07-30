@@ -135,6 +135,18 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     guest_modal_desc: 'Sign in or create an account to proceed with your action.',
     guest_tab_home: 'Home',
 
+    guest_banner_jobs_badge: 'For Skilled Workers in Qardho',
+    guest_banner_jobs_title: 'Are You Looking for Skilled Work in Qardho?',
+    guest_banner_jobs_desc: 'Qardho Skilled Platform directly connects local carpenters, solar technicians, tailors, electricians & builders with local employers.',
+    
+    guest_banner_workers_badge: 'For Employers & Hiring in Qardho',
+    guest_banner_workers_title: 'Do You Need Skilled Help for Your Project or Home?',
+    guest_banner_workers_desc: 'Directly find and hire verified local carpenters, solar technicians, tailors, electricians & builders in Qardho.',
+
+    guest_banner_home_badge: 'Browsing as a Guest in Qardho',
+    guest_banner_home_title: 'Are you looking for work or do you need skilled help?',
+    guest_banner_home_desc: 'Qardho Skilled Platform directly connects local carpenters, solar technicians, tailors, electricians & builders with local employers.',
+
     // Footer
     footer_copyright: '© 2026 Xirfad Qardho. Connecting Somali trade skills and local industry.',
   },

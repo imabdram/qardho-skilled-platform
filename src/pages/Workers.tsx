@@ -116,7 +116,7 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
         
         {/* Guest Orientation Banner if signed out */}
         {!currentUser && onOpenGuestModal && (
-          <GuestWelcomeBanner onOpenGuestModal={onOpenGuestModal} />
+          <GuestWelcomeBanner pageType="workers" onOpenGuestModal={onOpenGuestModal} />
         )}
 
         {/* Page Heading & Header Banner */}

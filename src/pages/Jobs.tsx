@@ -95,7 +95,7 @@ export default function Jobs({ jobs = [], currentUser, applications = [], isLoad
         
         {/* Guest Orientation Banner if signed out */}
         {!currentUser && onOpenGuestModal && (
-          <GuestWelcomeBanner onOpenGuestModal={onOpenGuestModal} />
+          <GuestWelcomeBanner pageType="jobs" onOpenGuestModal={onOpenGuestModal} />
         )}
 
         {/* Page Heading & Header Banner */}

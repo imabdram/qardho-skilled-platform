@@ -4,14 +4,15 @@ import { useLanguage } from '../LanguageContext';
 
 interface GuestWelcomeBannerProps {
   onOpenGuestModal: (role?: 'worker' | 'employer') => void;
+  pageType?: 'jobs' | 'workers' | 'home';
   className?: string;
 }
 
-export default function GuestWelcomeBanner({ onOpenGuestModal, className = '' }: GuestWelcomeBannerProps) {
+export default function GuestWelcomeBanner({ onOpenGuestModal, pageType = 'home', className = '' }: GuestWelcomeBannerProps) {
   const { t } = useLanguage();
   const [isDismissed, setIsDismissed] = useState(() => {
     try {
-      return sessionStorage.getItem('guest_welcome_dismissed') === 'true';
+      return sessionStorage.getItem(`guest_welcome_dismissed_${pageType}`) === 'true';
     } catch {
       return false;
     }
@@ -22,11 +23,47 @@ export default function GuestWelcomeBanner({ onOpenGuestModal, className = '' }:
   const handleDismiss = () => {
     setIsDismissed(true);
     try {
-      sessionStorage.setItem('guest_welcome_dismissed', 'true');
+      sessionStorage.setItem(`guest_welcome_dismissed_${pageType}`, 'true');
     } catch {
       // Storage fallback
     }
   };
+
+  const getBannerData = () => {
+    if (pageType === 'jobs') {
+      return {
+        badge: t('guest_banner_jobs_badge', 'For Skilled Workers in Qardho'),
+        title: t('guest_banner_jobs_title', 'Are You Looking for Skilled Work in Qardho?'),
+        desc: t('guest_banner_jobs_desc', 'Qardho Skilled Platform directly connects local carpenters, solar technicians, tailors, electricians & builders with local employers.'),
+        primaryRole: 'worker' as const,
+        primaryBtnText: 'Join as Worker',
+        secondaryRole: 'employer' as const,
+        secondaryBtnText: 'Join as Employer',
+      };
+    }
+    if (pageType === 'workers') {
+      return {
+        badge: t('guest_banner_workers_badge', 'For Employers & Hiring in Qardho'),
+        title: t('guest_banner_workers_title', 'Do You Need Skilled Help for Your Project or Home?'),
+        desc: t('guest_banner_workers_desc', 'Directly find and hire verified local carpenters, solar technicians, tailors, electricians & builders in Qardho.'),
+        primaryRole: 'employer' as const,
+        primaryBtnText: 'Join as Employer',
+        secondaryRole: 'worker' as const,
+        secondaryBtnText: 'Join as Worker',
+      };
+    }
+    return {
+      badge: t('guest_banner_home_badge', 'Browsing as a Guest in Qardho'),
+      title: t('guest_banner_home_title', 'Are you looking for work or do you need skilled help?'),
+      desc: t('guest_banner_home_desc', 'Qardho Skilled Platform directly connects local carpenters, solar technicians, tailors, electricians & builders with local employers.'),
+      primaryRole: 'worker' as const,
+      primaryBtnText: 'Join as Worker',
+      secondaryRole: 'employer' as const,
+      secondaryBtnText: 'Join as Employer',
+    };
+  };
+
+  const data = getBannerData();
 
   return (
     <div className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border border-blue-200/80 bg-gradient-to-r from-blue-900 via-blue-950 to-slate-950 p-4 sm:p-6 text-white shadow-md ${className}`}>
@@ -48,35 +85,39 @@ export default function GuestWelcomeBanner({ onOpenGuestModal, className = '' }:
         <div className="space-y-1.5 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 px-3 py-0.5 text-[10px] sm:text-xs font-black uppercase tracking-wider text-blue-300 backdrop-blur-md">
             <Sparkles className="h-3 w-3 text-blue-400" />
-            <span>Browsing as a Guest in Qardho</span>
+            <span>{data.badge}</span>
           </div>
 
           <h2 className="text-lg sm:text-xl font-black text-white leading-snug">
-            Are you looking for work or do you need skilled help?
+            {data.title}
           </h2>
 
           <p className="text-xs sm:text-sm font-medium text-slate-300 leading-relaxed">
-            Qardho Skilled Platform directly connects local carpenters, solar technicians, tailors, electricians & builders with local employers.
+            {data.desc}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0 pt-1 lg:pt-0">
           <button
             type="button"
-            onClick={() => onOpenGuestModal('worker')}
-            className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] shadow-md transition active:scale-[0.98]"
+            onClick={() => onOpenGuestModal(data.primaryRole)}
+            className={`inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl px-4 text-xs font-black text-white shadow-md transition active:scale-[0.98] ${
+              data.primaryRole === 'employer' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2563eb] hover:bg-[#1d4ed8]'
+            }`}
           >
-            <Wrench className="h-4 w-4" />
-            <span>Join as Worker</span>
+            {data.primaryRole === 'employer' ? <Briefcase className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}
+            <span>{data.primaryBtnText}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => onOpenGuestModal('employer')}
-            className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white hover:bg-emerald-700 shadow-md transition active:scale-[0.98]"
+            onClick={() => onOpenGuestModal(data.secondaryRole)}
+            className={`inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl px-4 text-xs font-black text-white shadow-md transition active:scale-[0.98] ${
+              data.secondaryRole === 'employer' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2563eb] hover:bg-[#1d4ed8]'
+            }`}
           >
-            <Briefcase className="h-4 w-4" />
-            <span>Join as Employer</span>
+            {data.secondaryRole === 'employer' ? <Briefcase className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}
+            <span>{data.secondaryBtnText}</span>
           </button>
         </div>
       </div>
