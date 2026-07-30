@@ -324,7 +324,7 @@ export default function Navbar({
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md" id="main-navbar">
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur-md" id="main-navbar" dir="ltr">
         <nav ref={shellRef} className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
           <div className="flex h-[60px] sm:h-[64px] items-center justify-between gap-3">
             {/* Logo & Desktop Nav Links */}
