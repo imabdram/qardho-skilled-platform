@@ -14,6 +14,7 @@ import Auth from './pages/Auth';
 import Onboarding from './pages/Onboarding';
 import ConnectModal from './components/ConnectModal';
 import ApplyModal from './components/ApplyModal';
+import GuestAuthModal from './components/GuestAuthModal';
 import NotFound from './pages/NotFound';
 import Unauthorized from './pages/Unauthorized';
 import AboutContact from './pages/AboutContact';
@@ -54,6 +55,16 @@ export default function App() {
   // Active Modals states
   const [selectedWorkerForConnect, setSelectedWorkerForConnect] = useState<User | null>(null);
   const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
+  const [guestAuthModal, setGuestAuthModal] = useState<{
+    isOpen: boolean;
+    role?: 'worker' | 'employer';
+    targetSummary?: any;
+  }>({ isOpen: false });
+
+  const handleOpenGuestModal = (role?: 'worker' | 'employer', summary?: any) => {
+    setGuestAuthModal({ isOpen: true, role, targetSummary: summary });
+  };
+
   const [roleToast, setRoleToast] = useState<string | null>(null);
   const [isSwitchingRole, setIsSwitchingRole] = useState(false);
   const [showRoleSwitchModal, setShowRoleSwitchModal] = useState(false);
@@ -287,7 +298,21 @@ export default function App() {
     const protectedPath = ['/profile', '/profile/edit', '/settings', '/dashboard', '/worker/dashboard', '/employer/dashboard', '/post-job', '/admin', '/onboarding'].includes(path);
     let target: string | null = null;
 
-    if (guestOnly && currentUser) target = getDefaultRouteForUser(currentUser);
+    if (guestOnly && currentUser) {
+      try {
+        const raw = sessionStorage.getItem('guest_auth_intent');
+        if (raw) {
+          const intent = JSON.parse(raw);
+          sessionStorage.removeItem('guest_auth_intent');
+          if (intent?.returnPath && intent.returnPath !== '/login' && intent.returnPath !== '/register') {
+            target = intent.returnPath;
+          }
+        }
+      } catch {
+        // Storage fallback
+      }
+      if (!target) target = getDefaultRouteForUser(currentUser);
+    }
     else if (!isSignedIn && protectedPath) target = '/login';
     else if (currentUser?.role === 'pending' && path !== '/onboarding' && (protectedPath || ['/', '/workers', '/jobs', '/about-contact'].includes(path) || /^\/jobs\//.test(path))) target = '/onboarding';
     else if (currentUser && path === '/onboarding' && currentUser.role !== 'pending') target = getDefaultRouteForUser(currentUser);
@@ -524,7 +549,7 @@ export default function App() {
   // Connection Request Action
   const triggerConnect = (worker: User) => {
     if (!currentUser) {
-      navigateTo('auth');
+      handleOpenGuestModal('employer', { type: 'worker', title: worker.name, subtitle: worker.skill || 'Skilled Professional' });
       return;
     }
     if (currentUser.role !== 'employer') {
@@ -565,7 +590,7 @@ export default function App() {
   // Application Submission Action
   const triggerApply = (job: Job) => {
     if (!currentUser) {
-      navigateTo('auth');
+      handleOpenGuestModal('worker', { type: 'job', title: job.title, subtitle: job.employerName });
       return;
     }
     if (currentUser.role !== 'worker') {
@@ -811,14 +836,11 @@ export default function App() {
             jobsCount={jobs.length}
             onNavigate={handleNavigate}
             onViewWorkerProfile={(worker) => {
-              if (!currentUser) {
-                navigateTo('auth');
-                return;
-              }
               setViewingProfileUser(worker);
               navigateTo('profile');
             }}
             currentUser={currentUser}
+            onOpenGuestModal={handleOpenGuestModal}
           />
         );
       case 'workers':
@@ -829,8 +851,12 @@ export default function App() {
             onConnect={triggerConnect}
             onNavigate={handleNavigate}
             reviews={reviews}
-            onViewProfile={handleViewWorkerProfile}
+            onViewProfile={(worker) => {
+              setViewingProfileUser(worker);
+              navigateTo('profile');
+            }}
             isLoading={isLoadingData}
+            onOpenGuestModal={handleOpenGuestModal}
           />
         );
       case 'jobs':
@@ -842,6 +868,7 @@ export default function App() {
             onNavigate={handleNavigate}
             applications={applications}
             isLoading={isLoadingData}
+            onOpenGuestModal={handleOpenGuestModal}
           />
         );
       case 'job-detail': {
@@ -854,6 +881,7 @@ export default function App() {
             applications={applications}
             onApply={triggerApply}
             onNavigate={handleNavigate}
+            onOpenGuestModal={handleOpenGuestModal}
           />
         );
       }
@@ -1051,7 +1079,7 @@ export default function App() {
   const roleSwitchProfileCheck = getRoleSwitchProfileCheck();
   const hasTypedRoleSwitchConfirmation = roleSwitchConfirmation.trim().toUpperCase() === 'CONFIRM';
   const canConfirmRoleSwitch = roleSwitchProfileCheck.blocking.length === 0 && !!currentUser;
-  const isAnyModalOpen = !!selectedWorkerForConnect || !!selectedJobForApply || showDeleteAccountModal || showRoleSwitchModal;
+  const isAnyModalOpen = !!selectedWorkerForConnect || !!selectedJobForApply || showDeleteAccountModal || showRoleSwitchModal || guestAuthModal.isOpen;
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col text-slate-800 antialiased font-sans" id="app-root-layout">
@@ -1074,7 +1102,7 @@ export default function App() {
       />
 
       {(isLoadingData || appError) && (
-        <div className={`px-4 py-2 text-xs font-semibold border-b ${
+        <div className={`mt-[60px] sm:mt-[64px] px-4 py-2 text-xs font-semibold border-b ${
           appError
             ? 'bg-rose-50 text-rose-700 border-rose-100'
             : 'bg-blue-50 text-blue-700 border-blue-100'
@@ -1123,11 +1151,18 @@ export default function App() {
       )}
 
       {/* Main Page Layout Frame */}
-      <main className="flex-1 pb-0">
+      <main className={`flex-1 pb-0 ${!(isLoadingData || appError) ? 'pt-[60px] sm:pt-[64px]' : ''}`}>
         {renderPage()}
       </main>
 
       {/* Modals render portals */}
+      <GuestAuthModal
+        isOpen={guestAuthModal.isOpen}
+        onClose={() => setGuestAuthModal({ isOpen: false })}
+        intentRole={guestAuthModal.role}
+        targetSummary={guestAuthModal.targetSummary}
+      />
+
       {selectedWorkerForConnect && (
         <ConnectModal
           worker={selectedWorkerForConnect}

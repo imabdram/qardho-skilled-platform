@@ -124,6 +124,17 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     landing_cta_find_workers: 'Find Skilled Workers',
     landing_cta_create_profile: 'Create Worker Profile',
 
+    // Simplified Hero & Guest UX Keys
+    hero_simple_title: 'Find Local Skilled Work or Hire Trusted Talent in Qardho',
+    hero_simple_subtitle: 'Whether you have a trade skill or need work done, Qardho Skilled Platform connects you directly.',
+    hero_card_worker_title: 'I am a Skilled Worker',
+    hero_card_worker_desc: 'Showcase your trade skills, get hired by local employers, and build your reputation in Qardho.',
+    hero_card_employer_title: 'I am an Employer',
+    hero_card_employer_desc: 'Post job offers and hire verified local electricians, solar technicians, plumbers & builders.',
+    guest_modal_title: 'Join Qardho Skilled Platform',
+    guest_modal_desc: 'Sign in or create an account to proceed with your action.',
+    guest_tab_home: 'Home',
+
     // Footer
     footer_copyright: '© 2026 Xirfad Qardho. Connecting Somali trade skills and local industry.',
   },
@@ -246,6 +257,17 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     landing_cta_find_workers: 'Raadi Xirfadlayaal',
     landing_cta_create_profile: 'Samayso Profile Shaqaale',
 
+    // Simplified Hero & Guest UX Keys
+    hero_simple_title: 'Hel Shaqo Xirfadeed ama Shaqaalaysii Xirfadlayaal Qardho',
+    hero_simple_subtitle: 'Hadii aad xirfad leedahay ama aad shaqo u baahan tahay, platform-kani waa kuu diyaar.',
+    hero_card_worker_title: 'Waxaan ahay Xirfadle',
+    hero_card_worker_desc: 'Muuji xirfaddaada, hel shaqaalaysiin deegaanka ah, oo dhis magacaaga Qardho.',
+    hero_card_employer_title: 'Waxaan ahay Qabte Shaqo',
+    hero_card_employer_desc: 'Gali shaqooyin oo shaqaalaysii korontayga, tuumbistayaal, iyo dhisayaal la hubiyay.',
+    guest_modal_title: 'Ku soo biir Xirfad Qardho',
+    guest_modal_desc: 'Gal koontada ama samayso akown si aad u sii wadato.',
+    guest_tab_home: 'Hoyga',
+
     // Footer
     footer_copyright: '© 2026 Xirfad Qardho. Isku xirka xirfadaha Soomaaliyeed iyo ganacsiga deegaanka.',
   },
@@ -367,6 +389,17 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     landing_cta_desc: 'ابحث في الملفات الشخصية المحلية أو أنشئ حساب مهني ليتمكن أصحاب العمل القريبون من التواصل معك.',
     landing_cta_find_workers: 'البحث عن عمالة ماهرة',
     landing_cta_create_profile: 'إنشاء ملف شخصي لمهني',
+
+    // Simplified Hero & Guest UX Keys
+    hero_simple_title: 'اعثر على عمل مهني محلي أو وظّف كفاءات موثوقة في قرضو',
+    hero_simple_subtitle: 'سواء كنت تمتلك مهارة حرفية أو تحتاج لإنجاز عمل، المنصة تصلك مباشرة.',
+    hero_card_worker_title: 'أنا مهني صاحب حرفة',
+    hero_card_worker_desc: 'اعرض مهاراتك الحرفية، احصل على عروض عمل محلياً، وابنِ سمعتك في قرضو.',
+    hero_card_employer_title: 'أنا صاحب عمل',
+    hero_card_employer_desc: 'انشر عروض عمل ووظّف فنيي طاقة شمسية، سباكين، كهربائيين وبنّائين موثقين.',
+    guest_modal_title: 'انضم إلى منصة حرف قرضو',
+    guest_modal_desc: 'سجل الدخول أو أنشئ حساباً لمتابعة إجرائك.',
+    guest_tab_home: 'الرئيسية',
 
     // Footer
     footer_copyright: '© 2026 حرف قرضو. ربط المهارات المهنية الصومالية بالصناعة المحلية.',

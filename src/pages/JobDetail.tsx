@@ -14,6 +14,7 @@ interface JobDetailProps {
   applications: Application[];
   onApply: (job: Job) => void;
   onNavigate: (page: string) => void;
+  onOpenGuestModal?: (role?: 'worker' | 'employer', summary?: any) => void;
 }
 
 const formatDate = (date?: string) => {
@@ -49,6 +50,7 @@ export default function JobDetail({
   applications = [],
   onApply,
   onNavigate,
+  onOpenGuestModal,
 }: JobDetailProps) {
 
   // Empty / Not Found State
@@ -106,7 +108,7 @@ export default function JobDetail({
   let applyButtonDisabled = !canApply;
 
   if (!currentUser) {
-    applyButtonLabel = 'Log in to Apply';
+    applyButtonLabel = 'Sign in to Apply';
     applyButtonDisabled = false;
   } else if (isOwner) {
     applyButtonLabel = 'Manage in Dashboard';
@@ -136,7 +138,11 @@ export default function JobDetail({
 
   const handleApplyClick = () => {
     if (!currentUser) {
-      onNavigate('auth');
+      if (onOpenGuestModal) {
+        onOpenGuestModal('worker', { type: 'job', title: job.title, subtitle: job.employerName });
+      } else {
+        onNavigate('auth');
+      }
       return;
     }
     if (isOwner) {
@@ -151,7 +157,7 @@ export default function JobDetail({
   const whatsappPhone = (job.phone || '').replace(/\D/g, '');
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] pb-[calc(90px+env(safe-area-inset-bottom))]">
+    <div className="min-h-screen bg-[#f8fafc] pb-[calc(130px+env(safe-area-inset-bottom))] lg:pb-12">
       {/* Centered Container ~1120px */}
       <div className="mx-auto max-w-[1120px] px-3.5 sm:px-6 py-4 sm:py-8 min-w-0">
         
@@ -399,12 +405,12 @@ export default function JobDetail({
       </div>
 
       {/* Mobile Sticky Bottom Action Bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-[60px] z-40 flex items-center border-t border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur-md shadow-lg lg:hidden">
         <button
           type="button"
           onClick={handleApplyClick}
           disabled={applyButtonDisabled}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-sm font-black text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-sm font-black text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
         >
           <CheckCircle2 className="h-4.5 w-4.5" />
           <span>{applyButtonLabel}</span>

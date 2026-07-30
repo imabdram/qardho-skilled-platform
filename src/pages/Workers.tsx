@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SignUpButton } from '@clerk/react';
 import WorkerCard from '../components/WorkerCard';
 import FilterBottomSheet from '../components/FilterBottomSheet';
+import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
 import { User, Review } from '../types';
 import { ArrowUpDown, Filter, MapPin, Search, Users, Wrench, X } from 'lucide-react';
 import { QARDHO_NEIGHBORHOODS } from '../constants';
@@ -17,9 +18,10 @@ interface WorkersProps {
   reviews: Review[];
   onViewProfile?: (worker: User) => void;
   isLoading?: boolean;
+  onOpenGuestModal?: (role?: 'worker' | 'employer', summary?: any) => void;
 }
 
-export default function Workers({ workers = [], currentUser, onConnect, reviews = [], onViewProfile, isLoading = false }: WorkersProps) {
+export default function Workers({ workers = [], currentUser, onConnect, reviews = [], onViewProfile, isLoading = false, onOpenGuestModal }: WorkersProps) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('workersFilter.search') || '');
@@ -112,6 +114,11 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
       {/* Centered Container ~1180px */}
       <div className="mx-auto max-w-[1180px] px-3.5 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6 min-w-0">
         
+        {/* Guest Orientation Banner if signed out */}
+        {!currentUser && onOpenGuestModal && (
+          <GuestWelcomeBanner onOpenGuestModal={onOpenGuestModal} />
+        )}
+
         {/* Page Heading & Header Banner */}
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-5 sm:p-8 shadow-xs">
           <div>
@@ -127,13 +134,12 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
             <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3.5 sm:max-w-xs shrink-0">
               <p className="text-xs font-black text-slate-900">Looking for work in Qardho?</p>
               <p className="mt-0.5 text-xs text-slate-600">Create a worker profile to showcase your skills.</p>
-              <SignUpButton mode="modal">
-                <button
-                  className="mt-2 inline-flex min-h-[38px] w-full sm:w-auto items-center justify-center rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
-                >
-                  Create a profile
-                </button>
-              </SignUpButton>
+              <button
+                onClick={() => onOpenGuestModal ? onOpenGuestModal('worker') : navigate(PAGE_ROUTES.auth)}
+                className="mt-2 inline-flex min-h-[38px] w-full sm:w-auto items-center justify-center rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
+              >
+                Create a profile
+              </button>
             </div>
           ) : currentUser.role === 'employer' ? (
             <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3.5 sm:max-w-xs shrink-0">

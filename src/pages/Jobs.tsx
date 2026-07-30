@@ -8,6 +8,8 @@ import { QARDHO_NEIGHBORHOODS } from '../constants';
 import { PAGE_ROUTES } from '../routes';
 import { useLanguage } from '../LanguageContext';
 
+import GuestWelcomeBanner from '../components/GuestWelcomeBanner';
+
 interface JobsProps {
   jobs: Job[];
   currentUser: User | null;
@@ -15,11 +17,12 @@ interface JobsProps {
   onNavigate: (page: string) => void;
   applications: Application[];
   isLoading?: boolean;
+  onOpenGuestModal?: (role?: 'worker' | 'employer', summary?: any) => void;
 }
 
 const WORK_TYPES = ['Full-time', 'Part-time', 'Contract', 'Daily Labour', 'Urgent Task'];
 
-export default function Jobs({ jobs = [], currentUser, applications = [], isLoading = false }: JobsProps) {
+export default function Jobs({ jobs = [], currentUser, applications = [], isLoading = false, onOpenGuestModal }: JobsProps) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('jobsFilter.search') || '');
@@ -90,6 +93,11 @@ export default function Jobs({ jobs = [], currentUser, applications = [], isLoad
       {/* Centered Container ~1180px */}
       <div className="mx-auto max-w-[1180px] px-3.5 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6 min-w-0">
         
+        {/* Guest Orientation Banner if signed out */}
+        {!currentUser && onOpenGuestModal && (
+          <GuestWelcomeBanner onOpenGuestModal={onOpenGuestModal} />
+        )}
+
         {/* Page Heading & Header Banner */}
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-5 sm:p-8 shadow-xs">
           <div>
@@ -104,12 +112,12 @@ export default function Jobs({ jobs = [], currentUser, applications = [], isLoad
           {!currentUser && (
             <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3.5 sm:max-w-xs shrink-0">
               <p className="text-xs font-black text-slate-900">Hiring in Qardho?</p>
-              <p className="mt-0.5 text-xs text-slate-600">Sign in as an employer to post jobs.</p>
+              <p className="mt-0.5 text-xs text-slate-600">Post jobs and hire local trade skills.</p>
               <button
-                onClick={() => navigate(PAGE_ROUTES.auth)}
+                onClick={() => onOpenGuestModal ? onOpenGuestModal('employer', { type: 'post-job', title: 'Post a New Job' }) : navigate(PAGE_ROUTES.auth)}
                 className="mt-2 inline-flex min-h-[38px] w-full sm:w-auto items-center justify-center rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
               >
-                Sign in to post
+                Post a Job
               </button>
             </div>
           )}

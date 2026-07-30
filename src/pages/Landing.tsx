@@ -246,7 +246,7 @@ function JobPreviewCard({ job, onView }: { job: Job; onView: () => void }) {
   );
 }
 
-export default function Landing({ workers, jobs, reviews, workersCount, jobsCount, onNavigate, onViewWorkerProfile, currentUser }: LandingProps) {
+export default function Landing({ workers, jobs, reviews, workersCount, jobsCount, onNavigate, onViewWorkerProfile, currentUser, onOpenGuestModal }: LandingProps & { onOpenGuestModal?: (role?: 'worker' | 'employer', summary?: any) => void }) {
   const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -314,17 +314,17 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
 
   return (
     <div className="bg-[#f8fafc]" id="landing-page-container">
-      {/* Hero Section */}
+      {/* Simplified Dual-Role Hero Section */}
       <section
         dir="ltr"
-        className="relative flex min-h-[600px] sm:min-h-[650px] lg:min-h-[680px] lg:max-h-[720px] items-center overflow-hidden bg-[#0a192f] text-white [direction:ltr]"
+        className="relative flex min-h-[580px] sm:min-h-[640px] items-center overflow-hidden bg-[#0a192f] text-white [direction:ltr] py-10 sm:py-14"
         aria-labelledby="hero-heading"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Carousel Background Images */}
+        {/* Background Images Carousel */}
         <div className="absolute inset-0 z-0 bg-[#0a192f]">
           {HERO_SLIDES.map((slide, idx) => (
             <div
@@ -344,103 +344,140 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
             </div>
           ))}
 
-          {/* Overlays for Text Contrast */}
-          {/* Desktop Overlay: Stronger on the left, lighter on the right */}
-          <div className="hidden md:block absolute inset-0 z-20 bg-gradient-to-r from-[#0a192f] via-[#0a192f]/90 to-[#0a192f]/20" />
-          {/* Mobile Overlay: Even dark overlay across full image */}
-          <div className="md:hidden absolute inset-0 z-20 bg-[#0a192f]/85" />
-          {/* Bottom Blend */}
-          <div className="absolute inset-x-0 bottom-0 h-16 z-20 bg-gradient-to-t from-[#0a192f] to-transparent" />
+          {/* Vignette Overlay for High Contrast */}
+          <div className="absolute inset-0 z-20 bg-gradient-to-b from-[#0a192f]/90 via-[#0a192f]/95 to-[#0a192f]" />
         </div>
 
         {/* Foreground Content */}
-        <div className="relative z-30 mx-auto w-full max-w-[1180px] px-5 py-10 sm:px-6 lg:px-8 flex flex-col justify-between h-full">
-          <div className="max-w-2xl lg:w-[54%] space-y-5 text-left [text-align:left] pt-4">
-            {/* Location Badge */}
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-950/50 px-3.5 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-blue-300 backdrop-blur-md shadow-xs">
+        <div className="relative z-30 mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8 space-y-8">
+          {/* Header Title & Location Badge */}
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-950/60 px-4 py-1.5 text-xs font-black uppercase tracking-[0.18em] text-blue-300 backdrop-blur-md shadow-xs">
               <MapPin className="h-3.5 w-3.5 text-blue-400" aria-hidden="true" />
               <span>{t('hero_badge')}</span>
             </div>
 
-            {/* Main Heading (Max 2 lines) */}
-            <h1 id="hero-heading" className="font-display text-[2.2rem] sm:text-[3rem] lg:text-[3.6rem] font-black leading-[1.08] text-white tracking-tight [text-align:left]">
-              {t('hero_title')}
+            <h1 id="hero-heading" className="font-display text-3xl sm:text-4xl lg:text-5xl font-black leading-tight text-white tracking-tight">
+              {t('hero_simple_title', 'Find Local Skilled Work or Hire Trusted Talent in Qardho')}
             </h1>
 
-            {/* Supporting Text */}
-            <p className="text-base sm:text-lg font-medium leading-relaxed text-slate-200 max-w-[540px] [text-align:left]">
-              {t('hero_subtitle')}
+            <p className="text-base sm:text-lg font-medium leading-relaxed text-slate-200 max-w-2xl mx-auto">
+              {t('hero_simple_subtitle', 'Whether you have a trade skill or need work done, Qardho Skilled Platform connects you directly.')}
             </p>
+          </div>
 
-            {/* Primary & Secondary Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
-              <button
-                onClick={() => onNavigate('workers')}
-                className="inline-flex min-h-[48px] w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-sm font-black text-white hover:bg-[#1d4ed8] active:bg-[#1e40af] shadow-lg shadow-black/30 border border-blue-500/30 transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-              >
-                <Users className="h-5 w-5" aria-hidden="true" />
-                <span>{t('hero_browse_workers')}</span>
-              </button>
+          {/* Dual Role Choice Cards (Worker vs Employer) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl mx-auto pt-2">
+            {/* Role Card 1: Skilled Worker */}
+            <div className="group relative overflow-hidden rounded-3xl border border-white/20 bg-white/10 p-6 sm:p-7 backdrop-blur-md transition duration-300 hover:border-blue-400 hover:bg-white/15 hover:shadow-2xl flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-400 border border-blue-400/30">
+                    <Wrench className="h-6 w-6" />
+                  </span>
+                  <span className="rounded-full bg-blue-500/20 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-300 border border-blue-400/20">
+                    For Workers
+                  </span>
+                </div>
 
-              <button
-                onClick={() => onNavigate('jobs')}
-                className="inline-flex min-h-[48px] w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-white/12 border border-white/25 px-6 text-sm font-black text-white hover:bg-white/20 active:bg-white/25 backdrop-blur-md transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-              >
-                <Briefcase className="h-5 w-5" aria-hidden="true" />
-                <span>{t('hero_post_job')}</span>
-              </button>
+                <h2 className="text-xl sm:text-2xl font-black text-white group-hover:text-blue-300 transition">
+                  {t('hero_card_worker_title', 'I am a Skilled Worker')}
+                </h2>
+
+                <p className="text-sm font-medium leading-relaxed text-slate-200">
+                  {t('hero_card_worker_desc', 'Showcase your trade skills, get hired by local employers, and build your reputation in Qardho.')}
+                </p>
+              </div>
+
+              <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!currentUser && onOpenGuestModal) {
+                      onOpenGuestModal('worker');
+                    } else {
+                      onNavigate('profile');
+                    }
+                  }}
+                  className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-4 text-xs sm:text-sm font-black text-white hover:bg-[#1d4ed8] shadow-lg transition duration-200"
+                >
+                  <span>{currentUser ? 'View My Profile' : 'Create Worker Profile'}</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onNavigate('jobs')}
+                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 text-xs font-black text-white hover:bg-white/20 backdrop-blur-md transition duration-200"
+                >
+                  <span>Browse Jobs</span>
+                </button>
+              </div>
             </div>
 
-            {/* Platform Statistics */}
-            <div className="grid grid-cols-3 gap-4 sm:gap-6 max-w-[520px] pt-3" aria-label="Platform statistics">
-              <div className="text-left [text-align:left]">
-                <span className="block text-xl sm:text-2xl font-black text-white leading-none">{workersCount}</span>
-                <span className="mt-1 block text-xs font-semibold text-slate-300">{t('hero_stat_workers')}</span>
+            {/* Role Card 2: Employer */}
+            <div className="group relative overflow-hidden rounded-3xl border border-white/20 bg-white/10 p-6 sm:p-7 backdrop-blur-md transition duration-300 hover:border-emerald-400 hover:bg-white/15 hover:shadow-2xl flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/30">
+                    <Briefcase className="h-6 w-6" />
+                  </span>
+                  <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300 border border-emerald-400/20">
+                    For Employers
+                  </span>
+                </div>
+
+                <h2 className="text-xl sm:text-2xl font-black text-white group-hover:text-emerald-300 transition">
+                  {t('hero_card_employer_title', 'I am an Employer')}
+                </h2>
+
+                <p className="text-sm font-medium leading-relaxed text-slate-200">
+                  {t('hero_card_employer_desc', 'Post job offers and hire verified local electricians, solar technicians, plumbers & builders.')}
+                </p>
               </div>
-              <div className="text-left [text-align:left]">
-                <span className="block text-xl sm:text-2xl font-black text-white leading-none">{jobsCount}</span>
-                <span className="mt-1 block text-xs font-semibold text-slate-300">{t('hero_stat_jobs')}</span>
-              </div>
-              <div className="text-left [text-align:left]">
-                <span className="block text-xl sm:text-2xl font-black text-white leading-none">6</span>
-                <span className="mt-1 block text-xs font-semibold text-slate-300">{t('hero_stat_neighborhoods')}</span>
+
+              <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!currentUser && onOpenGuestModal) {
+                      onOpenGuestModal('employer', { type: 'post-job', title: 'Post a New Job in Qardho' });
+                    } else {
+                      onNavigate('post-job');
+                    }
+                  }}
+                  className="inline-flex min-h-[46px] flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs sm:text-sm font-black text-white hover:bg-emerald-700 shadow-lg transition duration-200"
+                >
+                  <span>Post a Job Offer</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onNavigate('workers')}
+                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl bg-white/10 border border-white/20 px-4 text-xs font-black text-white hover:bg-white/20 backdrop-blur-md transition duration-200"
+                >
+                  <span>Find Workers</span>
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Carousel Indicators & Controls */}
-          <div className="mt-8 flex items-center justify-between gap-4 pt-4 border-t border-white/10">
-            <div className="flex items-center gap-2" role="group" aria-label="Slide indicators">
-              {HERO_SLIDES.map((slide, idx) => (
-                <button
-                  key={slide.src}
-                  onClick={() => setCurrentIndex(idx)}
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    idx === currentIndex
-                      ? 'w-7 bg-blue-400'
-                      : 'w-2 bg-white/40 hover:bg-white/70'
-                  }`}
-                  aria-label={`Go to slide ${idx + 1}`}
-                  aria-current={idx === currentIndex}
-                />
-              ))}
+          {/* Platform Quick Stats Counter */}
+          <div className="flex items-center justify-center gap-8 text-center pt-2 border-t border-white/10 max-w-2xl mx-auto">
+            <div>
+              <span className="block text-xl sm:text-2xl font-black text-white">{workersCount}</span>
+              <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">{t('hero_stat_workers')}</span>
             </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handlePrev}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-slate-950/40 text-white hover:bg-white/20 backdrop-blur-md transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
-                aria-label="Previous slide"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                onClick={handleNext}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-slate-950/40 text-white hover:bg-white/20 backdrop-blur-md transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
-                aria-label="Next slide"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+            <div className="h-8 w-px bg-white/15" />
+            <div>
+              <span className="block text-xl sm:text-2xl font-black text-white">{jobsCount}</span>
+              <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">{t('hero_stat_jobs')}</span>
+            </div>
+            <div className="h-8 w-px bg-white/15" />
+            <div>
+              <span className="block text-xl sm:text-2xl font-black text-white">6</span>
+              <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">{t('hero_stat_neighborhoods')}</span>
             </div>
           </div>
         </div>

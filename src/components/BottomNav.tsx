@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bell, BriefcaseBusiness, LayoutDashboard, UserRound, Users } from 'lucide-react';
+import { Bell, BriefcaseBusiness, Home, LayoutDashboard, UserRound, Users } from 'lucide-react';
 import { User } from '../types';
 import { PAGE_ROUTES } from '../routes';
+import { useLanguage } from '../LanguageContext';
 
 interface BottomNavProps {
   currentUser: User | null;
@@ -25,12 +26,21 @@ export default function BottomNav({
   isHidden = false,
 }: BottomNavProps) {
   const location = useLocation();
-  if (!currentUser || isHidden) return null;
+  const { t } = useLanguage();
 
-  const isAdmin = currentUser.role === 'admin';
-  const isEmployer = currentUser.role === 'employer';
+  if (isHidden) return null;
 
-  const tabs: NavTabItem[] = isAdmin ? [
+  const isAdmin = currentUser?.role === 'admin';
+  const isEmployer = currentUser?.role === 'employer';
+
+  const guestTabs: NavTabItem[] = [
+    { route: PAGE_ROUTES.home, label: t('guest_tab_home', 'Home'), icon: Home },
+    { route: PAGE_ROUTES.jobs, label: t('nav_jobs', 'Jobs'), icon: BriefcaseBusiness },
+    { route: PAGE_ROUTES.workers, label: t('nav_workers', 'Workers'), icon: Users },
+    { route: PAGE_ROUTES.auth, label: t('nav_signin', 'Sign In'), icon: UserRound },
+  ];
+
+  const userTabs: NavTabItem[] = isAdmin ? [
     { route: PAGE_ROUTES.workers, label: 'Workers', icon: Users },
     { route: PAGE_ROUTES.jobs, label: 'Jobs', icon: BriefcaseBusiness },
     { route: PAGE_ROUTES.admin, label: 'Admin', icon: LayoutDashboard },
@@ -44,9 +54,11 @@ export default function BottomNav({
     { route: PAGE_ROUTES.profile, label: 'Profile', icon: UserRound },
   ];
 
+  const tabs = currentUser ? userTabs : guestTabs;
+
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-40 bg-white/95 border-t border-slate-200/90 backdrop-blur-md shadow-lg md:hidden pb-[env(safe-area-inset-bottom)]"
+      className="fixed bottom-0 inset-x-0 z-50 bg-white/95 border-t border-slate-200/90 backdrop-blur-md shadow-lg md:hidden pb-[env(safe-area-inset-bottom)]"
       aria-label="Mobile Bottom Navigation"
     >
       <div className="grid grid-cols-4 h-[60px] items-center px-1">

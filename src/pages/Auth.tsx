@@ -31,6 +31,18 @@ export default function Auth() {
   const location = useLocation();
   const isRegister = location.pathname === PAGE_ROUTES.register;
   const [imageIndex, setImageIndex] = useState(0);
+  const [guestIntent, setGuestIntent] = useState<{ role?: string; targetSummary?: any } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('guest_auth_intent');
+      if (raw) {
+        setGuestIntent(JSON.parse(raw));
+      }
+    } catch {
+      // Storage fallback
+    }
+  }, []);
 
   // Auto-rotate background gallery images every 7 seconds
   useEffect(() => {
@@ -73,6 +85,21 @@ export default function Auth() {
             {isRegister ? 'Register' : 'Sign In'}
           </span>
         </div>
+
+        {/* Guest Action Context Notification Banner (if arriving from job/worker action) */}
+        {guestIntent?.targetSummary && (
+          <div className="mb-4 w-full max-w-[28rem] rounded-2xl bg-blue-950/80 border border-blue-400/30 p-3.5 text-white backdrop-blur-md shadow-lg flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#2563eb] text-white font-black text-xs">
+              !
+            </div>
+            <div className="min-w-0 flex-1 text-xs">
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-300 block">
+                {isRegister ? 'Account required to continue' : 'Sign in to continue'}
+              </span>
+              <p className="font-bold text-white truncate">{guestIntent.targetSummary.title}</p>
+            </div>
+          </div>
+        )}
 
         {/* Auth Glass Card Container */}
         <div className="w-full max-w-[28rem] min-w-0 rounded-3xl border border-white/20 bg-white/95 p-5 shadow-2xl backdrop-blur-md sm:p-7 flex flex-col items-center overflow-hidden">
