@@ -1,5 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lalezar&family=Instrument+Sans:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap');
 @import "tailwindcss";
+
+/* Arabic Font Support: Lalezar from Google Fonts */
+html[lang="ar"],
+html[data-lang="AR"],
+[dir="rtl"] {
+  font-family: 'Lalezar', 'Instrument Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html[lang="ar"] h1,
+html[lang="ar"] h2,
+html[lang="ar"] h3,
+html[lang="ar"] h4,
+html[lang="ar"] h5,
+html[lang="ar"] h6,
+html[lang="ar"] .font-display,
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3,
+[dir="rtl"] h4,
+[dir="rtl"] h5,
+[dir="rtl"] h6,
+[dir="rtl"] .font-display {
+  font-family: 'Lalezar', 'Outfit', system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
 
 /* ==========================================================================
    SUUQA XIRFADAHA - GLOBAL APP COLOR THEME CONFIGURATION (BLUE THEME)

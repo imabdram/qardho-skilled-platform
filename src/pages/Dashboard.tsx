@@ -1325,7 +1325,7 @@ export default function Dashboard({
             label: 'Active Work',
             value: activeJobsCount,
             icon: Briefcase,
-            bgColor: 'bg-blue-50 border-blue-100',
+            bgColor: 'bg-blue-50',
             textColor: 'text-blue-600',
             subtext: 'Ongoing engagements',
           }] : []),
@@ -1333,7 +1333,7 @@ export default function Dashboard({
             label: isWorker ? 'Applications Sent' : 'Applications Received',
             value: pendingApplications,
             icon: FileText,
-            bgColor: 'bg-indigo-50 border-indigo-100',
+            bgColor: 'bg-indigo-50',
             textColor: 'text-indigo-600',
             subtext: 'Pending responses',
           },
@@ -1341,7 +1341,7 @@ export default function Dashboard({
             label: 'Posted Jobs',
             value: myPostedJobs.length,
             icon: Briefcase,
-            bgColor: 'bg-teal-50 border-teal-100',
+            bgColor: 'bg-teal-50',
             textColor: 'text-teal-600',
             subtext: 'Active & closed listings',
           }] : []),
@@ -1349,7 +1349,7 @@ export default function Dashboard({
             label: isWorker ? 'Direct Offers' : 'Direct Offers Sent',
             value: pendingConnections,
             icon: Handshake,
-            bgColor: 'bg-emerald-50 border-emerald-100',
+            bgColor: 'bg-emerald-50',
             textColor: 'text-emerald-600',
             subtext: 'Direct hire requests',
           },
@@ -1359,14 +1359,14 @@ export default function Dashboard({
               ? allWorkerProgressItems.filter(item => item.job.status === 'completed' || item.job.status === 'closed').length
               : completedJobs,
             icon: CheckCircle2,
-            bgColor: 'bg-amber-50 border-amber-100',
+            bgColor: 'bg-amber-50',
             textColor: 'text-amber-600',
             subtext: 'Finished engagements',
           },
         ].map(metric => (
           <div
             key={metric.label}
-            className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-2xs hover:shadow-xs transition duration-200"
+            className="flex flex-col justify-between rounded-2xl bg-white p-4.5 shadow-2xs"
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">{metric.label}</span>

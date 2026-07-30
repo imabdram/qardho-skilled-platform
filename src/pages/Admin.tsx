@@ -376,7 +376,7 @@ export default function Admin({
 
           {/* METRIC HIGHLIGHT CARDS */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <div className="rounded-2xl bg-white p-5 shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Skilled Workers</span>
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -389,7 +389,7 @@ export default function Admin({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <div className="rounded-2xl bg-white p-5 shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Employers</span>
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
@@ -402,7 +402,7 @@ export default function Admin({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <div className="rounded-2xl bg-white p-5 shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Job Applications</span>
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
@@ -415,7 +415,7 @@ export default function Admin({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <div className="rounded-2xl bg-white p-5 shadow-2xs">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Direct Offers</span>
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">

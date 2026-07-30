@@ -48,6 +48,7 @@ interface SectionHeadingProps {
 
 interface CategoryConfig {
   name: string;
+  key: string;
   aliases: string[];
   icon: LucideIcon;
 }
@@ -87,14 +88,14 @@ const HERO_SLIDES: HeroSlide[] = [
 ];
 
 const categoryConfig: CategoryConfig[] = [
-  { name: 'Plumbing', aliases: ['plumb', 'pipe'], icon: Wrench },
-  { name: 'Electrical Work', aliases: ['electric'], icon: Plug },
-  { name: 'Solar Installation', aliases: ['solar'], icon: SunMedium },
-  { name: 'Construction', aliases: ['mason', 'builder', 'construction'], icon: Construction },
-  { name: 'Tailoring', aliases: ['tailor'], icon: Scissors },
-  { name: 'Teaching', aliases: ['teacher', 'tutor'], icon: GraduationCap },
-  { name: 'Farming', aliases: ['farm', 'agric'], icon: Leaf },
-  { name: 'General Repair', aliases: ['repair', 'labor', 'general'], icon: Hammer },
+  { name: 'Plumbing', key: 'cat_plumbing', aliases: ['plumb', 'pipe'], icon: Wrench },
+  { name: 'Electrical Work', key: 'cat_electrical', aliases: ['electric'], icon: Plug },
+  { name: 'Solar Installation', key: 'cat_solar', aliases: ['solar'], icon: SunMedium },
+  { name: 'Construction', key: 'cat_construction', aliases: ['mason', 'builder', 'construction'], icon: Construction },
+  { name: 'Tailoring', key: 'cat_tailoring', aliases: ['tailor'], icon: Scissors },
+  { name: 'Teaching', key: 'cat_teaching', aliases: ['teacher', 'tutor'], icon: GraduationCap },
+  { name: 'Farming', key: 'cat_farming', aliases: ['farm', 'agric'], icon: Leaf },
+  { name: 'General Repair', key: 'cat_repair', aliases: ['repair', 'labor', 'general'], icon: Hammer },
 ];
 
 const formatDate = (dateStr: string) => {
@@ -118,7 +119,9 @@ function SectionHeading({ eyebrow, title, description, align = 'left' }: Section
 }
 
 function CategoryCard({ category, count }: { category: CategoryConfig; count: number }) {
+  const { t } = useLanguage();
   const Icon = category.icon;
+  const countLabel = count === 1 ? t('landing_worker_count_singular') : t('landing_worker_count_plural');
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition duration-200 hover:-translate-y-0.5 hover:border-[#2563eb] hover:shadow-md">
       <div className="flex items-start gap-3">
@@ -126,8 +129,8 @@ function CategoryCard({ category, count }: { category: CategoryConfig; count: nu
           <Icon className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">
-          <h3 className="text-sm font-black text-slate-950">{category.name}</h3>
-          <p className="mt-1 text-xs font-semibold text-slate-500">{count} {count === 1 ? 'worker' : 'workers'}</p>
+          <h3 className="text-sm font-black text-slate-950">{t(category.key, category.name)}</h3>
+          <p className="mt-1 text-xs font-semibold text-slate-500">{count} {countLabel}</p>
         </div>
       </div>
     </div>
@@ -160,7 +163,7 @@ function StepCard({ audience, accent, icon: Icon, steps, cta, to }: { audience: 
               className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${styles.button}`}
             >
               {cta}
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
             </button>
           </SignUpButton>
         ) : (
@@ -169,7 +172,7 @@ function StepCard({ audience, accent, icon: Icon, steps, cta, to }: { audience: 
             className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${styles.button}`}
           >
             {cta}
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
           </Link>
         )}
       </div>
@@ -178,6 +181,7 @@ function StepCard({ audience, accent, icon: Icon, steps, cta, to }: { audience: 
 }
 
 function FeaturedWorkerCard({ worker, reviews, onView }: { worker: User; reviews: Review[]; onView: () => void }) {
+  const { t } = useLanguage();
   const workerReviews = reviews.filter(review => review.workerId === worker.id);
   const avgRating = workerReviews.length > 0
     ? (workerReviews.reduce((sum, review) => sum + review.rating, 0) / workerReviews.length).toFixed(1)
@@ -210,13 +214,14 @@ function FeaturedWorkerCard({ worker, reviews, onView }: { worker: User; reviews
         onClick={onView}
         className="mt-auto inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-black text-slate-800 transition hover:border-[#2563eb] hover:bg-[#2563eb] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
       >
-        View Profile
+        {t('landing_view_profile')}
       </button>
     </article>
   );
 }
 
 function JobPreviewCard({ job, onView }: { job: Job; onView: () => void }) {
+  const { t } = useLanguage();
   return (
     <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-xs transition duration-200 hover:border-[#2563eb] hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
@@ -235,7 +240,7 @@ function JobPreviewCard({ job, onView }: { job: Job; onView: () => void }) {
         onClick={onView}
         className="mt-auto inline-flex min-h-11 items-center justify-center rounded-xl bg-[#2563eb] px-4 py-2 text-sm font-black text-white transition hover:bg-[#1d4ed8] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]"
       >
-        View Job
+        {t('landing_view_job')}
       </button>
     </article>
   );
@@ -311,7 +316,8 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
     <div className="bg-[#f8fafc]" id="landing-page-container">
       {/* Hero Section */}
       <section
-        className="relative flex min-h-[600px] sm:min-h-[650px] lg:min-h-[680px] lg:max-h-[720px] items-center overflow-hidden bg-[#0a192f] text-white"
+        dir="ltr"
+        className="relative flex min-h-[600px] sm:min-h-[650px] lg:min-h-[680px] lg:max-h-[720px] items-center overflow-hidden bg-[#0a192f] text-white [direction:ltr]"
         aria-labelledby="hero-heading"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
@@ -349,7 +355,7 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
 
         {/* Foreground Content */}
         <div className="relative z-30 mx-auto w-full max-w-[1180px] px-5 py-10 sm:px-6 lg:px-8 flex flex-col justify-between h-full">
-          <div className="max-w-2xl lg:w-[54%] space-y-5 text-left pt-4">
+          <div className="max-w-2xl lg:w-[54%] space-y-5 text-left [text-align:left] pt-4">
             {/* Location Badge */}
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-950/50 px-3.5 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-blue-300 backdrop-blur-md shadow-xs">
               <MapPin className="h-3.5 w-3.5 text-blue-400" aria-hidden="true" />
@@ -357,12 +363,12 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
             </div>
 
             {/* Main Heading (Max 2 lines) */}
-            <h1 id="hero-heading" className="font-display text-[2.2rem] sm:text-[3rem] lg:text-[3.6rem] font-black leading-[1.08] text-white tracking-tight">
+            <h1 id="hero-heading" className="font-display text-[2.2rem] sm:text-[3rem] lg:text-[3.6rem] font-black leading-[1.08] text-white tracking-tight [text-align:left]">
               {t('hero_title')}
             </h1>
 
             {/* Supporting Text */}
-            <p className="text-base sm:text-lg font-medium leading-relaxed text-slate-200 max-w-[540px]">
+            <p className="text-base sm:text-lg font-medium leading-relaxed text-slate-200 max-w-[540px] [text-align:left]">
               {t('hero_subtitle')}
             </p>
 
@@ -387,15 +393,15 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
 
             {/* Platform Statistics */}
             <div className="grid grid-cols-3 gap-4 sm:gap-6 max-w-[520px] pt-3" aria-label="Platform statistics">
-              <div className="text-left">
+              <div className="text-left [text-align:left]">
                 <span className="block text-xl sm:text-2xl font-black text-white leading-none">{workersCount}</span>
                 <span className="mt-1 block text-xs font-semibold text-slate-300">{t('hero_stat_workers')}</span>
               </div>
-              <div className="text-left">
+              <div className="text-left [text-align:left]">
                 <span className="block text-xl sm:text-2xl font-black text-white leading-none">{jobsCount}</span>
                 <span className="mt-1 block text-xs font-semibold text-slate-300">{t('hero_stat_jobs')}</span>
               </div>
-              <div className="text-left">
+              <div className="text-left [text-align:left]">
                 <span className="block text-xl sm:text-2xl font-black text-white leading-none">6</span>
                 <span className="mt-1 block text-xs font-semibold text-slate-300">{t('hero_stat_neighborhoods')}</span>
               </div>
@@ -442,7 +448,7 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
 
       <section className="mx-auto -mt-10 max-w-7xl px-4 pb-12 sm:px-6 lg:px-8" aria-labelledby="category-heading">
         <div className="rounded-2xl border border-brand-950/10 bg-white/95 p-5 shadow-xl shadow-brand-950/10 backdrop-blur sm:p-6">
-        <SectionHeading title="Find help by skill" description="Browse the trade areas represented by current worker profiles." />
+        <SectionHeading title={t('landing_find_by_skill_title')} description={t('landing_find_by_skill_desc')} />
         <div className="mt-7 grid grid-cols-1 gap-4 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {categoryCounts.map(({ category, count }) => (
             <React.Fragment key={category.name}>
@@ -454,22 +460,22 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8" aria-labelledby="how-heading">
-        <SectionHeading eyebrow="Simple steps" title="How Xirfad Qardho works" description="Two clear paths for hiring local help or finding work nearby." align="center" />
+        <SectionHeading eyebrow={t('landing_steps_eyebrow')} title={t('landing_steps_title')} description={t('landing_steps_desc')} align="center" />
         <div className="mt-8 grid grid-cols-1 gap-5 md:grid-cols-2">
           <StepCard
-            audience="For people who need work done"
+            audience={t('landing_for_employers_title')}
             accent="blue"
             icon={Briefcase}
-            steps={['Search by skill or location', 'Contact a suitable worker', 'Agree directly and complete the work']}
-            cta="Find Workers"
+            steps={[t('landing_employer_step_1'), t('landing_employer_step_2'), t('landing_employer_step_3')]}
+            cta={t('landing_find_workers_btn')}
             to={PAGE_ROUTES.workers}
           />
           <StepCard
-            audience="For workers"
+            audience={t('landing_for_workers_title')}
             accent="green"
             icon={Wrench}
-            steps={['Create a worker profile', 'Show skills, location, and price', 'Receive messages and apply for jobs']}
-            cta={currentUser ? 'Open Dashboard' : 'Join as Worker'}
+            steps={[t('landing_worker_step_1'), t('landing_worker_step_2'), t('landing_worker_step_3')]}
+            cta={currentUser ? t('landing_open_dashboard_btn') : t('landing_join_worker_btn')}
             to={currentUser ? PAGE_ROUTES.dashboard : PAGE_ROUTES.register}
           />
         </div>
@@ -479,9 +485,9 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {[
-              { title: 'Local Worker Profiles', desc: 'Review skills, area, bio, price, and availability when workers provide them.', icon: ShieldCheck, color: 'bg-[#93c5fd]/35 text-[#1e40af]' },
-              { title: 'Direct Negotiation', desc: 'Message workers or applicants directly and agree on scope, timing, and payment.', icon: CheckCircle2, color: 'bg-brand-50 text-brand-600' },
-              { title: 'Neighborhood-Specific Results', desc: 'Find help around Kaambo, Qoryacad, Xorgoble, Xiingood, Xiddo, Sheerbi, and Waaciye.', icon: MapPin, color: 'bg-amber-50 text-amber-600' },
+              { title: t('landing_benefit_1_title'), desc: t('landing_benefit_1_desc'), icon: ShieldCheck, color: 'bg-[#93c5fd]/35 text-[#1e40af]' },
+              { title: t('landing_benefit_2_title'), desc: t('landing_benefit_2_desc'), icon: CheckCircle2, color: 'bg-brand-50 text-brand-600' },
+              { title: t('landing_benefit_3_title'), desc: t('landing_benefit_3_desc'), icon: MapPin, color: 'bg-amber-50 text-amber-600' },
             ].map(item => {
               const Icon = item.icon;
               return (
@@ -502,9 +508,9 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
 
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-labelledby="featured-workers-heading">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <SectionHeading title="Featured Skilled Workers" description="A short preview of worker profiles currently available in the platform." />
+          <SectionHeading title={t('landing_featured_workers_title')} description={t('landing_featured_workers_desc')} />
           <button onClick={() => onNavigate('workers')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-black text-[#3b82f6] hover:text-[#1e40af] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]">
-            View all workers <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            {t('landing_view_all_workers')} <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
           </button>
         </div>
         {featuredWorkers.length > 0 ? (
@@ -522,9 +528,9 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
 
       <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-labelledby="active-jobs-heading">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <SectionHeading title="Available Jobs in Qardho" description="Recent local job posts from employers in the platform." />
+          <SectionHeading title={t('landing_available_jobs_title')} description={t('landing_available_jobs_desc')} />
           <button onClick={() => onNavigate('jobs')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-1 text-sm font-black text-[#3b82f6] hover:text-[#1e40af] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]">
-            Browse all jobs <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            {t('landing_browse_all_jobs')} <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
           </button>
         </div>
         {recentJobs.length > 0 ? (
@@ -547,16 +553,16 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
       <section className="mx-auto max-w-7xl px-4 pb-14 pt-4 sm:px-6 lg:px-8" aria-labelledby="final-cta-heading">
         <div className="rounded-2xl bg-[#111615] px-5 py-8 text-white sm:px-8 md:flex md:items-center md:justify-between md:gap-8">
           <div>
-            <h2 id="final-cta-heading" className="text-2xl font-black tracking-tight sm:text-3xl">Ready to find skilled help in Qardho?</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Search local profiles or create a worker account so nearby employers can contact you.</p>
+            <h2 id="final-cta-heading" className="text-2xl font-black tracking-tight sm:text-3xl">{t('landing_cta_title')}</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{t('landing_cta_desc')}</p>
           </div>
           <div className="mt-6 flex flex-wrap gap-3 md:mt-0 md:shrink-0">
-            <button onClick={() => onNavigate('workers')} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#93c5fd] px-5 text-sm font-black text-[#111615] transition hover:bg-[#c8ff74] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Find Skilled Workers</button>
+            <button onClick={() => onNavigate('workers')} className="inline-flex min-h-12 items-center justify-center rounded-full bg-[#93c5fd] px-5 text-sm font-black text-[#111615] transition hover:bg-[#c8ff74] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">{t('landing_cta_find_workers')}</button>
             {currentUser ? (
-              <button onClick={() => onNavigate('dashboard')} className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10">Open Dashboard</button>
+              <button onClick={() => onNavigate('dashboard')} className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10">{t('landing_open_dashboard_btn')}</button>
             ) : (
               <SignUpButton mode="modal">
-                <button className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">Create Worker Profile</button>
+                <button className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-5 text-sm font-black text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#93c5fd] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">{t('landing_cta_create_profile')}</button>
               </SignUpButton>
             )}
           </div>
