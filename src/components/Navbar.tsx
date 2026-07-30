@@ -500,60 +500,10 @@ export default function Navbar({
               {activeUser && (
                 <NotificationButton />
               )}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMoreOpen((open) => !open);
-                    setProfileOpen(false);
-                    setNotificationsOpen(false);
-                  }}
-                  className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-black text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition ${focusRing}`}
-                  aria-expanded={moreOpen}
-                  aria-label="More preferences menu"
-                >
-                  <Globe2 className="h-4 w-4 text-slate-500" />
-                  <span>{t('nav_more')}</span>
-                  <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${moreOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {moreOpen && (
-                  <div className="absolute right-0 top-12 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                    <SegmentedLanguageControl />
-
-                    <div className="border-t border-slate-100 p-1.5 space-y-0.5">
-                      <Link
-                        to={PAGE_ROUTES.about}
-                        onClick={closeMenus}
-                        className="flex min-h-[40px] items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
-                      >
-                        <Globe2 className="h-4 w-4 text-[#2563eb]" />
-                        <span>{t('nav_about')}</span>
-                      </Link>
-
-                      <Link
-                        to={PAGE_ROUTES.settings}
-                        onClick={closeMenus}
-                        className="flex min-h-[40px] items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
-                      >
-                        <Settings className="h-4 w-4 text-[#2563eb]" />
-                        <span>{t('nav_settings')}</span>
-                      </Link>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Mobile Header Right Actions */}
             <div className="flex items-center gap-1.5 md:hidden">
-              <Show when="signed-out">
-                <SignInButton mode="modal">
-                  <button className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full bg-[#2563eb] px-3.5 text-xs font-black text-white hover:bg-[#1d4ed8] shadow-2xs ${focusRing}`}>
-                    <UserRound className="h-3.5 w-3.5" />{t('nav_signin')}
-                  </button>
-                </SignInButton>
-              </Show>
               <Show when="signed-in">
                 <NotificationButton />
                 {activeUser && (
