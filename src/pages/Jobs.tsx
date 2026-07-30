@@ -110,12 +110,12 @@ export default function Jobs({ jobs = [], currentUser, applications = [], isLoad
           </div>
 
           {!currentUser && (
-            <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3.5 sm:max-w-xs shrink-0">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 sm:max-w-xs shrink-0">
               <p className="text-xs font-black text-slate-900">Hiring in Qardho?</p>
               <p className="mt-0.5 text-xs text-slate-600">Post jobs and hire local trade skills.</p>
               <button
                 onClick={() => onOpenGuestModal ? onOpenGuestModal('employer', { type: 'post-job', title: 'Post a New Job' }) : navigate(PAGE_ROUTES.auth)}
-                className="mt-2 inline-flex min-h-[38px] w-full sm:w-auto items-center justify-center rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
+                className="mt-2 inline-flex min-h-[38px] w-full sm:w-auto items-center justify-center rounded-xl bg-emerald-600 px-4 text-xs font-black text-white hover:bg-emerald-700 transition"
               >
                 Post a Job
               </button>
