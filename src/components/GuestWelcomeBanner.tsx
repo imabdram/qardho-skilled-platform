@@ -97,27 +97,16 @@ export default function GuestWelcomeBanner({ onOpenGuestModal, pageType = 'home'
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0 pt-1 lg:pt-0">
+        <div className="flex items-center shrink-0 pt-1 lg:pt-0">
           <button
             type="button"
             onClick={() => onOpenGuestModal(data.primaryRole)}
-            className={`inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl px-4 text-xs font-black text-white shadow-md transition active:scale-[0.98] ${
+            className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-5 text-xs sm:text-sm font-black text-white shadow-md transition active:scale-[0.98] ${
               data.primaryRole === 'employer' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2563eb] hover:bg-[#1d4ed8]'
             }`}
           >
             {data.primaryRole === 'employer' ? <Briefcase className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}
             <span>{data.primaryBtnText}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onOpenGuestModal(data.secondaryRole)}
-            className={`inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl px-4 text-xs font-black text-white shadow-md transition active:scale-[0.98] ${
-              data.secondaryRole === 'employer' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#2563eb] hover:bg-[#1d4ed8]'
-            }`}
-          >
-            {data.secondaryRole === 'employer' ? <Briefcase className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}
-            <span>{data.secondaryBtnText}</span>
           </button>
         </div>
       </div>
