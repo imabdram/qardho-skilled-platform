@@ -1288,7 +1288,7 @@ async function startServer() {
       // ── Step 5: If found – load and return the linked Neon user ─────────────────
       if (existingIdentity) {
         const linkedUser = await db.get('SELECT * FROM users WHERE id = $1', [existingIdentity.user_id]);
-        if (linkedUser) {
+        if (linkedUser && linkedUser.role !== 'deleted') {
           if (linkedUser.suspended) {
             return res.status(403).json({ error: 'This account is currently suspended.', user: null });
           }

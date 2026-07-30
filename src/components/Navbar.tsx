@@ -8,7 +8,7 @@ import { Application, Connection, Job, Notification, Review, User } from '../typ
 import { PAGE_ROUTES } from '../routes';
 import Avatar from './Avatar';
 import BottomNav from './BottomNav';
-import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react';
+import { Show, SignInButton, SignUpButton, useUser } from '@clerk/react';
 import { useApi } from '../useApi';
 
 interface NavbarProps {
@@ -48,6 +48,14 @@ export default function Navbar({
 }: NavbarProps) {
   const fetchAuth = useApi();
   const fetch = fetchAuth;
+  const { user: clerkUser } = useUser();
+  const activeUser = currentUser || (clerkUser ? {
+    id: clerkUser.id,
+    name: clerkUser.fullName || clerkUser.firstName || clerkUser.primaryEmailAddress?.emailAddress || 'User Account',
+    avatarUrl: clerkUser.imageUrl,
+    phone: '',
+    role: 'worker' as const,
+  } as User : null);
   const navigate = useNavigate();
   const shellRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -342,8 +350,8 @@ export default function Navbar({
               </div>
             </div>
 
-            {/* Desktop Right Actions */}
-            <div className="hidden items-center gap-2 md:flex">
+            {/* Desktop / Responsive Right Actions */}
+            <div className="flex items-center gap-2">
               <Show when="signed-out">
                 <SignInButton mode="modal">
                   <button className={`inline-flex min-h-11 items-center gap-2 rounded-full bg-[#2563eb] px-5 text-sm font-black text-white hover:bg-[#1d4ed8] transition ${focusRing}`}>
@@ -357,7 +365,7 @@ export default function Navbar({
                 </SignUpButton>
               </Show>
               <Show when="signed-in">
-                {currentUser && (
+                {activeUser && (
                   <div className="relative">
                     <button
                       type="button"
@@ -370,27 +378,27 @@ export default function Navbar({
                       aria-expanded={profileOpen}
                       aria-label="Open account menu"
                     >
-                      <Avatar name={currentUser.name} src={currentUser.avatarUrl} size="sm" />
-                      <div className="hidden sm:flex flex-col text-left leading-tight">
+                      <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
+                      <div className="flex flex-col text-left leading-tight">
                         <span className="text-xs sm:text-sm font-black text-slate-900 leading-tight whitespace-nowrap">
-                          {currentUser.name}
+                          {activeUser.name}
                         </span>
                         <span className="text-[10px] font-bold text-slate-500 capitalize tracking-tight leading-none mt-0.5 whitespace-nowrap">
-                          {currentUser.role === 'worker' ? 'worker account' : currentUser.role === 'employer' ? 'employer account' : currentUser.role === 'admin' ? 'admin account' : 'account'}
+                          {activeUser.role === 'worker' ? 'worker account' : activeUser.role === 'employer' ? 'employer account' : activeUser.role === 'admin' ? 'admin account' : 'account'}
                         </span>
                       </div>
                       <span
-                        title={currentUser.role === 'worker' ? 'Worker account' : currentUser.role === 'employer' ? 'Employer account' : 'Administrator account'}
-                        aria-label={currentUser.role ? `${currentUser.role} account` : 'Account role'}
+                        title={activeUser.role === 'worker' ? 'Worker account' : activeUser.role === 'employer' ? 'Employer account' : 'Administrator account'}
+                        aria-label={activeUser.role ? `${activeUser.role} account` : 'Account role'}
                         className={`inline-flex h-9 w-9 items-center justify-center rounded-xl shrink-0 font-bold ml-0.5 ${
-                          currentUser.role === 'employer'
+                          activeUser.role === 'employer'
                             ? 'bg-emerald-50 text-emerald-600'
-                            : currentUser.role === 'admin'
+                            : activeUser.role === 'admin'
                             ? 'bg-amber-50 text-amber-600'
                             : 'bg-blue-50 text-[#2563eb]'
                         }`}
                       >
-                        {currentUser.role === 'employer' ? <BriefcaseBusiness className="h-4.5 w-4.5" /> : <UserRound className="h-4.5 w-4.5" />}
+                        {activeUser.role === 'employer' ? <BriefcaseBusiness className="h-4.5 w-4.5" /> : <UserRound className="h-4.5 w-4.5" />}
                       </span>
                       <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
                     </button>
@@ -398,17 +406,17 @@ export default function Navbar({
                     {profileOpen && (
                       <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100">
                         <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/50 px-4 py-3">
-                          <Avatar name={currentUser.name} src={currentUser.avatarUrl} size="sm" />
+                          <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-black text-slate-900 truncate">{currentUser.name}</p>
+                            <p className="text-xs font-black text-slate-900 truncate">{activeUser.name}</p>
                             <p className="text-[10px] font-bold text-[#2563eb] capitalize mt-0.5">
-                              {currentUser.role === 'worker' ? 'Worker Account' : currentUser.role === 'employer' ? 'Employer Account' : 'Account'}
+                              {activeUser.role === 'worker' ? 'Worker Account' : activeUser.role === 'employer' ? 'Employer Account' : 'Account'}
                             </p>
                           </div>
                         </div>
 
                         <div className="p-1.5 space-y-0.5">
-                          {currentUser.role === 'admin' && (
+                          {activeUser.role === 'admin' && (
                             <button
                               type="button"
                               onClick={() => {
@@ -458,7 +466,7 @@ export default function Navbar({
                             <span>Platform Settings</span>
                           </button>
 
-                          {onSwitchRole && currentUser.role !== 'admin' && (
+                          {onSwitchRole && activeUser.role !== 'admin' && (
                             <button
                               type="button"
                               onClick={() => {
@@ -468,7 +476,7 @@ export default function Navbar({
                               className="flex min-h-[40px] w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-blue-50 hover:text-[#2563eb] transition text-left"
                             >
                               <RefreshCw className="h-4 w-4 text-[#2563eb]" />
-                              <span>Switch to {currentUser.role === 'worker' ? 'Employer' : 'Worker'}</span>
+                              <span>Switch to {activeUser.role === 'worker' ? 'Employer' : 'Worker'}</span>
                             </button>
                           )}
                         </div>
@@ -490,32 +498,11 @@ export default function Navbar({
                     )}
                   </div>
                 )}
-                {!currentUser && (
-                  <UserButton appearance={{ elements: { userButtonBox: 'flex-row-reverse gap-2 font-black text-slate-800' } }}>
-                    <UserButton.MenuItems>
-                      <UserButton.Action
-                        label="View Profile"
-                        labelIcon={<UserRound className="h-4 w-4" />}
-                        onClick={() => navigate(PAGE_ROUTES.profile)}
-                      />
-                      <UserButton.Action
-                        label="Edit Profile"
-                        labelIcon={<Edit3 className="h-4 w-4" />}
-                        onClick={() => navigate(PAGE_ROUTES['profile-edit'])}
-                      />
-                      <UserButton.Action
-                        label="Platform Settings"
-                        labelIcon={<Settings className="h-4 w-4" />}
-                        onClick={() => navigate(PAGE_ROUTES.settings)}
-                      />
-                    </UserButton.MenuItems>
-                  </UserButton>
-                )}
               </Show>
-              {currentUser && (
+              {activeUser && (
                 <NotificationButton />
               )}
-              {!currentUser && (
+              {!activeUser && (
                 <div className="relative">
                   <button
                     onClick={() => setMoreOpen((open) => !open)}
@@ -595,29 +582,29 @@ export default function Navbar({
             </div>
 
             {/* Signed-in Mobile Drawer Content */}
-            {currentUser ? (
+            {activeUser ? (
               <div className="flex flex-col flex-1 min-h-0 pt-3">
                 {/* 1. Profile summary */}
                 <div className="mb-4 flex items-center gap-3 rounded-2xl bg-slate-50 p-3 border border-slate-100">
-                  <Avatar name={currentUser.name} src={currentUser.avatarUrl} />
+                  <Avatar name={activeUser.name} src={activeUser.avatarUrl} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-slate-950 break-words">{currentUser.name}</p>
+                    <p className="text-sm font-black text-slate-950 break-words">{activeUser.name}</p>
                     <p className="text-[10px] font-bold capitalize text-slate-500 mt-0.5">
-                      {currentUser.role === 'worker' ? 'worker account' : currentUser.role === 'employer' ? 'employer account' : currentUser.role === 'admin' ? 'admin account' : 'account'}
+                      {activeUser.role === 'worker' ? 'worker account' : activeUser.role === 'employer' ? 'employer account' : activeUser.role === 'admin' ? 'admin account' : 'account'}
                     </p>
                   </div>
                   <span
-                    title={currentUser.role === 'worker' ? 'Worker account' : currentUser.role === 'employer' ? 'Employer account' : 'Administrator account'}
-                    aria-label={currentUser.role ? `${currentUser.role} account` : 'Account role'}
+                    title={activeUser.role === 'worker' ? 'Worker account' : activeUser.role === 'employer' ? 'Employer account' : 'Administrator account'}
+                    aria-label={activeUser.role ? `${activeUser.role} account` : 'Account role'}
                     className={`inline-flex h-9 w-9 items-center justify-center rounded-xl shrink-0 font-bold ${
-                      currentUser.role === 'employer'
+                      activeUser.role === 'employer'
                         ? 'bg-emerald-50 text-emerald-600'
-                        : currentUser.role === 'admin'
+                        : activeUser.role === 'admin'
                         ? 'bg-amber-50 text-amber-600'
                         : 'bg-blue-50 text-[#2563eb]'
                     }`}
                   >
-                    {currentUser.role === 'employer' ? <BriefcaseBusiness className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}
+                    {activeUser.role === 'employer' ? <BriefcaseBusiness className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}
                   </span>
                 </div>
 
