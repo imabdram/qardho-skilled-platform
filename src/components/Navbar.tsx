@@ -50,7 +50,10 @@ export default function Navbar({
   const fetchAuth = useApi();
   const fetch = fetchAuth;
   const { user: clerkUser } = useUser();
-  const activeUser = currentUser || (clerkUser ? {
+  const activeUser = currentUser ? {
+    ...currentUser,
+    avatarUrl: currentUser.avatarUrl || clerkUser?.imageUrl,
+  } : (clerkUser ? {
     id: clerkUser.id,
     name: clerkUser.fullName || clerkUser.firstName || clerkUser.primaryEmailAddress?.emailAddress || 'User Account',
     avatarUrl: clerkUser.imageUrl,
@@ -324,7 +327,7 @@ export default function Navbar({
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-xs" id="main-navbar" dir="ltr">
+      <header className="relative md:fixed md:top-0 md:inset-x-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-xs" id="main-navbar" dir="ltr">
         <nav ref={shellRef} className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
           <div className="flex h-[60px] sm:h-[64px] items-center justify-between gap-3">
             {/* Logo & Desktop Nav Links */}
@@ -368,11 +371,6 @@ export default function Navbar({
                     <UserRound className="h-4 w-4" />{t('nav_signin')}
                   </button>
                 </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:bg-slate-50 transition ${focusRing}`}>
-                    {t('nav_signup')}
-                  </button>
-                </SignUpButton>
               </Show>
               <Show when="signed-in">
                 {activeUser && (
@@ -753,6 +751,7 @@ export default function Navbar({
         currentUser={currentUser}
         unreadCount={unreadCount}
         onOpenNotifications={openNotifications}
+        onOpenMore={() => setMobileOpen(true)}
         isHidden={mobileOpen || notificationsOpen || isModalOpen}
       />
     </>

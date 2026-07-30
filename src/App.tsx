@@ -1102,7 +1102,7 @@ export default function App() {
       />
 
       {(isLoadingData || appError) && (
-        <div className={`mt-[60px] sm:mt-[64px] px-4 py-2 text-xs font-semibold border-b ${
+        <div className={`mt-0 md:mt-[64px] px-4 py-2 text-xs font-semibold border-b ${
           appError
             ? 'bg-rose-50 text-rose-700 border-rose-100'
             : 'bg-blue-50 text-blue-700 border-blue-100'
@@ -1151,7 +1151,7 @@ export default function App() {
       )}
 
       {/* Main Page Layout Frame */}
-      <main className={`flex-1 pb-0 ${!(isLoadingData || appError) ? 'pt-[60px] sm:pt-[64px]' : ''}`}>
+      <main className={`flex-1 pb-0 ${!(isLoadingData || appError) ? 'pt-0 md:pt-[64px]' : ''}`}>
         {renderPage()}
       </main>
 

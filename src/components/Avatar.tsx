@@ -16,23 +16,59 @@ const sizes = {
   xl: 'h-24 w-24 text-2xl',
 };
 
+function resolveAvatarUrl(url?: string): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.includes('img.clerk.com/ey')) {
+    try {
+      const parts = trimmed.split('img.clerk.com/');
+      if (parts[1]) {
+        const base64Segment = parts[1].split('?')[0].split('/')[0];
+        const normalized = base64Segment.replace(/-/g, '+').replace(/_/g, '/');
+        const pad = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
+        const decoded = JSON.parse(atob(normalized + pad));
+        if (decoded?.src && typeof decoded.src === 'string') {
+          return decoded.src;
+        }
+      }
+    } catch {
+      // Storage or decoding fallback
+    }
+  }
+  return trimmed;
+}
+
 export default function Avatar({ name, src, size = 'md', eager = false, className = '' }: AvatarProps) {
   const [imgError, setImgError] = React.useState(false);
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+
+  React.useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
+  const initials = (name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  const validSrc = resolveAvatarUrl(src);
+
   return (
     <span className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-100 font-black text-brand-800 ring-1 ring-brand-950/10 ${sizes[size]} ${className}`} aria-hidden="true">
-      {src && !imgError ? (
+      {validSrc && !imgError ? (
         <img
-          src={src}
+          src={validSrc}
           alt=""
           className="h-full w-full object-cover"
           loading={eager ? 'eager' : 'lazy'}
           decoding="async"
+          referrerPolicy="no-referrer"
           onError={() => setImgError(true)}
           width={size === 'xl' ? 96 : size === 'lg' ? 64 : size === 'md' ? 44 : 36}
           height={size === 'xl' ? 96 : size === 'lg' ? 64 : size === 'md' ? 44 : 36}
         />
-      ) : initials ? initials : <UserRound className="h-1/2 w-1/2" />}
+      ) : initials ? (
+        initials
+      ) : (
+        <UserRound className="h-1/2 w-1/2" />
+      )}
     </span>
   );
 }

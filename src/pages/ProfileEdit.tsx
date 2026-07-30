@@ -4,7 +4,7 @@ import { PricingType, User } from '../types';
 import { QARDHO_NEIGHBORHOODS } from '../constants';
 import Avatar from '../components/Avatar';
 import SkillSelector from '../components/SkillSelector';
-import { useClerk } from '@clerk/react';
+import { useClerk, useUser } from '@clerk/react';
 
 interface ProfileEditProps {
   currentUser: User;
@@ -20,6 +20,7 @@ export default function ProfileEdit({
   onNavigate,
 }: ProfileEditProps) {
   const { openUserProfile } = useClerk();
+  const { user: clerkUser } = useUser();
 
   const rawPhone = (currentUser.phone || '').replace(/[^\d]/g, '').replace(/^252/, '');
   const rawWhatsapp = (currentUser.whatsappPhone || '').replace(/[^\d]/g, '').replace(/^252/, '');
@@ -168,7 +169,7 @@ export default function ProfileEdit({
               <div className="relative shrink-0">
                 <Avatar
                   name={currentUser.name}
-                  src={currentUser.avatarUrl}
+                  src={currentUser.avatarUrl || clerkUser?.imageUrl}
                   size="xl"
                   eager
                 />

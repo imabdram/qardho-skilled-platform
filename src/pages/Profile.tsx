@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '@clerk/react';
 import {
   ArrowLeft, Briefcase, CheckCircle2, DollarSign, Edit3, Lock, MapPin,
   MessageSquare, Phone, Send, Share2, ShieldCheck, Star, UserCheck, UserRound, Wrench, Settings as SettingsIcon, Check, X, FileText
@@ -52,9 +53,12 @@ export default function Profile({
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [ratingHover, setRatingHover] = useState<number | null>(null);
 
-  if (!currentUser) return null;
-
-  const targetUser = userToShow || currentUser;
+  const { user: clerkUser } = useUser();
+  const rawTarget = userToShow || currentUser;
+  const targetUser = rawTarget ? {
+    ...rawTarget,
+    avatarUrl: rawTarget.avatarUrl || (rawTarget.id === currentUser.id ? clerkUser?.imageUrl : undefined),
+  } : currentUser;
   const isOwnProfile = targetUser.id === currentUser.id;
   const isWorker = targetUser.role === 'worker';
 

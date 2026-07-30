@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bell, BriefcaseBusiness, Home, LayoutDashboard, UserRound, Users } from 'lucide-react';
+import { Bell, BriefcaseBusiness, Globe2, Home, LayoutDashboard, UserRound, Users } from 'lucide-react';
 import { User } from '../types';
 import { PAGE_ROUTES } from '../routes';
 import { useLanguage } from '../LanguageContext';
@@ -9,6 +9,7 @@ interface BottomNavProps {
   currentUser: User | null;
   unreadCount?: number;
   onOpenNotifications?: () => void;
+  onOpenMore?: () => void;
   isHidden?: boolean;
 }
 
@@ -17,12 +18,14 @@ interface NavTabItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   isNotification?: boolean;
+  isMore?: boolean;
 }
 
 export default function BottomNav({
   currentUser,
   unreadCount = 0,
   onOpenNotifications,
+  onOpenMore,
   isHidden = false,
 }: BottomNavProps) {
   const location = useLocation();
@@ -37,7 +40,7 @@ export default function BottomNav({
     { route: PAGE_ROUTES.home, label: t('guest_tab_home', 'Home'), icon: Home },
     { route: PAGE_ROUTES.jobs, label: t('nav_jobs', 'Jobs'), icon: BriefcaseBusiness },
     { route: PAGE_ROUTES.workers, label: t('nav_workers', 'Workers'), icon: Users },
-    { route: PAGE_ROUTES.auth, label: t('nav_signin', 'Sign In'), icon: UserRound },
+    { route: 'more', label: t('nav_more', 'More'), icon: Globe2, isMore: true },
   ];
 
   const userTabs: NavTabItem[] = isAdmin ? [
@@ -64,7 +67,7 @@ export default function BottomNav({
       <div className="grid grid-cols-4 h-[60px] items-center px-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = tab.isNotification
+          const isActive = tab.isNotification || tab.isMore
             ? false
             : location.pathname === tab.route ||
               (tab.route === PAGE_ROUTES.dashboard && location.pathname.startsWith('/dashboard')) ||
@@ -88,6 +91,23 @@ export default function BottomNav({
                   )}
                 </div>
                 <span className="mt-1 text-[10px] font-bold tracking-tight">Notifications</span>
+              </button>
+            );
+          }
+
+          if (tab.isMore) {
+            return (
+              <button
+                key="more"
+                type="button"
+                onClick={onOpenMore}
+                className="flex flex-col items-center justify-center h-full min-h-[48px] w-full py-1 text-slate-500 hover:text-slate-900 transition"
+                aria-label="More menu"
+              >
+                <div className="p-1 rounded-full">
+                  <Icon className="h-5 w-5 text-slate-500" />
+                </div>
+                <span className="mt-1 text-[10px] font-semibold tracking-tight">{tab.label}</span>
               </button>
             );
           }
