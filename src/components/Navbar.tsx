@@ -10,6 +10,7 @@ import Avatar from './Avatar';
 import BottomNav from './BottomNav';
 import { Show, SignInButton, SignUpButton, useUser } from '@clerk/react';
 import { useApi } from '../useApi';
+import { useLanguage } from '../LanguageContext';
 
 interface NavbarProps {
   currentUser: User | null;
@@ -67,7 +68,7 @@ export default function Navbar({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationState, setNotificationState] = useState<'idle' | 'loading' | 'error'>('idle');
-  const [language, setLanguage] = useState(() => localStorage.getItem('qardho-language') || 'EN');
+  const { language, setLanguage, t } = useLanguage();
 
   useEffect(() => {
     if (realtimeNotification) {
@@ -191,12 +192,12 @@ export default function Navbar({
 
   const isEmployer = currentUser?.role === 'employer';
   const mainLink = isEmployer
-    ? { page: 'workers', label: 'Workers', icon: Users, count: workersCount }
-    : { page: 'jobs', label: 'Jobs', icon: BriefcaseBusiness, count: jobsCount };
+    ? { page: 'workers', label: t('nav_workers'), icon: Users, count: workersCount }
+    : { page: 'jobs', label: t('nav_jobs'), icon: BriefcaseBusiness, count: jobsCount };
 
   const secondaryLink = isEmployer
-    ? { page: 'jobs', label: 'Jobs', icon: BriefcaseBusiness, count: jobsCount }
-    : { page: 'workers', label: 'Workers', icon: Users, count: workersCount };
+    ? { page: 'jobs', label: t('nav_jobs'), icon: BriefcaseBusiness, count: jobsCount }
+    : { page: 'workers', label: t('nav_workers'), icon: Users, count: workersCount };
 
   const unreadCount = notifications.filter((item) => !item.readAt).length;
 
@@ -341,19 +342,19 @@ export default function Navbar({
               <div className="hidden items-center gap-1.5 md:flex">
                 {currentUser?.role === 'admin' ? (
                   <>
-                    <NavLink page="workers" label="Workers" count={workersCount} Icon={Users} />
-                    <NavLink page="jobs" label="Jobs" count={jobsCount} Icon={BriefcaseBusiness} />
-                    <NavLink page="admin" label="Admin Portal" Icon={ShieldCheck} />
+                    <NavLink page="workers" label={t('nav_workers')} count={workersCount} Icon={Users} />
+                    <NavLink page="jobs" label={t('nav_jobs')} count={jobsCount} Icon={BriefcaseBusiness} />
+                    <NavLink page="admin" label={t('nav_admin')} Icon={ShieldCheck} />
                   </>
                 ) : currentUser ? (
                   <>
                     <NavLink {...mainLink} />
-                    <NavLink page="dashboard" label="Dashboard" Icon={LayoutDashboard} />
+                    <NavLink page="dashboard" label={t('nav_dashboard')} Icon={LayoutDashboard} />
                   </>
                 ) : (
                   <>
-                    <NavLink page="workers" label="Workers" count={workersCount} />
-                    <NavLink page="jobs" label="Jobs" count={jobsCount} />
+                    <NavLink page="workers" label={t('nav_workers')} count={workersCount} />
+                    <NavLink page="jobs" label={t('nav_jobs')} count={jobsCount} />
                   </>
                 )}
               </div>
@@ -364,12 +365,12 @@ export default function Navbar({
               <Show when="signed-out">
                 <SignInButton mode="modal">
                   <button className={`inline-flex min-h-11 items-center gap-2 rounded-full bg-[#2563eb] px-5 text-sm font-black text-white hover:bg-[#1d4ed8] transition ${focusRing}`}>
-                    <UserRound className="h-4 w-4" />Sign In
+                    <UserRound className="h-4 w-4" />{t('nav_signin')}
                   </button>
                 </SignInButton>
                 <SignUpButton mode="modal">
                   <button className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:bg-slate-50 transition ${focusRing}`}>
-                    Sign Up
+                    {t('nav_signup')}
                   </button>
                 </SignUpButton>
               </Show>
@@ -425,7 +426,7 @@ export default function Navbar({
                               className="flex min-h-[40px] w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 transition text-left"
                             >
                               <ShieldCheck className="h-4 w-4 text-amber-600" />
-                              <span>Admin Portal</span>
+                              <span>{t('nav_admin')}</span>
                             </button>
                           )}
 
@@ -438,7 +439,7 @@ export default function Navbar({
                             className="flex min-h-[40px] w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition text-left"
                           >
                             <UserRound className="h-4 w-4 text-[#2563eb]" />
-                            <span>View Profile</span>
+                            <span>{t('nav_profile')}</span>
                           </button>
 
                           <button
@@ -450,7 +451,7 @@ export default function Navbar({
                             className="flex min-h-[40px] w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition text-left"
                           >
                             <Edit3 className="h-4 w-4 text-[#2563eb]" />
-                            <span>Edit Profile</span>
+                            <span>{t('nav_edit_profile')}</span>
                           </button>
 
                           <button
@@ -462,7 +463,7 @@ export default function Navbar({
                             className="flex min-h-[40px] w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition text-left"
                           >
                             <Settings className="h-4 w-4 text-[#2563eb]" />
-                            <span>Platform Settings</span>
+                            <span>{t('nav_settings')}</span>
                           </button>
 
                           {onSwitchRole && activeUser.role !== 'admin' && (
@@ -475,7 +476,7 @@ export default function Navbar({
                               className="flex min-h-[40px] w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-blue-50 hover:text-[#2563eb] transition text-left"
                             >
                               <RefreshCw className="h-4 w-4 text-[#2563eb]" />
-                              <span>Switch to {activeUser.role === 'worker' ? 'Employer' : 'Worker'}</span>
+                              <span>{activeUser.role === 'worker' ? t('nav_switch_employer') : t('nav_switch_worker')}</span>
                             </button>
                           )}
                         </div>
@@ -490,7 +491,7 @@ export default function Navbar({
                             className="flex min-h-[40px] w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition text-left"
                           >
                             <LogOut className="h-4 w-4" />
-                            <span>Sign Out</span>
+                            <span>{t('nav_signout')}</span>
                           </button>
                         </div>
                       </div>
@@ -514,7 +515,7 @@ export default function Navbar({
                   aria-label="More preferences menu"
                 >
                   <Globe2 className="h-4 w-4 text-slate-500" />
-                  <span>More</span>
+                  <span>{t('nav_more')}</span>
                   <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${moreOpen ? 'rotate-180' : ''}`} />
                 </button>
 
@@ -529,7 +530,7 @@ export default function Navbar({
                         className="flex min-h-[40px] items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
                       >
                         <Globe2 className="h-4 w-4 text-[#2563eb]" />
-                        <span>About & Contact</span>
+                        <span>{t('nav_about')}</span>
                       </Link>
 
                       <Link
@@ -538,7 +539,7 @@ export default function Navbar({
                         className="flex min-h-[40px] items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
                       >
                         <Settings className="h-4 w-4 text-[#2563eb]" />
-                        <span>Platform Settings</span>
+                        <span>{t('nav_settings')}</span>
                       </Link>
                     </div>
                   </div>

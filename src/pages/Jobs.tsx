@@ -6,6 +6,7 @@ import FilterBottomSheet from '../components/FilterBottomSheet';
 import { Application, Job, User } from '../types';
 import { QARDHO_NEIGHBORHOODS } from '../constants';
 import { PAGE_ROUTES } from '../routes';
+import { useLanguage } from '../LanguageContext';
 
 interface JobsProps {
   jobs: Job[];
@@ -19,6 +20,7 @@ interface JobsProps {
 const WORK_TYPES = ['Full-time', 'Part-time', 'Contract', 'Daily Labour', 'Urgent Task'];
 
 export default function Jobs({ jobs = [], currentUser, applications = [], isLoading = false }: JobsProps) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('jobsFilter.search') || '');
   const [selectedLocation, setSelectedLocation] = useState(() => localStorage.getItem('jobsFilter.location') || '');
@@ -92,7 +94,7 @@ export default function Jobs({ jobs = [], currentUser, applications = [], isLoad
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-5 sm:p-8 shadow-xs">
           <div>
             <h1 className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
-              Jobs
+              {t('nav_jobs')}
             </h1>
             <p className="mt-1 text-xs sm:text-sm font-medium text-slate-600">
               Find local work opportunities that match your skills.
@@ -124,7 +126,7 @@ export default function Jobs({ jobs = [], currentUser, applications = [], isLoad
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search title, category, employer, description..."
+                placeholder={t('search_jobs_placeholder')}
                 className="min-h-[44px] w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-xs font-medium text-slate-900 outline-none transition focus:border-[#3b82f6] focus:bg-white focus:ring-2 focus:ring-blue-100"
               />
               {searchQuery && (

@@ -7,6 +7,7 @@ import { User, Review } from '../types';
 import { ArrowUpDown, Filter, MapPin, Search, Users, Wrench, X } from 'lucide-react';
 import { QARDHO_NEIGHBORHOODS } from '../constants';
 import { PAGE_ROUTES } from '../routes';
+import { useLanguage } from '../LanguageContext';
 
 interface WorkersProps {
   workers: User[];
@@ -19,6 +20,7 @@ interface WorkersProps {
 }
 
 export default function Workers({ workers = [], currentUser, onConnect, reviews = [], onViewProfile, isLoading = false }: WorkersProps) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('workersFilter.search') || '');
   const [selectedLocation, setSelectedLocation] = useState(() => localStorage.getItem('workersFilter.location') || '');
@@ -114,7 +116,7 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-5 sm:p-8 shadow-xs">
           <div>
             <h1 className="text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
-              Workers
+              {t('nav_workers')}
             </h1>
             <p className="mt-1 text-xs sm:text-sm font-medium text-slate-600">
               Browse skilled professionals, review experience, and hire top talent in Qardho.
@@ -141,7 +143,7 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
                 onClick={() => navigate(PAGE_ROUTES['post-job'])}
                 className="mt-2 inline-flex min-h-[38px] w-full sm:w-auto items-center justify-center rounded-xl bg-[#2563eb] px-4 text-xs font-black text-white hover:bg-[#1d4ed8] transition"
               >
-                Post a Job
+                {t('hero_post_job')}
               </button>
             </div>
           ) : null}
@@ -157,7 +159,7 @@ export default function Workers({ workers = [], currentUser, onConnect, reviews 
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search name, skill, category, bio..."
+                placeholder={t('search_workers_placeholder')}
                 className="min-h-[44px] w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-xs font-medium text-slate-900 outline-none transition focus:border-[#3b82f6] focus:bg-white focus:ring-2 focus:ring-blue-100"
               />
               {searchQuery && (

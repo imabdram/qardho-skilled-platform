@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Job, Review, User } from '../types';
 import { PAGE_ROUTES } from '../routes';
+import { useLanguage } from '../LanguageContext';
 
 interface LandingProps {
   workers: User[];
@@ -241,6 +242,7 @@ function JobPreviewCard({ job, onView }: { job: Job; onView: () => void }) {
 }
 
 export default function Landing({ workers, jobs, reviews, workersCount, jobsCount, onNavigate, onViewWorkerProfile, currentUser }: LandingProps) {
+  const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -324,6 +326,7 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
               className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
                 idx === currentIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
               }`}
+              aria-hidden={idx !== currentIndex}
             >
               <img
                 src={slide.src}
@@ -350,17 +353,17 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
             {/* Location Badge */}
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-950/50 px-3.5 py-1.5 text-xs font-black uppercase tracking-[0.16em] text-blue-300 backdrop-blur-md shadow-xs">
               <MapPin className="h-3.5 w-3.5 text-blue-400" aria-hidden="true" />
-              <span>Qardho, Karkaar Region</span>
+              <span>{t('hero_badge')}</span>
             </div>
 
             {/* Main Heading (Max 2 lines) */}
             <h1 id="hero-heading" className="font-display text-[2.2rem] sm:text-[3rem] lg:text-[3.6rem] font-black leading-[1.08] text-white tracking-tight">
-              Find trusted local skills
+              {t('hero_title')}
             </h1>
 
             {/* Supporting Text */}
             <p className="text-base sm:text-lg font-medium leading-relaxed text-slate-200 max-w-[540px]">
-              Connect directly with skilled workers and employers across Qardho.
+              {t('hero_subtitle')}
             </p>
 
             {/* Primary & Secondary Buttons */}
@@ -370,7 +373,7 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
                 className="inline-flex min-h-[48px] w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-6 text-sm font-black text-white hover:bg-[#1d4ed8] active:bg-[#1e40af] shadow-lg shadow-black/30 border border-blue-500/30 transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
               >
                 <Users className="h-5 w-5" aria-hidden="true" />
-                <span>Find Skilled Workers</span>
+                <span>{t('hero_browse_workers')}</span>
               </button>
 
               <button
@@ -378,7 +381,7 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
                 className="inline-flex min-h-[48px] w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-white/12 border border-white/25 px-6 text-sm font-black text-white hover:bg-white/20 active:bg-white/25 backdrop-blur-md transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
               >
                 <Briefcase className="h-5 w-5" aria-hidden="true" />
-                <span>Browse Jobs</span>
+                <span>{t('hero_post_job')}</span>
               </button>
             </div>
 
@@ -386,15 +389,15 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
             <div className="grid grid-cols-3 gap-4 sm:gap-6 max-w-[520px] pt-3" aria-label="Platform statistics">
               <div className="text-left">
                 <span className="block text-xl sm:text-2xl font-black text-white leading-none">{workersCount}</span>
-                <span className="mt-1 block text-xs font-semibold text-slate-300">Skilled workers</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-300">{t('hero_stat_workers')}</span>
               </div>
               <div className="text-left">
                 <span className="block text-xl sm:text-2xl font-black text-white leading-none">{jobsCount}</span>
-                <span className="mt-1 block text-xs font-semibold text-slate-300">Active jobs</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-300">{t('hero_stat_jobs')}</span>
               </div>
               <div className="text-left">
-                <span className="block text-xs font-black uppercase text-blue-400 tracking-wider">Qardho</span>
-                <span className="mt-1 block text-xs font-semibold text-slate-300">Built for Qardho</span>
+                <span className="block text-xl sm:text-2xl font-black text-white leading-none">6</span>
+                <span className="mt-1 block text-xs font-semibold text-slate-300">{t('hero_stat_neighborhoods')}</span>
               </div>
             </div>
           </div>

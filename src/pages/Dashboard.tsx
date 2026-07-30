@@ -15,6 +15,7 @@ import StatusBadge, { DisplayStatus } from '../components/dashboard/StatusBadge'
 import FiltersBar, { StatusFilterValue, SourceFilterValue, SortOrderValue } from '../components/dashboard/FiltersBar';
 import PaginationBar from '../components/dashboard/PaginationBar';
 import EmptyState from '../components/dashboard/EmptyState';
+import { useLanguage } from '../LanguageContext';
 
 interface DashboardProps {
   currentUser: User | null;
@@ -66,6 +67,7 @@ export default function Dashboard({
   verificationMessage = null,
   onReadVerificationMessage
 }: DashboardProps) {
+  const { t } = useLanguage();
   if (!currentUser) return null;
 
   if (currentUser.role === 'admin') {
@@ -1168,15 +1170,13 @@ export default function Dashboard({
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-black sm:text-2xl">Dashboard</h1>
+              <h1 className="text-xl font-black sm:text-2xl">{t('dash_title')}</h1>
               <span className="inline-flex rounded-full bg-white/20 px-3 py-0.5 text-[10px] font-black uppercase tracking-wider text-white border border-white/20">
                 {currentUser.role === 'worker' ? 'Skilled Worker' : currentUser.role === 'employer' ? 'Employer' : 'Administrator'}
               </span>
             </div>
             <p className="mt-1 text-xs font-medium text-white/85 sm:text-sm">
-              {isWorker
-                ? 'Track your active work, job applications, and direct hire offers in Qardho.'
-                : 'Manage candidate applications, posted jobs, active engagements, and worker reviews.'}
+              {t('dash_subtitle')}
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
