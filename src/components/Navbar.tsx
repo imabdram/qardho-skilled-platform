@@ -404,17 +404,7 @@ export default function Navbar({
                     </button>
 
                     {profileOpen && (
-                      <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100">
-                        <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/50 px-4 py-3">
-                          <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-black text-slate-900 truncate">{activeUser.name}</p>
-                            <p className="text-[10px] font-bold text-[#2563eb] capitalize mt-0.5">
-                              {activeUser.role === 'worker' ? 'Worker Account' : activeUser.role === 'employer' ? 'Employer Account' : 'Account'}
-                            </p>
-                          </div>
-                        </div>
-
+                      <div className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100">
                         <div className="p-1.5 space-y-0.5">
                           {activeUser.role === 'admin' && (
                             <button
@@ -502,25 +492,27 @@ export default function Navbar({
               {activeUser && (
                 <NotificationButton />
               )}
-              {!activeUser && (
-                <div className="relative">
-                  <button
-                    onClick={() => setMoreOpen((open) => !open)}
-                    className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:bg-slate-50 ${focusRing}`}
-                    aria-expanded={moreOpen}
-                  >
-                    More<ChevronDown className="h-4 w-4" />
-                  </button>
-                  {moreOpen && (
-                    <div className="absolute right-0 top-12 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl z-50">
-                      <SegmentedLanguageControl />
-                      <Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-black hover:bg-slate-50">
-                        <Globe2 className="h-4 w-4" />About & Contact
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setMoreOpen((open) => !open);
+                    setProfileOpen(false);
+                    setNotificationsOpen(false);
+                  }}
+                  className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:bg-slate-50 ${focusRing}`}
+                  aria-expanded={moreOpen}
+                >
+                  More<ChevronDown className="h-4 w-4" />
+                </button>
+                {moreOpen && (
+                  <div className="absolute right-0 top-12 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <SegmentedLanguageControl />
+                    <Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-black hover:bg-slate-50">
+                      <Globe2 className="h-4 w-4" />About & Contact
+                    </Link>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Mobile Header Right Actions */}
