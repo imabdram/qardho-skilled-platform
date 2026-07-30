@@ -328,8 +328,8 @@ export default function Navbar({
   return (
     <>
       <header className="relative md:fixed md:top-0 md:inset-x-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-xs" id="main-navbar" dir="ltr">
-        <nav ref={shellRef} className="mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8" aria-label="Main navigation">
-          <div className="flex h-[60px] sm:h-[64px] items-center justify-between gap-3">
+        <nav ref={shellRef} className="mx-auto max-w-[1180px] px-3 sm:px-6 lg:px-8" aria-label="Main navigation">
+          <div className="flex h-[56px] sm:h-[64px] items-center justify-between gap-2.5">
             {/* Logo & Desktop Nav Links */}
             <div className="flex items-center gap-4">
               <Link to={PAGE_ROUTES.home} onClick={closeMenus} className={`inline-flex min-h-11 items-center rounded-full px-1 ${focusRing}`}>
@@ -546,26 +546,39 @@ export default function Navbar({
             </div>
 
             {/* Mobile Header Right Actions */}
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex items-center gap-1.5 md:hidden">
               <Show when="signed-out">
                 <SignInButton mode="modal">
-                  <button className={`inline-flex min-h-[38px] items-center gap-1.5 rounded-full bg-[#2563eb] px-3.5 text-xs font-black text-white hover:bg-[#1d4ed8] ${focusRing}`}>
-                    <UserRound className="h-3.5 w-3.5" />Sign In
+                  <button className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full bg-[#2563eb] px-3.5 text-xs font-black text-white hover:bg-[#1d4ed8] shadow-2xs ${focusRing}`}>
+                    <UserRound className="h-3.5 w-3.5" />{t('nav_signin')}
                   </button>
                 </SignInButton>
               </Show>
               <Show when="signed-in">
                 <NotificationButton />
+                {activeUser && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeMenus();
+                      navigate(PAGE_ROUTES.profile);
+                    }}
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full ${focusRing}`}
+                    aria-label="View Profile"
+                  >
+                    <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
+                  </button>
+                )}
               </Show>
               <button
                 ref={menuButtonRef}
                 type="button"
                 onClick={() => setMobileOpen((open) => !open)}
-                className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 ${focusRing}`}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 ${focusRing}`}
                 aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
                 aria-expanded={mobileOpen}
               >
-                {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                {mobileOpen ? <X className="h-4.5 w-4.5" /> : <Menu className="h-4.5 w-4.5" />}
               </button>
             </div>
           </div>
