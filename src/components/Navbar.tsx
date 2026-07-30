@@ -219,21 +219,30 @@ export default function Navbar({
   );
 
   const SegmentedLanguageControl = () => (
-    <div className="p-2">
-      <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">Language</p>
-      <div className="grid grid-cols-3 gap-1 bg-slate-100/90 p-1 rounded-xl">
-        {['SO', 'EN', 'AR'].map((value) => (
+    <div className="p-2.5">
+      <div className="flex items-center justify-between px-1 pb-1.5">
+        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Language / Luqadda</p>
+        <span className="text-[10px] font-bold text-[#2563eb]">{language === 'SO' ? 'Somali' : language === 'EN' ? 'English' : 'العربية'}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+        {[
+          { key: 'SO', label: 'SO' },
+          { key: 'EN', label: 'EN' },
+          { key: 'AR', label: 'AR' },
+        ].map(({ key, label }) => (
           <button
-            key={value}
+            key={key}
             type="button"
-            onClick={() => setLanguage(value)}
-            className={`min-h-[40px] rounded-lg text-xs font-black transition-all ${
-              language === value ? 'bg-[#2563eb] text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            onClick={() => setLanguage(key)}
+            className={`min-h-[36px] rounded-lg text-xs font-black transition-all ${
+              language === key
+                ? 'bg-[#2563eb] text-white shadow-xs scale-[1.02]'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
-            aria-pressed={language === value}
-            aria-label={`Switch language to ${value}`}
+            aria-pressed={language === key}
+            aria-label={`Switch language to ${label}`}
           >
-            {value}
+            {label}
           </button>
         ))}
       </div>
@@ -494,22 +503,44 @@ export default function Navbar({
               )}
               <div className="relative">
                 <button
+                  type="button"
                   onClick={() => {
                     setMoreOpen((open) => !open);
                     setProfileOpen(false);
                     setNotificationsOpen(false);
                   }}
-                  className={`inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 hover:bg-slate-50 ${focusRing}`}
+                  className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-black text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition ${focusRing}`}
                   aria-expanded={moreOpen}
+                  aria-label="More preferences menu"
                 >
-                  More<ChevronDown className="h-4 w-4" />
+                  <Globe2 className="h-4 w-4 text-slate-500" />
+                  <span>More</span>
+                  <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${moreOpen ? 'rotate-180' : ''}`} />
                 </button>
+
                 {moreOpen && (
-                  <div className="absolute right-0 top-12 w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute right-0 top-12 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5 z-50 animate-in fade-in zoom-in-95 duration-100">
                     <SegmentedLanguageControl />
-                    <Link to={PAGE_ROUTES.about} onClick={closeMenus} className="flex min-h-12 items-center gap-2 border-t border-slate-100 px-4 text-sm font-black hover:bg-slate-50">
-                      <Globe2 className="h-4 w-4" />About & Contact
-                    </Link>
+
+                    <div className="border-t border-slate-100 p-1.5 space-y-0.5">
+                      <Link
+                        to={PAGE_ROUTES.about}
+                        onClick={closeMenus}
+                        className="flex min-h-[40px] items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
+                      >
+                        <Globe2 className="h-4 w-4 text-[#2563eb]" />
+                        <span>About & Contact</span>
+                      </Link>
+
+                      <Link
+                        to={PAGE_ROUTES.settings}
+                        onClick={closeMenus}
+                        className="flex min-h-[40px] items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition"
+                      >
+                        <Settings className="h-4 w-4 text-[#2563eb]" />
+                        <span>Platform Settings</span>
+                      </Link>
+                    </div>
                   </div>
                 )}
               </div>
