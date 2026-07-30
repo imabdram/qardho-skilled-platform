@@ -500,6 +500,60 @@ export default function Navbar({
               {activeUser && (
                 <NotificationButton />
               )}
+
+              {/* Direct Desktop More Settings Menu Button (Far Right) */}
+              <div className="relative hidden md:block">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen((open) => !open);
+                    setProfileOpen(false);
+                    setNotificationsOpen(false);
+                  }}
+                  className={`inline-flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition ${focusRing} ${
+                    moreOpen || currentPage === 'settings'
+                      ? 'bg-blue-50 text-[#2563eb] border-blue-200'
+                      : ''
+                  }`}
+                  aria-expanded={moreOpen}
+                  aria-label="More Settings"
+                  title="More Settings"
+                >
+                  <Settings className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                </button>
+
+                {moreOpen && (
+                  <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl ring-1 ring-black/5 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="p-1.5 space-y-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeMenus();
+                          navigate(PAGE_ROUTES.settings);
+                        }}
+                        className="flex min-h-[40px] w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition text-left"
+                      >
+                        <Settings className="h-4 w-4 text-[#2563eb]" />
+                        <span>{t('nav_settings')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeMenus();
+                          navigate(PAGE_ROUTES.about);
+                        }}
+                        className="flex min-h-[40px] w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 transition text-left"
+                      >
+                        <Globe2 className="h-4 w-4 text-[#2563eb]" />
+                        <span>About & Contact</span>
+                      </button>
+                    </div>
+                    <div className="border-t border-slate-100 bg-slate-50/50">
+                      <SegmentedLanguageControl />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Mobile Header Right Actions */}
