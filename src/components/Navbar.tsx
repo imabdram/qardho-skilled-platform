@@ -558,22 +558,6 @@ export default function Navbar({
 
             {/* Mobile Header Right Actions */}
             <div className="flex items-center gap-1.5 md:hidden">
-              <Show when="signed-in">
-                <NotificationButton />
-                {activeUser && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeMenus();
-                      navigate(PAGE_ROUTES.profile);
-                    }}
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full ${focusRing}`}
-                    aria-label="View Profile"
-                  >
-                    <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
-                  </button>
-                )}
-              </Show>
               <button
                 ref={menuButtonRef}
                 type="button"
@@ -647,20 +631,8 @@ export default function Navbar({
                   </span>
                 </div>
 
-                {/* Main Links */}
+                {/* Secondary Links & Account Actions */}
                 <div className="space-y-1">
-                  {currentUser.role === 'admin' ? (
-                    <>
-                      <NavLink page="workers" label="Workers" count={workersCount} Icon={Users} />
-                      <NavLink page="jobs" label="Jobs" count={jobsCount} Icon={BriefcaseBusiness} />
-                      <NavLink page="admin" label="Admin Portal" Icon={ShieldCheck} />
-                    </>
-                  ) : (
-                    <>
-                      <NavLink {...mainLink} />
-                      <NavLink page="dashboard" label="Dashboard" Icon={LayoutDashboard} />
-                    </>
-                  )}
                   <Link
                     to={PAGE_ROUTES.profile}
                     onClick={closeMenus}
@@ -677,6 +649,19 @@ export default function Navbar({
                     <Edit3 className="h-4 w-4 text-[#2563eb]" />
                     <span>Edit profile</span>
                   </Link>
+                  {onSwitchRole && activeUser.role !== 'admin' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closeMenus();
+                        onSwitchRole();
+                      }}
+                      className="flex min-h-[48px] w-full items-center gap-3 rounded-xl px-4 text-sm font-black text-slate-800 hover:bg-blue-50 hover:text-[#2563eb] transition text-left"
+                    >
+                      <RefreshCw className="h-4 w-4 text-[#2563eb]" />
+                      <span>{activeUser.role === 'worker' ? t('nav_switch_employer') : t('nav_switch_worker')}</span>
+                    </button>
+                  )}
                   <Link
                     to={PAGE_ROUTES.settings}
                     onClick={closeMenus}
@@ -742,8 +727,6 @@ export default function Navbar({
 
                 {/* Navigation Links */}
                 <div className="space-y-1 pt-2 border-t border-slate-100">
-                  <NavLink page="workers" label="Workers" count={workersCount} />
-                  <NavLink page="jobs" label="Jobs" count={jobsCount} />
                   <Link
                     to={PAGE_ROUTES.about}
                     onClick={closeMenus}
