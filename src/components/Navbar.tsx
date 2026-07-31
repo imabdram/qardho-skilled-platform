@@ -558,6 +558,9 @@ export default function Navbar({
 
             {/* Mobile Header Right Actions */}
             <div className="flex items-center gap-1.5 md:hidden">
+              <Show when="signed-in">
+                <NotificationButton />
+              </Show>
               <button
                 ref={menuButtonRef}
                 type="button"

@@ -49,11 +49,9 @@ export default function BottomNav({
     { route: PAGE_ROUTES.admin, label: 'Admin', icon: LayoutDashboard },
     { route: PAGE_ROUTES.profile, label: 'Profile', icon: UserRound },
   ] : [
-    isEmployer
-      ? { route: PAGE_ROUTES.workers, label: 'Workers', icon: Users }
-      : { route: PAGE_ROUTES.jobs, label: 'Jobs', icon: BriefcaseBusiness },
+    { route: PAGE_ROUTES.jobs, label: 'Jobs', icon: BriefcaseBusiness },
+    { route: PAGE_ROUTES.workers, label: 'Workers', icon: Users },
     { route: PAGE_ROUTES.dashboard, label: 'Dashboard', icon: LayoutDashboard },
-    { route: 'notifications', label: 'Notifications', icon: Bell, isNotification: true },
     { route: PAGE_ROUTES.profile, label: 'Profile', icon: UserRound },
   ];
 
