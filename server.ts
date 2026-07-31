@@ -100,30 +100,57 @@ function createPostgresDb(databaseUrl: string) {
   const normalizedDatabaseUrl = normalizePostgresUrl(databaseUrl);
   const pool = new Pool({
     connectionString: normalizedDatabaseUrl,
-    connectionTimeoutMillis: 5000,
-    query_timeout: 10000,
+    connectionTimeoutMillis: 30000,
+    query_timeout: 30000,
+    keepAlive: true,
   });
-  const isPreConnectionReset = (error: any) =>
-    error?.code === 'ECONNRESET' ||
-    String(error?.message || '').includes('ECONNRESET') ||
-    String(error?.message || '').includes('before secure TLS connection was established');
-  const queryWithRetry = async (sql: string, params: any[] = []) => {
-    try {
-      return await pool.query(sql, params);
-    } catch (error) {
-      if (!isPreConnectionReset(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      return pool.query(sql, params);
-    }
+
+  pool.on('error', (err) => {
+    console.warn('[PostgreSQL Pool Warning] Idle connection error:', err?.message || err);
+  });
+
+  const isTransientDbError = (error: any) => {
+    const code = error?.code;
+    const msg = String(error?.message || '');
+    return (
+      code === 'ECONNRESET' ||
+      code === '57P01' ||
+      code === '57P02' ||
+      code === '57P03' ||
+      msg.includes('ECONNRESET') ||
+      msg.includes('Connection terminated') ||
+      msg.includes('connection timeout') ||
+      msg.includes('timeout') ||
+      msg.includes('before secure TLS connection was established')
+    );
   };
-  const connectWithRetry = async () => {
-    try {
-      return await pool.connect();
-    } catch (error) {
-      if (!isPreConnectionReset(error)) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      return pool.connect();
+
+  const queryWithRetry = async (sql: string, params: any[] = []) => {
+    let lastError: any;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await pool.query(sql, params);
+      } catch (error) {
+        lastError = error;
+        if (!isTransientDbError(error) || attempt === 3) throw error;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+      }
     }
+    throw lastError;
+  };
+
+  const connectWithRetry = async () => {
+    let lastError: any;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await pool.connect();
+      } catch (error) {
+        lastError = error;
+        if (!isTransientDbError(error) || attempt === 3) throw error;
+        await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+      }
+    }
+    throw lastError;
   };
 
   return {
