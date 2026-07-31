@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { SignUpButton } from '@clerk/react';
 import {
   ArrowRight,
@@ -137,8 +136,8 @@ function CategoryCard({ category, count }: { category: CategoryConfig; count: nu
   );
 }
 
-function StepCard({ audience, accent, icon: Icon, steps, cta, to }: { audience: string; accent: 'blue' | 'green'; icon: LucideIcon; steps: string[]; cta: string; to: string }) {
-  const styles = { icon: 'bg-blue-50 text-[#2563eb]', marker: 'bg-[#2563eb] text-white', button: 'bg-[#2563eb] text-white shadow-sm hover:bg-[#1d4ed8] focus-visible:ring-[#2563eb]' };
+function StepCard({ audience, accent, icon: Icon, steps }: { audience: string; accent: 'blue' | 'green'; icon: LucideIcon; steps: string[] }) {
+  const styles = { icon: 'bg-blue-50 text-[#2563eb]', marker: 'bg-[#2563eb] text-white' };
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs">
@@ -156,26 +155,6 @@ function StepCard({ audience, accent, icon: Icon, steps, cta, to }: { audience: 
           </li>
         ))}
       </ol>
-      <div className="mt-auto pt-6">
-        {to === PAGE_ROUTES.register ? (
-          <SignUpButton mode="modal">
-            <button
-              className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${styles.button}`}
-            >
-              {cta}
-              <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
-            </button>
-          </SignUpButton>
-        ) : (
-          <Link
-            to={to}
-            className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${styles.button}`}
-          >
-            {cta}
-            <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
-          </Link>
-        )}
-      </div>
     </div>
   );
 }
@@ -504,16 +483,12 @@ export default function Landing({ workers, jobs, reviews, workersCount, jobsCoun
             accent="blue"
             icon={Briefcase}
             steps={[t('landing_employer_step_1'), t('landing_employer_step_2'), t('landing_employer_step_3')]}
-            cta={t('landing_find_workers_btn')}
-            to={PAGE_ROUTES.workers}
           />
           <StepCard
             audience={t('landing_for_workers_title')}
             accent="green"
             icon={Wrench}
             steps={[t('landing_worker_step_1'), t('landing_worker_step_2'), t('landing_worker_step_3')]}
-            cta={currentUser ? t('landing_open_dashboard_btn') : t('landing_join_worker_btn')}
-            to={currentUser ? PAGE_ROUTES.dashboard : PAGE_ROUTES.register}
           />
         </div>
       </section>
