@@ -570,11 +570,19 @@ export default function Navbar({
                       setMoreOpen(false);
                       setNotificationsOpen(false);
                     }}
-                    className={`flex items-center justify-center rounded-full border border-slate-200 bg-white p-0.5 hover:bg-slate-50 transition ${focusRing}`}
+                    className={`flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white p-1 pl-1.5 pr-2 hover:bg-slate-50 transition ${focusRing}`}
                     aria-expanded={profileOpen}
                     aria-label="Open account menu"
                   >
                     <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
+                    <div className="flex flex-col text-left leading-tight max-w-[70px] sm:max-w-[100px]">
+                      <span className="text-[11px] font-black text-slate-900 leading-tight truncate">
+                        {activeUser.name}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-500 capitalize tracking-tight leading-none mt-0.5 truncate">
+                        {activeUser.role}
+                      </span>
+                    </div>
                   </button>
                 )}
               </Show>
