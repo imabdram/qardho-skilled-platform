@@ -23,8 +23,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     const langCode = language === 'SO' ? 'so' : language === 'AR' ? 'ar' : 'en';
-    const isRtl = language === 'AR';
-    document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+    document.documentElement.dir = 'ltr';
     document.documentElement.lang = langCode;
     document.documentElement.setAttribute('data-lang', language);
   }, [language]);
@@ -33,7 +32,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return TRANSLATIONS[language]?.[key] || TRANSLATIONS.EN[key] || fallback || key;
   };
 
-  const dir = language === 'AR' ? 'rtl' : 'ltr';
+  const dir = 'ltr';
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t, dir }}>
