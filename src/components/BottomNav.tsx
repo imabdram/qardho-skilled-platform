@@ -44,10 +44,12 @@ export default function BottomNav({
   ];
 
   const userTabs: NavTabItem[] = isAdmin ? [
+    { route: PAGE_ROUTES.home, label: t('guest_tab_home', 'Home'), icon: Home },
     { route: PAGE_ROUTES.workers, label: 'Workers', icon: Users },
     { route: PAGE_ROUTES.jobs, label: 'Jobs', icon: BriefcaseBusiness },
     { route: PAGE_ROUTES.admin, label: 'Admin', icon: LayoutDashboard },
   ] : [
+    { route: PAGE_ROUTES.home, label: t('guest_tab_home', 'Home'), icon: Home },
     { route: PAGE_ROUTES.jobs, label: 'Jobs', icon: BriefcaseBusiness },
     { route: PAGE_ROUTES.workers, label: 'Workers', icon: Users },
     { route: PAGE_ROUTES.dashboard, label: 'Dashboard', icon: LayoutDashboard },
@@ -60,7 +62,7 @@ export default function BottomNav({
       className="fixed bottom-0 inset-x-0 z-50 bg-white/95 border-t border-slate-200/90 backdrop-blur-md shadow-lg md:hidden pb-[env(safe-area-inset-bottom)]"
       aria-label="Mobile Bottom Navigation"
     >
-      <div className={`grid ${tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-4'} h-[60px] items-center px-1`}>
+      <div className="grid grid-cols-4 h-[60px] items-center px-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = tab.isNotification || tab.isMore

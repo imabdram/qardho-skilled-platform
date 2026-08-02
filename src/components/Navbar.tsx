@@ -382,12 +382,12 @@ export default function Navbar({
                         setMoreOpen(false);
                         setNotificationsOpen(false);
                       }}
-                      className={`flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-1.5 pl-2 pr-3 hover:bg-slate-50 hover:border-slate-300 transition ${focusRing}`}
+                      className={`flex items-center gap-2.5 rounded-2xl border border-slate-200 bg-white p-1 md:p-1.5 md:pl-2 md:pr-3 hover:bg-slate-50 hover:border-slate-300 transition ${focusRing}`}
                       aria-expanded={profileOpen}
                       aria-label="Open account menu"
                     >
                       <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
-                      <div className="flex flex-col text-left leading-tight">
+                      <div className="hidden md:flex flex-col text-left leading-tight">
                         <span className="text-xs sm:text-sm font-black text-slate-900 leading-tight whitespace-nowrap">
                           {activeUser.name}
                         </span>
@@ -398,7 +398,7 @@ export default function Navbar({
                       <span
                         title={activeUser.role === 'worker' ? 'Worker account' : activeUser.role === 'employer' ? 'Employer account' : 'Administrator account'}
                         aria-label={activeUser.role ? `${activeUser.role} account` : 'Account role'}
-                        className={`inline-flex h-9 w-9 items-center justify-center rounded-xl shrink-0 font-bold ml-0.5 ${
+                        className={`hidden md:inline-flex h-9 w-9 items-center justify-center rounded-xl shrink-0 font-bold ml-0.5 ${
                           activeUser.role === 'employer'
                             ? 'bg-emerald-50 text-emerald-600'
                             : activeUser.role === 'admin'
@@ -408,7 +408,7 @@ export default function Navbar({
                       >
                         {activeUser.role === 'employer' ? <BriefcaseBusiness className="h-4.5 w-4.5" /> : <UserRound className="h-4.5 w-4.5" />}
                       </span>
-                      <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown className={`hidden md:block h-4 w-4 text-slate-400 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
                     </button>
 
                     {profileOpen && (
