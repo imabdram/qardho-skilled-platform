@@ -1080,22 +1080,7 @@ export default function App() {
     }
   };
 
-  if (sessionLoading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6 text-center">
-        <div className="h-10 w-10 rounded-full border-4 border-blue-600 border-t-transparent animate-spin mb-4" />
-        <p className="text-sm font-black text-slate-800">Checking your session...</p>
-        <p className="text-xs text-slate-500 mt-1">Connecting to Qardho Skilled Platform</p>
-        <button
-          type="button"
-          onClick={() => setSessionLoading(false)}
-          className="mt-6 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 transition"
-        >
-          Skip & Browse as Guest
-        </button>
-      </div>
-    );
-  }
+
 
   const roleSwitchTarget = getRoleSwitchTarget();
   const roleSwitchTargetName = roleSwitchTarget === 'worker' ? 'Worker' : 'Employer';
