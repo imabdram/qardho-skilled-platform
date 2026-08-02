@@ -561,7 +561,6 @@ export default function Navbar({
             {/* Mobile Header Right Actions */}
             <div className="flex items-center gap-1.5 md:hidden">
               <Show when="signed-in">
-                <NotificationButton />
                 {activeUser && (
                   <button
                     type="button"
@@ -585,6 +584,7 @@ export default function Navbar({
                     </div>
                   </button>
                 )}
+                <NotificationButton />
               </Show>
               <button
                 ref={menuButtonRef}
