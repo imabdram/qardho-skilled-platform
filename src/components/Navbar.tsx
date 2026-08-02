@@ -498,7 +498,9 @@ export default function Navbar({
                 )}
               </Show>
               {activeUser && (
-                <NotificationButton />
+                <div className="hidden md:block">
+                  <NotificationButton />
+                </div>
               )}
 
               {/* Direct Desktop More Settings Menu Button (Far Right) */}
