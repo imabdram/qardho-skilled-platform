@@ -52,7 +52,7 @@ export default function Navbar({
   const { user: clerkUser } = useUser();
   const activeUser = currentUser ? {
     ...currentUser,
-    avatarUrl: currentUser.avatarUrl || clerkUser?.imageUrl,
+    avatarUrl: (currentUser.avatarUrl && currentUser.avatarUrl.trim()) || clerkUser?.imageUrl,
   } : (clerkUser ? {
     id: clerkUser.id,
     name: clerkUser.fullName || clerkUser.firstName || clerkUser.primaryEmailAddress?.emailAddress || 'User Account',
@@ -384,7 +384,7 @@ export default function Navbar({
                       aria-expanded={profileOpen}
                       aria-label="Open account menu"
                     >
-                      <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
+                      <Avatar name={activeUser.name} src={activeUser.avatarUrl} fallbackSrc={clerkUser?.imageUrl} size="sm" />
                       <div className="hidden md:flex flex-col text-left leading-tight">
                         <span className="text-xs sm:text-sm font-black text-slate-900 leading-tight whitespace-nowrap">
                           {activeUser.name}
@@ -570,7 +570,7 @@ export default function Navbar({
                     aria-expanded={profileOpen}
                     aria-label="Open account menu"
                   >
-                    <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
+                    <Avatar name={activeUser.name} src={activeUser.avatarUrl} fallbackSrc={clerkUser?.imageUrl} size="sm" />
                     <div className="flex flex-col text-left leading-tight max-w-[70px] sm:max-w-[100px]">
                       <span className="text-[11px] font-black text-slate-900 leading-tight truncate">
                         {activeUser.name}
