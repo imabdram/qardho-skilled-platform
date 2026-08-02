@@ -365,16 +365,14 @@ export default function Navbar({
 
             {/* Desktop / Responsive Right Actions */}
             <div className="flex items-center gap-2">
-              <Show when="signed-out">
+              {!activeUser ? (
                 <SignInButton mode="modal">
                   <button className={`inline-flex min-h-11 items-center gap-2 rounded-full bg-[#2563eb] px-5 text-sm font-black text-white hover:bg-[#1d4ed8] transition ${focusRing}`}>
                     <UserRound className="h-4 w-4" />{t('nav_signin')}
                   </button>
                 </SignInButton>
-              </Show>
-              <Show when="signed-in">
-                {activeUser && (
-                  <div className="relative hidden md:block">
+              ) : (
+                <div className="relative hidden md:block">
                     <button
                       type="button"
                       onClick={() => {
@@ -495,8 +493,7 @@ export default function Navbar({
                       </div>
                     )}
                   </div>
-                )}
-              </Show>
+              )}
               {activeUser && (
                 <div className="hidden md:block">
                   <NotificationButton />
@@ -560,8 +557,8 @@ export default function Navbar({
 
             {/* Mobile Header Right Actions */}
             <div className="flex items-center gap-1.5 md:hidden">
-              <Show when="signed-in">
-                {activeUser && (
+              {activeUser && (
+                <>
                   <button
                     type="button"
                     onClick={() => {
@@ -583,9 +580,9 @@ export default function Navbar({
                       </span>
                     </div>
                   </button>
-                )}
-                <NotificationButton />
-              </Show>
+                  <NotificationButton />
+                </>
+              )}
               <button
                 ref={menuButtonRef}
                 type="button"

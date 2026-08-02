@@ -19,25 +19,7 @@ const sizes = {
 function resolveAvatarUrl(url?: string): string | null {
   if (!url || typeof url !== 'string') return null;
   const trimmed = url.trim();
-  if (!trimmed) return null;
-
-  if (trimmed.includes('img.clerk.com/ey')) {
-    try {
-      const parts = trimmed.split('img.clerk.com/');
-      if (parts[1]) {
-        const base64Segment = parts[1].split('?')[0].split('/')[0];
-        const normalized = base64Segment.replace(/-/g, '+').replace(/_/g, '/');
-        const pad = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
-        const decoded = JSON.parse(atob(normalized + pad));
-        if (decoded?.src && typeof decoded.src === 'string') {
-          return decoded.src;
-        }
-      }
-    } catch {
-      // Storage or decoding fallback
-    }
-  }
-  return trimmed;
+  return trimmed || null;
 }
 
 export default function Avatar({ name, src, size = 'md', eager = false, className = '' }: AvatarProps) {
