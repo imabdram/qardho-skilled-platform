@@ -374,7 +374,7 @@ export default function Navbar({
               </Show>
               <Show when="signed-in">
                 {activeUser && (
-                  <div className="relative">
+                  <div className="relative hidden md:block">
                     <button
                       type="button"
                       onClick={() => {
@@ -562,6 +562,21 @@ export default function Navbar({
             <div className="flex items-center gap-1.5 md:hidden">
               <Show when="signed-in">
                 <NotificationButton />
+                {activeUser && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen((open) => !open);
+                      setMoreOpen(false);
+                      setNotificationsOpen(false);
+                    }}
+                    className={`flex items-center justify-center rounded-full border border-slate-200 bg-white p-0.5 hover:bg-slate-50 transition ${focusRing}`}
+                    aria-expanded={profileOpen}
+                    aria-label="Open account menu"
+                  >
+                    <Avatar name={activeUser.name} src={activeUser.avatarUrl} size="sm" />
+                  </button>
+                )}
               </Show>
               <button
                 ref={menuButtonRef}
