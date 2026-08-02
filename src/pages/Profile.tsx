@@ -57,31 +57,62 @@ export default function Profile({
   const rawTarget = userToShow || currentUser;
   const targetUser = rawTarget ? {
     ...rawTarget,
-    avatarUrl: rawTarget.avatarUrl || (rawTarget.id === currentUser.id ? clerkUser?.imageUrl : undefined),
-  } : currentUser;
-  const isOwnProfile = targetUser.id === currentUser.id;
+    avatarUrl: rawTarget.avatarUrl || (currentUser && rawTarget.id === currentUser.id ? clerkUser?.imageUrl : undefined),
+  } : null;
+
+  if (!targetUser) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-16 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 mb-4">
+          <UserRound className="h-8 w-8" />
+        </div>
+        <h2 className="text-xl font-black text-slate-800">Profile Not Found</h2>
+        <p className="mt-2 text-xs font-semibold text-slate-500 max-w-md mx-auto">
+          Please sign in to view your profile, or select a worker from the marketplace directory.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            onClick={() => navigate('/workers')}
+            className="rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-black text-white shadow-sm hover:bg-blue-700 transition"
+          >
+            Browse Skilled Workers
+          </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-50 transition"
+          >
+            Sign In / Register
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isOwnProfile = !!(currentUser && targetUser.id === currentUser.id);
   const isWorker = targetUser.role === 'worker';
 
   // Candidate application lookup if current user is an employer viewing an applicant
-  const candidateApplication = (!isOwnProfile && currentUser.role === 'employer' && applications)
-    ? applications.find(a => a.applicantId === targetUser.id && a.employerId === currentUser.id)
+  const candidateApplication = (!isOwnProfile && currentUser?.role === 'employer' && applications)
+    ? applications.find(a => a.applicantId === targetUser.id && a.employerId === currentUser?.id)
     : null;
 
   // Direct offer lookup if current user is a worker viewing an employer who sent them a direct offer
-  const directOffer = (!isOwnProfile && currentUser.role === 'worker' && connections)
-    ? connections.find(c => c.fromUserId === targetUser.id && c.toUserId === currentUser.id)
+  const directOffer = (!isOwnProfile && currentUser?.role === 'worker' && connections)
+    ? connections.find(c => c.fromUserId === targetUser.id && c.toUserId === currentUser?.id)
     : null;
 
   // Connections logic for contact privacy
-  const connection = connections.find(
-    c => (c.fromUserId === currentUser.id && c.toUserId === targetUser.id) ||
-         (c.fromUserId === targetUser.id && c.toUserId === currentUser.id)
-  );
+  const connection = (currentUser && connections)
+    ? connections.find(
+        c => (c.fromUserId === currentUser.id && c.toUserId === targetUser.id) ||
+             (c.fromUserId === targetUser.id && c.toUserId === currentUser.id)
+      )
+    : null;
   const isConnected = isOwnProfile || (connection && connection.status === 'accepted');
   const isPendingConnection = connection && connection.status === 'pending';
 
   // Completion calculation (does not include reviews)
-  const missingFields = isOwnProfile ? getMissingProfileFields(currentUser) : [];
+  const missingFields = (isOwnProfile && currentUser) ? getMissingProfileFields(currentUser) : [];
   const isProfileComplete = missingFields.length === 0;
 
   // Filter reviews for target user

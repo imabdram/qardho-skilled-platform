@@ -947,8 +947,7 @@ export default function Dashboard({
         icon: Eye,
         variant: 'primary' as const,
         onClick: () => {
-          if (onViewJobDetails && job) onViewJobDetails(job);
-          else onNavigate('jobs');
+          onNavigate('jobs');
         },
       };
 
@@ -1163,7 +1162,7 @@ export default function Dashboard({
       <div className={`mb-8 overflow-hidden rounded-3xl p-6 sm:p-8 text-white shadow-xl ${
         currentUser.role === 'employer'
           ? 'bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-800 shadow-emerald-950/10'
-          : currentUser.role === 'admin'
+          : (currentUser.role as string) === 'admin'
           ? 'bg-gradient-to-r from-amber-600 via-amber-700 to-yellow-800 shadow-amber-950/10'
           : 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 shadow-blue-950/10'
       }`}>
@@ -1527,7 +1526,7 @@ export default function Dashboard({
             ))
           ) : (
             <EmptyState
-              type="jobs"
+              type="active"
               isWorker={false}
               onAction={() => onNavigate('post-job')}
             />

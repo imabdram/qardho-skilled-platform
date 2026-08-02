@@ -7,14 +7,40 @@
  * Run:  npx vitest run tests/auth-me-identity-resolution.test.ts
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert';
 import { createHash, randomBytes } from 'crypto';
+
+const expect = (actual: any) => ({
+  toBe: (expected: any) => assert.strictEqual(actual, expected),
+  not: {
+    toBe: (expected: any) => assert.notStrictEqual(actual, expected),
+    toHaveBeenCalled: () => assert.strictEqual(mockGetUserCalls.length, 0),
+  },
+});
+
+let mockGetUserCalls: any[] = [];
 
 // ---------------------------------------------------------------------------
 // In-memory state
 // ---------------------------------------------------------------------------
 let dbUsers: any[]       = [];
 let dbIdentities: any[]  = [];
+
+const vi = {
+  fn: (impl?: any) => {
+    let currentImpl = impl;
+    const f: any = (...args: any[]) => {
+      f.mock.calls.push(args);
+      return currentImpl ? currentImpl(...args) : undefined;
+    };
+    f.mock = { calls: [] };
+    f.mockReset = () => { f.mock.calls = []; currentImpl = impl; };
+    f.mockResolvedValue = (val: any) => { currentImpl = async () => val; return f; };
+    f.mockReturnValue = (val: any) => { currentImpl = () => val; return f; };
+    return f;
+  }
+};
 
 // ---------------------------------------------------------------------------
 // DB stub

@@ -133,7 +133,7 @@ export default function Admin({
       if (reviewRatingFilter !== 'all' && String(rev.rating) !== reviewRatingFilter) return false;
       const q = query.trim().toLowerCase();
       if (!q) return true;
-      return [rev.reviewerName, rev.revieweeName, rev.comment].filter(Boolean).join(' ').toLowerCase().includes(q);
+      return [(rev as any).reviewerName, (rev as any).revieweeName, rev.employerName, rev.comment].filter(Boolean).join(' ').toLowerCase().includes(q);
     });
   }, [reviews, reviewRatingFilter, query]);
 
