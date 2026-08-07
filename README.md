@@ -8,7 +8,7 @@ The application features a React frontend, Express API backend, Clerk authentica
 
 ---
 
-## Recent Platform Upgrades
+## Recent Platform Upgrades.
 
 - **Dynamic Homepage Hero Carousel**: Rotates WebP trade photography from `/public/assets` with smooth 700ms cross-fade transitions, tab visibility auto-pausing, touch swipe gesture support, and dual-mode contrast overlays.
 - **Aligned Worker Directory (`/workers`)**: Matched grid layout, search filters, active chips, sorting dropdowns, and card container metrics with the jobs board (`/jobs`).
@@ -17,7 +17,7 @@ The application features a React frontend, Express API backend, Clerk authentica
 
 ---
 
-## Current Technical Architecture
+## Current Technical Architecture.
 
 - **Clerk Authentication Integration**: Identity, email registration, OTP verification, password login, password reset, logout, and secure browser sessions handled by Clerk (`@clerk/react` and `@clerk/express`).
 - **PostgreSQL Authorization & Data**: PostgreSQL owns user roles (`pending`, `worker`, `employer`, `admin`), profiles, Somali phone numbers, WhatsApp numbers, pricing, jobs, applications, connections, reviews, notifications, and verification status.
@@ -27,7 +27,7 @@ The application features a React frontend, Express API backend, Clerk authentica
 
 ---
 
-## Key Features
+## Key Features.
 
 - **Worker Directory**: Search, skill filters, neighborhood filters, availability filters, rating summaries, and verified badges.
 - **Job Board**: Search and neighborhood filtering with status tracking.
