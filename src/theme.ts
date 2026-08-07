@@ -5,7 +5,7 @@
  * ==============================================================================
  * BLUE COLOR THEME CONFIGURATION
  * ==============================================================================
- * All brand colors are defined here in blue.
+ * All brand colors are defined here in blue..
  * 
  * 1. Modify the hex codes below in THEME_COLORS (Primary, Hover, Accent, etc.)
  * 2. Update the corresponding CSS variables in `src/index.css` (:root & @theme)
