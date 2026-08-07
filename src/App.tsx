@@ -36,7 +36,7 @@ export default function App() {
   const fetchAuth = useApi();
   const fetch = fetchAuth;
 
-  // Navigation & User session states
+  // Navigation & User session state
   const [currentPage, setCurrentPage] = useState<PageId>(() => getPageForPath(location.pathname));
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
